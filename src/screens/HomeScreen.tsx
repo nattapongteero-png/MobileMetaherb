@@ -9,13 +9,20 @@ import {
   TextInput,
   Dimensions,
   Animated,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
+// On web cap viewport at mobile size so layout that uses SCREEN_WIDTH
+// (cards, banner aspect, paged scroll) renders like the phone build.
+const MOBILE_MAX_WIDTH = 430;
+const SCREEN_WIDTH =
+  Platform.OS === "web"
+    ? Math.min(Dimensions.get("window").width, MOBILE_MAX_WIDTH)
+    : Dimensions.get("window").width;
 
 const CATEGORIES = [
   { label: "สมุนไพร", icon: "leaf", color: "#52b788" },
