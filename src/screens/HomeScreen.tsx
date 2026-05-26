@@ -273,7 +273,11 @@ function ProductCard({ product, width }: { product: Product; width: number }) {
     >
       {/* Image area (flex-1) */}
       <View className="flex-1 relative bg-gray-100">
-        <Image source={product.image} className="w-full h-full" resizeMode="cover" />
+        <Image
+          source={product.image}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
+        />
 
         {/* Top-right tag pill */}
         {tag === "flashsale" || tag === "discount" ? (
@@ -512,7 +516,7 @@ export function HomeScreen() {
               >
                 <Image
                   source={MAIN_BANNERS[bannerIdx]}
-                  className="w-full h-full"
+                  style={{ width: "100%", height: "100%" }}
                   resizeMode="cover"
                 />
                 <View
@@ -546,7 +550,7 @@ export function HomeScreen() {
                   >
                     <Image
                       source={src}
-                      className="w-full h-full"
+                      style={{ width: "100%", height: "100%" }}
                       resizeMode="cover"
                     />
                   </View>
