@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   View,
   Text,
+  Image,
   TextInput,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
+import { CheckCircle2, ChevronLeft, Eye, EyeOff } from "lucide-react-native";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Login">;
@@ -22,14 +24,20 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleLogin = () => {
-    if (!email || !password) {
+    // Postel's Law: be liberal in what we accept — trim spaces, lowercase email.
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    if (!cleanEmail || !cleanPassword) {
       setError("กรุณากรอกข้อมูลให้ครบ");
       return;
     }
     setError("");
-    nav.replace("Home");
+    // Peak-End Rule: brief positive feedback before navigating.
+    setSuccess(true);
+    setTimeout(() => nav.replace("Home"), 450);
   };
 
   return (
@@ -49,16 +57,18 @@ export function LoginScreen() {
                 onPress={() => nav.canGoBack() && nav.goBack()}
                 className="bg-[#319754]/10 flex-row items-center self-start px-4 py-1.5 rounded-full"
               >
-                <Ionicons name="chevron-back" size={14} color="#319754" />
+                <ChevronLeft size={14} color="#319754" />
                 <Text className="text-[12px] text-[#319754] font-medium ml-1">ย้อนกลับ</Text>
               </Pressable>
             </View>
 
             {/* Logo + Title */}
             <View className="items-center px-4 pt-2">
-              <View className="size-[58px] rounded-full bg-[#319754] items-center justify-center mb-4">
-                <Ionicons name="leaf" size={32} color="white" />
-              </View>
+              <Image
+                source={require("../../assets/logo.png")}
+                style={{ width: 76, height: 76, marginBottom: 16 }}
+                resizeMode="contain"
+              />
               <Text className="text-[20px] text-black font-medium">ยินดีต้อนรับสู่ METAHERB</Text>
               <Text className="text-[12px] text-black text-center mt-2">
                 ลงชื่อเข้าใช้เพื่อรับประสบการณ์{"\n"}การช้อปสมุนไพรที่ดีที่สุด
@@ -100,11 +110,11 @@ export function LoginScreen() {
                     className="absolute right-4"
                     hitSlop={8}
                   >
-                    <Ionicons
-                      name={showPassword ? "eye" : "eye-off"}
-                      size={20}
-                      color="#9ca3af"
-                    />
+                    {showPassword ? (
+                      <Eye size={20} color="#9ca3af" />
+                    ) : (
+                      <EyeOff size={20} color="#9ca3af" />
+                    )}
                   </Pressable>
                 </View>
               </View>
@@ -128,12 +138,27 @@ export function LoginScreen() {
                 </Text>
               </Pressable>
 
-              {/* Sign in */}
+              {/* Sign in — switches to success state for ~450ms before navigating */}
               <Pressable
                 onPress={handleLogin}
-                className="bg-[#008c45] active:bg-[#007a3b] h-[49px] rounded-full items-center justify-center"
+                disabled={success}
+                className={`${
+                  success
+                    ? "bg-[#16a34a]"
+                    : "bg-[#008c45] active:bg-[#007a3b]"
+                } h-[49px] rounded-full flex-row items-center justify-center`}
+                style={{ gap: 8 }}
               >
-                <Text className="text-white text-[14px] font-medium">เข้าสู่ระบบ</Text>
+                {success ? (
+                  <>
+                    <CheckCircle2 size={20} color="white" />
+                    <Text className="text-white text-[14px] font-medium">
+                      เข้าสู่ระบบสำเร็จ
+                    </Text>
+                  </>
+                ) : (
+                  <Text className="text-white text-[14px] font-medium">เข้าสู่ระบบ</Text>
+                )}
               </Pressable>
 
               {/* Divider */}

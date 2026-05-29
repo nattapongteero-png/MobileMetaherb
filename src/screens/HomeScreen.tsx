@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   Image,
-  FlatList,
   TextInput,
   Dimensions,
   Animated,
@@ -13,8 +12,28 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
-import Svg, { Path } from "react-native-svg";
+import {
+  Bell,
+  BookOpen,
+  ChevronRight,
+  Home as HomeIcon,
+  Leaf,
+  Search,
+  ShoppingBag,
+  Star,
+  User,
+} from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { Product, ProductImage } from "../types/Product";
+import type { RootStackParamList } from "../navigation/RootStack";
+import { ProductCard } from "../components/ProductCard";
+import { FlashSaleHero } from "../components/FlashSaleHero";
+import { IconButton } from "../components/IconButton";
+import { CountBadge } from "../components/CountBadge";
+import { STAR_YELLOW } from "../theme/tokens";
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // On web cap viewport at mobile size so layout that uses SCREEN_WIDTH
 // (cards, banner aspect, paged scroll) renders like the phone build.
@@ -24,15 +43,19 @@ const SCREEN_WIDTH =
     ? Math.min(Dimensions.get("window").width, MOBILE_MAX_WIDTH)
     : Dimensions.get("window").width;
 
-const CATEGORIES = [
-  { label: "สมุนไพร", icon: "leaf", color: "#52b788" },
-  { label: "อาหาร", icon: "restaurant", color: "#f97316" },
-  { label: "ยา", icon: "medkit", color: "#ef4444" },
-  { label: "เครื่องหอม", icon: "flower", color: "#ec4899" },
-  { label: "ความสวย", icon: "sparkles", color: "#a855f7" },
-  { label: "ของขวัญ", icon: "gift", color: "#06b6d4" },
-  { label: "ชาสมุนไพร", icon: "cafe", color: "#16a34a" },
-  { label: "น้ำมันสกัด", icon: "water", color: "#0ea5e9" },
+type Category =
+  | { label: string; image: number; color: string }
+  | { label: string; icon: string; color: string };
+
+// Categories taken from the web menu — 6 entries that match the real catalog.
+// `\n` placed manually so labels break at word boundaries, not mid-word.
+const CATEGORIES: Category[] = [
+  { label: "ผลิตภัณฑ์\nสุขภาพ", image: require("../../assets/IMG_4022.png"), color: "#319754" },
+  { label: "อาหาร\n& เครื่องดื่ม", image: require("../../assets/IMG_4021.png"), color: "#16a34a" },
+  { label: "เครื่องหอม\n& อโรม่า", image: require("../../assets/IMG_4020.png"), color: "#52b788" },
+  { label: "ผลิตภัณฑ์\nสมุนไพร", image: require("../../assets/IMG_4023.png"), color: "#226a3b" },
+  { label: "วัตถุดิบ\nสมุนไพร", image: require("../../assets/IMG_4024.png"), color: "#84cc16" },
+  { label: "ชุดของชำร่วย\n& ของขวัญ", image: require("../../assets/IMG_4025.png"), color: "#06b6d4" },
 ];
 
 const MAIN_BANNERS = [
@@ -46,53 +69,43 @@ const SIDE_BANNERS = [
   require("../../assets/banner/banner_26_1778215046.jpg"),
 ];
 
-const IMAGE_POOL = [
-  require("../../assets/products/cinnamon.png"),
-  require("../../assets/products/coffee.png"),
-  require("../../assets/products/gift-ribbon.png"),
-  require("../../assets/products/gift-set.png"),
-  require("../../assets/products/herb-jar.png"),
-  require("../../assets/products/dokjun.png"),
-  require("../../assets/products/lemon.png"),
+const IMG_CINNAMON = require("../../assets/products/cinnamon.png");
+const IMG_COFFEE = require("../../assets/products/coffee.png");
+const IMG_GIFT_RIBBON = require("../../assets/products/gift-ribbon.png");
+const IMG_GIFT_SET = require("../../assets/products/gift-set.png");
+const IMG_HERB_JAR = require("../../assets/products/herb-jar.png");
+const IMG_DOKJUN = require("../../assets/products/dokjun.png");
+const IMG_LEMON = require("../../assets/products/lemon.png");
+
+// Each entry pairs a name with the image that visually represents it,
+// so shuffling stays coherent (no "coffee name + cinnamon image" mismatches).
+const PRODUCT_POOL: { name: string; image: number }[] = [
+  { name: "อบเชยเทศ Cinnamon Varum 150g", image: IMG_CINNAMON },
+  { name: "มะตูมแห้งหั่นชง 200g", image: IMG_CINNAMON },
+  { name: "ชาสมุนไพร 9 ชนิด รวมในซองเดียว", image: IMG_CINNAMON },
+
+  { name: "กาแฟดริป Dark Roast Arabica 9 ซอง", image: IMG_COFFEE },
+  { name: "กาแฟคั่วเข้ม Signature Blend 200g", image: IMG_COFFEE },
+
+  { name: "ชุดของขวัญพรีเมียม ผูกโบว์", image: IMG_GIFT_RIBBON },
+  { name: "ชุดของขวัญ Limited Edition", image: IMG_GIFT_RIBBON },
+
+  { name: "ชุดของขวัญคุกกี้สมุนไพร", image: IMG_GIFT_SET },
+  { name: "ชุดของขวัญ Cookies & Tea Set", image: IMG_GIFT_SET },
+
+  { name: "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน", image: IMG_HERB_JAR },
+  { name: "เมต้าเฮิร์บ Herbal Inhaler Classic", image: IMG_HERB_JAR },
+  { name: "ขมิ้นชันแคปซูล 60 เม็ด", image: IMG_HERB_JAR },
+  { name: "น้ำผึ้งดิบจากป่าธรรมชาติ 350ml", image: IMG_HERB_JAR },
+
+  { name: "ดอกจันอบแห้ง คัดพิเศษ 30g", image: IMG_DOKJUN },
+  { name: "ใบบัวบกอบแห้ง 30g", image: IMG_DOKJUN },
+  { name: "อัญชันแห้ง พรีเมียม 100g", image: IMG_DOKJUN },
+  { name: "กระชายอบแห้ง 100g", image: IMG_DOKJUN },
+
+  { name: "เปลือกมะนาวอบแห้ง 50g", image: IMG_LEMON },
+  { name: "ตะไคร้แห้งหั่นฝอย 80g", image: IMG_LEMON },
 ];
-
-const NAME_POOL = [
-  "อบเชยเทศ Cinnamon Varum 150g",
-  "กาแฟดริป Dark Roast Arabica 9 ซอง",
-  "ชุดของขวัญพรีเมียม ผูกโบว์",
-  "ชุดของขวัญคุกกี้สมุนไพร",
-  "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน",
-  "ดอกจันอบแห้ง คัดพิเศษ 30g",
-  "เปลือกมะนาวอบแห้ง 50g",
-  "ขมิ้นชันแคปซูล 60 เม็ด",
-  "ชาสมุนไพร 9 ชนิด รวมในซองเดียว",
-  "น้ำผึ้งดิบจากป่าธรรมชาติ 350ml",
-  "ใบบัวบกอบแห้ง 30g",
-  "อัญชันแห้ง พรีเมียม 100g",
-  "ตะไคร้แห้งหั่นฝอย 80g",
-  "กระชายอบแห้ง 100g",
-  "มะตูมแห้งหั่นชง 200g",
-  "เมต้าเฮิร์บ Herbal Inhaler Classic",
-  "ชุดของขวัญ Cookies & Tea Set",
-];
-
-type ProductImage = number | { uri: string };
-
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  discountPercent?: number;
-  rating: number;
-  sold: string;
-  image: ProductImage;
-  isFlashSale?: boolean;
-  isRecommended?: boolean;
-  isFreeShipping?: boolean;
-  hasCoupon?: boolean;
-  flashSaleEndsIn?: number;
-};
 
 function shuffleArr<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -105,7 +118,7 @@ function shuffleArr<T>(arr: T[]): T[] {
 
 function makeProduct(
   idx: number,
-  name: string,
+  item: { name: string; image: number },
   opts: { flashSale?: boolean; recommended?: boolean },
 ): Product {
   // Price rounded to nearest 5 baht between 45–445
@@ -119,13 +132,13 @@ function makeProduct(
   const soldCount = Math.floor(Math.random() * 380) + 40;
   return {
     id: `${opts.flashSale ? "fs" : "r"}${idx + 1}`,
-    name,
+    name: item.name,
     price,
     originalPrice,
     discountPercent,
     rating,
     sold: `ขายได้ ${soldCount}+`,
-    image: IMAGE_POOL[Math.floor(Math.random() * IMAGE_POOL.length)],
+    image: item.image,
     isFlashSale: opts.flashSale,
     isRecommended: opts.recommended,
     isFreeShipping: Math.random() > 0.5,
@@ -133,16 +146,17 @@ function makeProduct(
     flashSaleEndsIn: opts.flashSale
       ? Math.floor(Math.random() * 50000) + 3600
       : undefined,
+    soldPercent: opts.flashSale ? Math.floor(Math.random() * 60) + 30 : undefined,
   };
 }
 
-// Random shuffle name pool once on module load → split into two sections
-const SHUFFLED_NAMES = shuffleArr(NAME_POOL);
-const FLASH_SALE: Product[] = SHUFFLED_NAMES.slice(0, 6).map((n, i) =>
-  makeProduct(i, n, { flashSale: true }),
+// Shuffle the {name, image} pool once on module load → split into two sections
+const SHUFFLED_POOL = shuffleArr(PRODUCT_POOL);
+const FLASH_SALE: Product[] = SHUFFLED_POOL.slice(0, 6).map((p, i) =>
+  makeProduct(i, p, { flashSale: true }),
 );
-const RECOMMENDED: Product[] = SHUFFLED_NAMES.slice(6, 12).map((n, i) =>
-  makeProduct(i, n, { recommended: true }),
+const RECOMMENDED: Product[] = SHUFFLED_POOL.slice(6, 12).map((p, i) =>
+  makeProduct(i, p, { recommended: true }),
 );
 
 function FlashSaleCountdown() {
@@ -178,173 +192,7 @@ function FlashSaleCountdown() {
   );
 }
 
-function MiniCountdown({ initialSeconds }: { initialSeconds: number }) {
-  const [sec, setSec] = useState(initialSeconds);
-  useEffect(() => {
-    const t = setInterval(() => setSec((s) => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const h = String(Math.floor(sec / 3600)).padStart(2, "0");
-  const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
-  const s = String(sec % 60).padStart(2, "0");
-  return (
-    <View className="flex-row items-center" style={{ gap: 3 }}>
-      {[h, m, s].map((t, i) => (
-        <View key={i} className="flex-row items-center" style={{ gap: 3 }}>
-          <View className="rounded-[4px] bg-[#bc1b06] items-center justify-center" style={{ width: 18, height: 18 }}>
-            <Text className="text-[10px] text-white font-bold" style={{ lineHeight: 12 }}>{t}</Text>
-          </View>
-          {i < 2 && <Text className="text-[11px] text-white font-semibold">:</Text>}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// Coupon tag icon — same vector path as web (svg-7w99agzzp8 → p1939b280)
-const COUPON_SVG_PATH =
-  "M7.26822 14.3069L13.2794 8.03003C13.7418 7.54819 13.7727 7.27194 13.7727 6.59735V4.15596C13.7727 3.47495 13.6185 3.26293 13.15 2.77465L11.7319 1.29698C11.2695 0.815134 11.0661 0.648091 10.4125 0.648091H8.06351C7.41614 0.648091 7.15723 0.680215 6.69484 1.16206L0.66509 7.43253C-0.216556 8.35127 -0.228887 9.30211 0.671259 10.2401L4.57393 14.3005C5.48024 15.2385 6.38656 15.2257 7.26822 14.3069ZM6.60235 13.5296C6.16459 13.9921 5.68986 13.9986 5.23979 13.5231L1.4111 9.53981C0.961028 9.0708 0.967196 8.57614 1.40493 8.11996L7.39152 1.89448C7.52094 1.76598 7.64431 1.68246 7.85391 1.68246H10.4495C10.6468 1.68246 10.7701 1.75956 10.9058 1.89448L12.5827 3.64199C12.7122 3.7769 12.78 3.91182 12.78 4.11099V6.82221C12.78 7.03418 12.706 7.16912 12.5827 7.2976L6.60235 13.5296ZM9.69115 5.78783C10.1721 5.78783 10.5358 5.39592 10.5358 4.90765C10.5358 4.41295 10.1721 4.02747 9.69115 4.02747C9.21027 4.02747 8.84655 4.41295 8.84655 4.90765C8.84655 5.39592 9.21027 5.78783 9.69115 5.78783Z";
-
-function CouponIcon() {
-  return (
-    <Svg width={14} height={15} viewBox="0 0 14 15" fill="none">
-      <Path d={COUPON_SVG_PATH} fill="#DF9723" />
-    </Svg>
-  );
-}
-
-type CardTag = "flashsale" | "discount" | "recommended" | null;
-function getCardTag(p: Product): CardTag {
-  if (p.isFlashSale) return "flashsale";
-  if (p.discountPercent) return "discount";
-  if (p.isRecommended) return "recommended";
-  return null;
-}
-
-function TagPill({ color, label }: { color: string; label: string }) {
-  // Mirrors web: px-2.5 py-0.5 rounded-full text-[10px] font-semibold + colored shadow.
-  // includeFontPadding:false + explicit lineHeight removes Android extra top space
-  // that otherwise makes top/bottom padding look uneven.
-  return (
-    <View
-      style={{
-        backgroundColor: color,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 9999,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 6,
-        elevation: 2,
-      }}
-    >
-      <Text
-        style={{
-          color: "white",
-          fontSize: 10,
-          fontWeight: "600",
-          lineHeight: 12,
-          includeFontPadding: false,
-          textAlignVertical: "center",
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function ProductCard({ product, width }: { product: Product; width: number }) {
-  const tag = getCardTag(product);
-  const priceColor = product.discountPercent ? "#e62e05" : "#226a3b";
-  return (
-    <Pressable
-      style={{
-        width,
-        height: 259,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
-      }}
-      className="bg-white rounded-2xl border border-[#d4d4d4] overflow-hidden active:opacity-90"
-    >
-      {/* Image area (flex-1) */}
-      <View className="flex-1 relative bg-gray-100">
-        <Image
-          source={product.image}
-          style={{ width: "100%", height: "100%" }}
-          resizeMode="cover"
-        />
-
-        {/* Top-right tag pill */}
-        {tag === "flashsale" || tag === "discount" ? (
-          <View className="absolute top-0 right-0 p-1.5">
-            <TagPill color="#e62e05" label={`ลด ${product.discountPercent}%`} />
-          </View>
-        ) : null}
-        {tag === "recommended" ? (
-          <View className="absolute top-0 right-0 p-1.5">
-            <TagPill color="#319754" label="แนะนำ" />
-          </View>
-        ) : null}
-
-        {/* Bottom-left Flash Sale badge with countdown */}
-        {tag === "flashsale" ? (
-          <View
-            className="absolute bottom-0 left-0 flex-row items-center bg-[#e62e05]/80"
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderTopRightRadius: 12,
-              gap: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 11,
-                fontWeight: "600",
-                lineHeight: 13,
-                includeFontPadding: false,
-              }}
-            >
-              Flash Sale
-            </Text>
-            <MiniCountdown initialSeconds={product.flashSaleEndsIn || 3600} />
-          </View>
-        ) : null}
-      </View>
-
-      {/* Info section */}
-      <View className="p-2.5" style={{ gap: 4 }}>
-        <Text numberOfLines={1} className="text-[14px] text-black font-medium">
-          {product.name}
-        </Text>
-        <View className="flex-row items-center" style={{ gap: 8 }}>
-          <Text className="text-[14px] font-semibold" style={{ color: priceColor }}>
-            ฿ {product.price.toFixed(2)}
-          </Text>
-          {product.originalPrice ? (
-            <Text className="text-[10px] text-[#a3a3a3] line-through">
-              ฿{product.originalPrice.toFixed(2)}
-            </Text>
-          ) : null}
-          {product.hasCoupon ? <CouponIcon /> : null}
-        </View>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center" style={{ gap: 4 }}>
-            <Ionicons name="star" size={12} color="#F7C42B" />
-            <Text className="text-[10px] text-black">{product.rating}/5</Text>
-          </View>
-          <Text className="text-[10px] text-black">{product.sold}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
+// ProductCard moved to src/components/ProductCard.tsx (shared with ShopScreen).
 
 function SectionHeader({
   title,
@@ -366,7 +214,7 @@ function SectionHeader({
       {showSeeAll ? (
         <Pressable onPress={onSeeAll} className="flex-row items-center" style={{ gap: 6 }}>
           <Text className="text-[12px] text-gray-500">ดูทั้งหมด</Text>
-          <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+          <ChevronRight size={16} color="#6b7280" />
         </Pressable>
       ) : null}
     </View>
@@ -461,92 +309,430 @@ function PagedProductList({ products }: { products: Product[] }) {
 }
 
 export function HomeScreen() {
+  const nav = useNavigation<Nav>();
   const [bannerIdx, setBannerIdx] = useState(0);
   const [search, setSearch] = useState("");
+  const scrollY = useRef(new Animated.Value(0)).current;
+  // FlatList ref for the hero banner — used to programmatically scroll to the
+  // next slide every 4s with a smooth animation. `any` ref because
+  // Animated.FlatList's generic signature is `<unknown>` which clashes with
+  // a typed inner array, but `scrollToOffset` is available at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bannerRef = useRef<any>(null);
+  const bannerInnerWidth = SCREEN_WIDTH - 32; // outer paddingHorizontal:16
+  // Drives the dot indicator interpolation so width + color blend smoothly
+  // as the user swipes (or auto-advance scrolls) between banners.
+  const bannerScrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const id = setInterval(() => {
-      setBannerIdx((p) => (p + 1) % MAIN_BANNERS.length);
+      const next = (bannerIdx + 1) % MAIN_BANNERS.length;
+      bannerRef.current?.scrollToOffset({
+        offset: next * bannerInnerWidth,
+        animated: true,
+      });
     }, 4000);
     return () => clearInterval(id);
-  }, []);
+  }, [bannerIdx, bannerInnerWidth]);
 
   const cardWidth = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
 
+  // Collapsible header: logo + wordmark row shrinks to 0 as user scrolls past ~60px.
+  const HEADER_TOP_ROW_HEIGHT = 60;
+  const topRowHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
+    outputRange: [HEADER_TOP_ROW_HEIGHT, 0],
+    extrapolate: "clamp",
+  });
+  const topRowOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_TOP_ROW_HEIGHT * 0.6, HEADER_TOP_ROW_HEIGHT],
+    outputRange: [1, 0.2, 0],
+    extrapolate: "clamp",
+  });
+  // Crossfade icons between top row (scrollY=0) and search row (scrollY=60)
+  // at the SAME screen pixel — translateY counter-acts the layout shift so
+  // rendered y stays constant. Search bar's marginRight grows in step, so it's
+  // full-width when icons are invisible and shrinks as icons appear.
+  const searchIconsOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_TOP_ROW_HEIGHT * 0.4, HEADER_TOP_ROW_HEIGHT],
+    outputRange: [0, 0.4, 1],
+    extrapolate: "clamp",
+  });
+  const iconsTranslateY = scrollY.interpolate({
+    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
+    outputRange: [-HEADER_TOP_ROW_HEIGHT, 0],
+    extrapolate: "clamp",
+  });
+  // 106 = bell 38 + gap 12 + cart 38 + leading gap 12 + 6 margin for badge
+  const searchBarMarginRight = scrollY.interpolate({
+    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
+    outputRange: [0, 106],
+    extrapolate: "clamp",
+  });
+
   return (
-    <View className="flex-1 bg-[#fafafa]">
-      <StatusBar style="dark" />
-      <SafeAreaView edges={["top"]} className="bg-white">
-        {/* Top bar */}
-        <View className="flex-row items-center px-4 py-3 gap-3">
-          <View className="size-9 rounded-full bg-[#319754] items-center justify-center">
-            <Ionicons name="leaf" size={18} color="white" />
-          </View>
-          <View className="flex-1 flex-row items-center bg-[#f5f5f5] rounded-full px-4 h-10">
-            <Ionicons name="search" size={16} color="#9ca3af" />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="ค้นหาสินค้า, สมุนไพร, ร้านค้า..."
-              placeholderTextColor="#a3a3a3"
-              className="flex-1 ml-2 text-[13px] text-gray-700"
+    <View className="flex-1" style={{ backgroundColor: "#319754" }}>
+      <StatusBar style="light" />
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#319754" }}>
+        {/* Decorative herb leaves overlaid on the green header. Clipped to
+            SafeAreaView bounds so leaves never bleed past the green band
+            (which would otherwise be visible through the white surface's
+            rounded corners). */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            overflow: "hidden",
+          }}
+        >
+          {/* Header watermark — 5 leaves arranged for visual balance.
+              Composition rules applied:
+              • Diagonal flow (top-right ↘ bottom-left, top-left ↘ bottom-right)
+              • Anchor leaves at opposite corners with similar weight
+              • Center filler ties corners together (rule of thirds)
+              • All leaves fully inside bounds — no clipping
+              • Opacity gradient: anchors brighter (0.45), fillers subtler (0.28) */}
+
+          {/* (1) Top-right anchor — frames the corner where bell+cart sit */}
+          <Image
+            source={require("../../assets/herb-leaf-d.png")}
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 6,
+              width: 100,
+              height: 100,
+              opacity: 0.45,
+              transform: [{ rotate: "28deg" }],
+            }}
+            resizeMode="contain"
+          />
+          {/* (2) Top-left counter-weight — beside the logo */}
+          <Image
+            source={require("../../assets/herb-leaf-b.png")}
+            style={{
+              position: "absolute",
+              top: 32,
+              left: 24,
+              width: 38,
+              height: 38,
+              opacity: 0.4,
+              transform: [{ rotate: "-22deg" }],
+            }}
+            resizeMode="contain"
+          />
+          {/* (3) Center subtle filler — bridges top and bottom rows */}
+          <Image
+            source={require("../../assets/herb-leaf-c.png")}
+            style={{
+              position: "absolute",
+              top: 60,
+              left: "44%",
+              width: 52,
+              height: 52,
+              opacity: 0.28,
+              transform: [{ rotate: "60deg" }],
+            }}
+            resizeMode="contain"
+          />
+          {/* (5) Bottom-right balance — opposes bottom-left */}
+          <Image
+            source={require("../../assets/herb-leaf-c.png")}
+            style={{
+              position: "absolute",
+              top: 92,
+              right: 14,
+              width: 78,
+              height: 78,
+              opacity: 0.4,
+              transform: [{ rotate: "85deg" }],
+            }}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Collapsible top row — logo + wordmark fades + shrinks on scroll */}
+        <Animated.View
+          style={{
+            height: topRowHeight,
+            opacity: topRowOpacity,
+            overflow: "hidden",
+          }}
+        >
+          <View
+            className="flex-row items-center"
+            style={{
+              height: HEADER_TOP_ROW_HEIGHT,
+              paddingLeft: 16,
+              paddingRight: 18,
+              gap: 12,
+            }}
+          >
+            <Image
+              source={require("../../assets/logo.png")}
+              style={{ width: 44, height: 44 }}
+              resizeMode="contain"
             />
+            <View className="flex-1">
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 18,
+                  fontWeight: "700",
+                  includeFontPadding: false,
+                  letterSpacing: 0.5,
+                }}
+              >
+                METAHERB
+              </Text>
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.85)",
+                  fontSize: 11,
+                  includeFontPadding: false,
+                  lineHeight: 16,
+                  marginTop: 2,
+                }}
+              >
+                สมุนไพรไทยเพื่อสุขภาพดี
+              </Text>
+            </View>
+
+            {/* Bell — same x as search-row bell (paddingRight 18 matches) */}
+            <IconButton
+              onPress={() => nav.navigate("Notification")}
+              variant="translucentDark"
+            >
+              <Bell size={20} color="white" />
+              <View style={{ position: "absolute", top: -2, right: -4 }}>
+                <CountBadge count={3} />
+              </View>
+            </IconButton>
+
+            {/* Cart — same x as search-row cart */}
+            <IconButton
+              onPress={() => nav.navigate("Cart")}
+              variant="translucentDark"
+            >
+              <ShoppingBag size={20} color="white" />
+              <View style={{ position: "absolute", top: -2, right: -4 }}>
+                <CountBadge count={2} />
+              </View>
+            </IconButton>
           </View>
-          <Pressable hitSlop={6}>
-            <Ionicons name="notifications-outline" size={22} color="#374151" />
-          </Pressable>
-          <Pressable hitSlop={6}>
-            <Ionicons name="bag-outline" size={22} color="#374151" />
-          </Pressable>
+        </Animated.View>
+
+        {/* Sticky search row. Search bar is full-width when icons are invisible
+            (scrollY=0) thanks to animated marginRight. Icons are absolutely
+            positioned at the same screen pixel as the top-row icons (right:18),
+            and translate from -60 to 0 so they appear stationary during the
+            crossfade. */}
+        <View
+          style={{
+            paddingLeft: 12,
+            paddingRight: 12,
+            paddingBottom: 12,
+            paddingTop: 4,
+          }}
+        >
+          {/* Search bar — full-width pill with animated right margin */}
+          <Animated.View style={{ marginRight: searchBarMarginRight }}>
+            <View
+              className="flex-row items-center rounded-full px-4"
+              style={{
+                height: 44,
+                backgroundColor: "#ffffff",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 4,
+              }}
+            >
+              <Search size={18} color="#319754" />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="ค้นหาสินค้า, สมุนไพร, ร้านค้า..."
+                placeholderTextColor="#a3a3a3"
+                style={{
+                  flex: 1,
+                  marginLeft: 8,
+                  fontSize: 13,
+                  color: "#374151",
+                }}
+              />
+            </View>
+          </Animated.View>
+
+          {/* Absolutely-positioned icons — overlap top-row icons exactly at
+              scrollY=0 (right:18 + translateY:-60), reveal as scroll progresses */}
+          <Animated.View
+            pointerEvents="box-none"
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 18,
+              height: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              opacity: searchIconsOpacity,
+              transform: [{ translateY: iconsTranslateY }],
+            }}
+          >
+            <IconButton
+              onPress={() => nav.navigate("Notification")}
+              variant="translucentDark"
+            >
+              <Bell size={20} color="white" />
+              <View style={{ position: "absolute", top: -2, right: -4 }}>
+                <CountBadge count={3} />
+              </View>
+            </IconButton>
+            <IconButton
+              onPress={() => nav.navigate("Cart")}
+              variant="translucentDark"
+            >
+              <ShoppingBag size={20} color="white" />
+              <View style={{ position: "absolute", top: -2, right: -4 }}>
+                <CountBadge count={2} />
+              </View>
+            </IconButton>
+          </Animated.View>
         </View>
       </SafeAreaView>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Banner section — main hero carousel + 2 side promo banners (web parity) */}
+      {/* White surface — rounded top corners reveal green underneath */}
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#fafafa",
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          overflow: "hidden",
+        }}
+      >
+        <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false },
+          )}
+          scrollEventThrottle={16}
+        >
+        {/* Banner section — hero locked to a single aspect so all 3 slides
+            are the same height (no layout shift on swipe). Chosen to match
+            the majority of banner images (banner_14, banner_15 = 3.825:1). */}
         {(() => {
-          // Main banner width = SCREEN_WIDTH - 16*2 padding
-          // Height derived from web's 775/160 aspect → side banners share this height.
-          const BANNER_HEIGHT = ((SCREEN_WIDTH - 32) * 160) / 775;
+          const innerWidth = SCREEN_WIDTH - 32; // outer paddingHorizontal:16 both sides
+          const SIDE_WIDTH = (innerWidth - 10) / 2; // gap 10
+          const HERO_ASPECT = 3.825; // 1530÷400 — fits banner_14/15 perfectly,
+          // banner_6 (4.8:1) gets ~12% side crop in cover mode.
+          const HERO_HEIGHT = innerWidth / HERO_ASPECT;
+          // Side banners are uniform (3.39:1) so we can sample once.
+          const SIDE_ASPECT =
+            Image.resolveAssetSource(SIDE_BANNERS[0]).width /
+            Image.resolveAssetSource(SIDE_BANNERS[0]).height;
+          const SIDE_HEIGHT = SIDE_WIDTH / SIDE_ASPECT;
           return (
-            <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 10 }}>
-              {/* Main hero carousel */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 10 }}>
+              {/* Hero carousel — FlatList paging gives a smooth slide
+                  animation between banners (and lets the user swipe too). */}
               <View
                 className="bg-[#faf8f5] overflow-hidden"
-                style={{ height: BANNER_HEIGHT, borderRadius: 16 }}
+                style={{ height: HERO_HEIGHT, borderRadius: 16 }}
               >
-                <Image
-                  source={MAIN_BANNERS[bannerIdx]}
-                  style={{ width: "100%", height: "100%" }}
-                  resizeMode="cover"
+                <Animated.FlatList
+                  ref={bannerRef}
+                  data={MAIN_BANNERS}
+                  keyExtractor={(_: unknown, i: number) => `banner-${i}`}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: bannerScrollX } } }],
+                    { useNativeDriver: false },
+                  )}
+                  scrollEventThrottle={16}
+                  onMomentumScrollEnd={(e) => {
+                    const idx = Math.round(
+                      e.nativeEvent.contentOffset.x / bannerInnerWidth,
+                    );
+                    if (idx !== bannerIdx) setBannerIdx(idx);
+                  }}
+                  renderItem={({ item }) => (
+                    <Image
+                      source={item as number}
+                      style={{
+                        width: bannerInnerWidth,
+                        height: HERO_HEIGHT,
+                      }}
+                      resizeMode="cover"
+                    />
+                  )}
                 />
                 <View
                   className="absolute left-0 right-0 flex-row items-center justify-center"
-                  style={{ bottom: 8, gap: 6 }}
+                  style={{ bottom: 10, gap: 6 }}
+                  pointerEvents="box-none"
                 >
-                  {MAIN_BANNERS.map((_, i) => (
-                    <Pressable
-                      key={i}
-                      onPress={() => setBannerIdx(i)}
-                      hitSlop={8}
-                      style={{
-                        height: 5,
-                        width: i === bannerIdx ? 14 : 5,
-                        borderRadius: 2.5,
-                        backgroundColor:
-                          i === bannerIdx ? "#ffffff" : "rgba(255,255,255,0.6)",
-                      }}
-                    />
-                  ))}
+                  {MAIN_BANNERS.map((_, i) => {
+                    const inputRange = [
+                      (i - 1) * bannerInnerWidth,
+                      i * bannerInnerWidth,
+                      (i + 1) * bannerInnerWidth,
+                    ];
+                    const width = bannerScrollX.interpolate({
+                      inputRange,
+                      outputRange: [6, 18, 6],
+                      extrapolate: "clamp",
+                    });
+                    const backgroundColor = bannerScrollX.interpolate({
+                      inputRange,
+                      outputRange: [
+                        "rgba(255,255,255,0.6)",
+                        "#ffffff",
+                        "rgba(255,255,255,0.6)",
+                      ],
+                      extrapolate: "clamp",
+                    });
+                    return (
+                      <Pressable
+                        key={i}
+                        onPress={() => {
+                          bannerRef.current?.scrollToOffset({
+                            offset: i * bannerInnerWidth,
+                            animated: true,
+                          });
+                        }}
+                        hitSlop={14}
+                      >
+                        <Animated.View
+                          style={{
+                            height: 6,
+                            width,
+                            borderRadius: 3,
+                            backgroundColor,
+                          }}
+                        />
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* 2 side promo banners — same height as main */}
+              {/* 2 side promo banners — flatter, smaller below the hero */}
               <View className="flex-row" style={{ gap: 10 }}>
                 {SIDE_BANNERS.map((src, i) => (
                   <View
                     key={i}
                     className="flex-1 overflow-hidden bg-gray-100"
-                    style={{ height: BANNER_HEIGHT, borderRadius: 16 }}
+                    style={{ height: SIDE_HEIGHT, borderRadius: 12 }}
                   >
                     <Image
                       source={src}
@@ -560,81 +746,86 @@ export function HomeScreen() {
           );
         })()}
 
-        {/* Categories */}
-        <View className="px-4 py-4">
-          <View className="flex-row flex-wrap" style={{ rowGap: 16 }}>
+        {/* Categories — horizontal scroll, no title; items peek off-screen on the right
+            to signal scrollability without an explicit hint. */}
+        <View style={{ paddingTop: 16, paddingBottom: 16 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              // Pressable is 70px wide and items-center; the 56px circle sits
+              // with 7px slack on each side. Subtract that 7 so the first
+              // circle's left edge lands at x=16, aligning with section
+              // headers above/below. Gap between items stays 14.
+              paddingLeft: 9,
+              paddingRight: 9,
+              gap: 14,
+            }}
+            decelerationRate="fast"
+          >
             {CATEGORIES.map((c) => (
               <Pressable
                 key={c.label}
-                className="w-1/4 items-center active:opacity-60"
-                style={{ gap: 6 }}
+                className="items-center active:opacity-60"
+                // Width 70 + gap 14 → on a 390px screen 4 items fit fully and the
+                // 5th peeks ~50% off the right edge, giving a clear scroll cue.
+                style={{ width: 70, gap: 8 }}
               >
                 <View
                   className="rounded-full items-center justify-center overflow-hidden"
-                  style={{ width: 40, height: 40, backgroundColor: c.color + "1a" }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    backgroundColor: c.color + "1a",
+                    borderWidth: 0.5,
+                    borderColor: c.color + "33",
+                  }}
                 >
-                  <Ionicons name={c.icon as any} size={20} color={c.color} />
+                  {"image" in c ? (
+                    <Image
+                      source={c.image}
+                      style={{ width: 36, height: 36 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Leaf size={26} color={c.color} />
+                  )}
                 </View>
-                <Text className="text-[11px] text-gray-600" numberOfLines={1}>
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: 11,
+                    color: "#525252",
+                    includeFontPadding: false,
+                    lineHeight: 16,
+                    textAlign: "center",
+                  }}
+                >
                   {c.label}
                 </Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         {/* Recommended section (paged 2-per-page) */}
-        <View className="mb-3 bg-white py-4">
+        <View className="mb-4 bg-white py-4">
           <View style={{ paddingHorizontal: 16 }}>
-            <SectionHeader title="แนะนำสำหรับคุณ" showSeeAll={false} />
+            <SectionHeader title="แนะนำสำหรับคุณ" />
           </View>
           <PagedProductList products={RECOMMENDED} />
         </View>
 
-        {/* Flash Sale section (paged 2-per-page) */}
-        <View className="mb-3 bg-white py-4">
-          <View style={{ paddingHorizontal: 16 }}>
-            <SectionHeader
-              title="Flash Sale"
-              rightSlot={<FlashSaleCountdown />}
-              showSeeAll={false}
-            />
-          </View>
+        {/* Flash Sale section — hero banner replaces plain SectionHeader to
+            drive urgency (Scarcity + Loss Aversion + Zeigarnik). */}
+        <View className="mb-4 bg-white py-4">
+          <FlashSaleHero />
+          <View style={{ height: 12 }} />
           <PagedProductList products={FLASH_SALE} />
         </View>
 
-        {/* Promo banners */}
-        <View
-          className="flex-row pb-6"
-          style={{ paddingHorizontal: 16, gap: 10 }}
-        >
-          {[
-            { color: "#319754", title: "คูปองส่วนลด", subtitle: "รับสูงสุด 100฿", icon: "pricetag" },
-            { color: "#f59e0b", title: "ส่งฟรี", subtitle: "ทั่วประเทศ", icon: "rocket" },
-          ].map((p) => (
-            <Pressable
-              key={p.title}
-              className="flex-1 rounded-2xl p-4 flex-row items-center active:opacity-80"
-              style={{ backgroundColor: p.color + "15", gap: 10 }}
-            >
-              <View
-                className="rounded-full items-center justify-center"
-                style={{ width: 40, height: 40, backgroundColor: p.color }}
-              >
-                <Ionicons name={p.icon as any} size={18} color="white" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[13px] font-medium" style={{ color: p.color }}>
-                  {p.title}
-                </Text>
-                <Text className="text-[11px] text-gray-600">{p.subtitle}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-
         {/* More Recommended (full-bleed) */}
-        <View className="mb-3 bg-white py-4">
+        <View className="mb-4 bg-white py-4">
           <View style={{ paddingHorizontal: 16 }}>
             <SectionHeader title="สินค้ามาใหม่" />
           </View>
@@ -650,33 +841,34 @@ export function HomeScreen() {
 
         {/* Footer spacer */}
         <View className="h-6" />
-      </ScrollView>
+      </Animated.ScrollView>
+      </View>
 
       {/* Bottom tab bar (visual mockup) */}
       <SafeAreaView edges={["bottom"]} className="bg-white border-t border-gray-200">
         <View className="flex-row items-center justify-around py-2">
           {[
-            { icon: "home", label: "หน้าแรก", active: true },
-            { icon: "leaf", label: "ผลิตภัณฑ์" },
-            { icon: "book", label: "สาระความรู้" },
-            { icon: "person", label: "บัญชี" },
+            { Icon: HomeIcon, label: "หน้าแรก", active: true },
+            { Icon: Leaf, label: "ผลิตภัณฑ์" },
+            { Icon: BookOpen, label: "สาระความรู้" },
+            { Icon: User, label: "บัญชี" },
           ].map((t) => (
             <Pressable
               key={t.label}
               className="items-center flex-1 py-1 active:opacity-60"
               style={{ gap: 2 }}
             >
-              <Ionicons
-                name={(t.active ? t.icon : `${t.icon}-outline`) as any}
+              <t.Icon
                 size={22}
                 color={t.active ? "#319754" : "#9ca3af"}
+                strokeWidth={t.active ? 2.4 : 2}
               />
               <Text
                 style={{
                   fontSize: 10,
                   color: t.active ? "#319754" : "#9ca3af",
                   includeFontPadding: false,
-                  lineHeight: 12,
+                  lineHeight: 15,
                 }}
               >
                 {t.label}
@@ -685,10 +877,10 @@ export function HomeScreen() {
                 <Text
                   style={{
                     fontSize: 8,
-                    color: "#f59e0b",
+                    color: STAR_YELLOW,
                     fontWeight: "600",
                     includeFontPadding: false,
-                    lineHeight: 10,
+                    lineHeight: 13,
                   }}
                 >
                   กำลังพัฒนา

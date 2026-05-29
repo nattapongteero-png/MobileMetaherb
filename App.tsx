@@ -1,13 +1,77 @@
 import "./src/styles/global.css";
-import { Platform, View } from "react-native";
+import { Platform, Text, View, TextInput } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  useFonts,
+  IBMPlexSansThaiLooped_400Regular,
+  IBMPlexSansThaiLooped_500Medium,
+  IBMPlexSansThaiLooped_600SemiBold,
+  IBMPlexSansThaiLooped_700Bold,
+} from "@expo-google-fonts/ibm-plex-sans-thai-looped";
 import { RootStack } from "./src/navigation/RootStack";
 
 const MOBILE_MAX_WIDTH = 430;
 
+// Map fontWeight values to the loaded Thai font family — RN doesn't auto-pick
+// a weight variant from a base family, so we resolve via fontWeight at render.
+function applyThaiFontDefault() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const TextAny = Text as any;
+  if (TextAny.__thaiPatched) return;
+  TextAny.__thaiPatched = true;
+  const original = TextAny.render;
+
+  const resolveFamily = (weight?: string | number): string => {
+    const w = String(weight ?? "400");
+    if (w === "700" || w === "bold") return "IBMPlexSansThaiLooped_700Bold";
+    if (w === "600") return "IBMPlexSansThaiLooped_600SemiBold";
+    if (w === "500") return "IBMPlexSansThaiLooped_500Medium";
+    return "IBMPlexSansThaiLooped_400Regular";
+  };
+
+  // Inject default fontFamily on every <Text>. The user's explicit fontFamily
+  // (if any) still wins because it's spread AFTER our default.
+  TextAny.render = function (...args: unknown[]) {
+    const element = original.apply(this, args);
+    const flat = Array.isArray(element.props.style)
+      ? Object.assign({}, ...element.props.style.filter(Boolean))
+      : { ...(element.props.style || {}) };
+    const family = flat.fontFamily || resolveFamily(flat.fontWeight);
+    return {
+      ...element,
+      props: {
+        ...element.props,
+        style: [{ fontFamily: family }, element.props.style],
+      },
+    };
+  };
+
+  // Same default for TextInput so placeholders + values use the Thai font.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (TextInput as any).defaultProps.style = [
+    { fontFamily: "IBMPlexSansThaiLooped_400Regular" },
+    (TextInput as any).defaultProps.style,
+  ];
+}
+
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    IBMPlexSansThaiLooped_400Regular,
+    IBMPlexSansThaiLooped_500Medium,
+    IBMPlexSansThaiLooped_600SemiBold,
+    IBMPlexSansThaiLooped_700Bold,
+  });
+
+  if (fontsLoaded) applyThaiFontDefault();
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: "#319754" }} />;
+  }
+
   const tree = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
