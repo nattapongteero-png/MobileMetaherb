@@ -14,14 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import {
   Bell,
-  BookOpen,
   ChevronRight,
-  Home as HomeIcon,
   Leaf,
   Search,
   ShoppingBag,
   Star,
-  User,
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -31,7 +28,6 @@ import { ProductCard } from "../components/ProductCard";
 import { FlashSaleHero } from "../components/FlashSaleHero";
 import { IconButton } from "../components/IconButton";
 import { CountBadge } from "../components/CountBadge";
-import { STAR_YELLOW } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -839,57 +835,11 @@ export function HomeScreen() {
           </View>
         </View>
 
-        {/* Footer spacer */}
-        <View className="h-6" />
+        {/* Footer spacer — clears the floating Liquid Glass tab bar */}
+        <View style={{ height: 104 }} />
       </Animated.ScrollView>
       </View>
 
-      {/* Bottom tab bar (visual mockup) */}
-      <SafeAreaView edges={["bottom"]} className="bg-white border-t border-gray-200">
-        <View className="flex-row items-center justify-around py-2">
-          {[
-            { Icon: HomeIcon, label: "หน้าแรก", active: true },
-            { Icon: Leaf, label: "ผลิตภัณฑ์" },
-            { Icon: BookOpen, label: "สาระความรู้" },
-            { Icon: User, label: "บัญชี" },
-          ].map((t) => (
-            <Pressable
-              key={t.label}
-              className="items-center flex-1 py-1 active:opacity-60"
-              style={{ gap: 2 }}
-            >
-              <t.Icon
-                size={22}
-                color={t.active ? "#319754" : "#9ca3af"}
-                strokeWidth={t.active ? 2.4 : 2}
-              />
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: t.active ? "#319754" : "#9ca3af",
-                  includeFontPadding: false,
-                  lineHeight: 15,
-                }}
-              >
-                {t.label}
-              </Text>
-              {!t.active ? (
-                <Text
-                  style={{
-                    fontSize: 8,
-                    color: STAR_YELLOW,
-                    fontWeight: "600",
-                    includeFontPadding: false,
-                    lineHeight: 13,
-                  }}
-                >
-                  กำลังพัฒนา
-                </Text>
-              ) : null}
-            </Pressable>
-          ))}
-        </View>
-      </SafeAreaView>
     </View>
   );
 }

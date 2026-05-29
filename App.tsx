@@ -1,4 +1,5 @@
 import "./src/styles/global.css";
+import { useEffect, useState } from "react";
 import { Platform, Text, View, TextInput } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -11,6 +12,11 @@ import {
   IBMPlexSansThaiLooped_700Bold,
 } from "@expo-google-fonts/ibm-plex-sans-thai-looped";
 import { RootStack } from "./src/navigation/RootStack";
+import { SplashScreen } from "./src/components/SplashScreen";
+
+// Keep the branded splash up at least this long so a fast font load doesn't
+// flash it for a single frame.
+const MIN_SPLASH_MS = 1200;
 
 const MOBILE_MAX_WIDTH = 430;
 
@@ -66,10 +72,16 @@ export default function App() {
     IBMPlexSansThaiLooped_700Bold,
   });
 
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   if (fontsLoaded) applyThaiFontDefault();
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: "#319754" }} />;
+  if (!fontsLoaded || !minTimeElapsed) {
+    return <SplashScreen />;
   }
 
   const tree = (

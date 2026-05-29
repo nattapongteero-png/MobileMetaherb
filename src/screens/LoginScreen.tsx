@@ -37,7 +37,7 @@ export function LoginScreen() {
     setError("");
     // Peak-End Rule: brief positive feedback before navigating.
     setSuccess(true);
-    setTimeout(() => nav.replace("Home"), 450);
+    setTimeout(() => nav.replace("Main"), 450);
   };
 
   return (

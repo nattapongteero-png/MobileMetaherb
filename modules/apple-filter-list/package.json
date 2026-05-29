@@ -1,0 +1,7 @@
+{
+  "name": "apple-filter-list",
+  "version": "1.0.0",
+  "description": "Native SwiftUI inset-grouped filter list (iOS only)",
+  "main": "index.ts",
+  "private": true
+}
