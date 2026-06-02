@@ -38,9 +38,10 @@ function Pill({ children, style }: { children: React.ReactNode; style?: object }
   );
 }
 
-function ArticleCard({ a }: { a: Article }) {
+function ArticleCard({ a, onPress }: { a: Article; onPress: () => void }) {
   return (
     <Pressable
+      onPress={onPress}
       className="active:opacity-90"
       style={{
         flexDirection: "row",
@@ -188,8 +189,8 @@ export function KnowledgeScreen() {
         subtitle="บทความ & วิดีโอสมุนไพร"
         titleSize={20}
         showLogo={false}
-        showBell={false}
-        showCart={false}
+        showBell={true}
+        showCart={true}
         showSearch={false}
         onBell={() => nav.navigate("Notification")}
         onCart={() => nav.navigate("Cart")}
@@ -213,7 +214,9 @@ export function KnowledgeScreen() {
           scrollEventThrottle={16}
         >
           {tab === "articles" ? (
-            ARTICLES.map((a) => <ArticleCard key={a.id} a={a} />)
+            ARTICLES.map((a) => (
+              <ArticleCard key={a.id} a={a} onPress={() => nav.navigate("ArticleDetail", { article: a })} />
+            ))
           ) : (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
               {VIDEOS.map((v) => (

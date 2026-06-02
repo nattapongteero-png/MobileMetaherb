@@ -9,14 +9,17 @@ import { NotificationScreen } from "../screens/NotificationScreen";
 import { ShopScreen } from "../screens/ShopScreen";
 import { ProductsScreen } from "../screens/ProductsScreen";
 import { KnowledgeScreen } from "../screens/KnowledgeScreen";
+import { ArticleDetailScreen } from "../screens/ArticleDetailScreen";
 import { AccountScreen } from "../screens/AccountScreen";
 import { BRAND_GREEN } from "../theme/tokens";
 import type { Product } from "../types/Product";
+import type { Article } from "../data/articles";
 
 export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
   ProductDetail: { product: Product };
+  ArticleDetail: { article: Article };
   Cart: undefined;
   Payment: undefined;
   Notification: undefined;
@@ -63,7 +66,7 @@ function MainTabs() {
       <Tab.Screen
         name="Account"
         component={AccountScreen}
-        options={{ title: "บัญชี", tabBarIcon: () => ({ sfSymbol: "person.fill" }) }}
+        options={{ title: "ฉัน", tabBarIcon: () => ({ sfSymbol: "person.fill" }) }}
       />
     </Tab.Navigator>
   );
@@ -79,6 +82,11 @@ export function RootStack() {
       <Stack.Screen
         name="ProductDetail"
         component={ProductDetailScreen}
+        options={{ animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="ArticleDetail"
+        component={ArticleDetailScreen}
         options={{ animation: "slide_from_right" }}
       />
       <Stack.Screen

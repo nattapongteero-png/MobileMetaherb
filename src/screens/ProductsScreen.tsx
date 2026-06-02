@@ -41,7 +41,8 @@ export function ProductsScreen() {
         subtitle="เลือกซื้อสมุนไพรคุณภาพ"
         titleSize={20}
         showLogo={false}
-        showBell={false}
+        showBell={true}
+        showCart={true}
         query={query}
         onChangeQuery={setQuery}
         onBell={() => nav.navigate("Notification")}
