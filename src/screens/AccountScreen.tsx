@@ -41,18 +41,12 @@ const LEAF_B = require("../../assets/herb-leaf-b.png");
 const LEAF_C = require("../../assets/herb-leaf-c.png");
 const LEAF_D = require("../../assets/herb-leaf-d.png");
 
-const ORDER_STATUS: { label: string; Icon: LucideIcon; count: number; tint: string; bg: string }[] = [
-  { label: "รอชำระเงิน", Icon: Wallet, count: 2, tint: "#f97316", bg: "rgba(249,115,22,0.12)" },
-  { label: "รอตรวจสอบ", Icon: ClipboardCheck, count: 1, tint: "#0ea5e9", bg: "rgba(14,165,233,0.12)" },
-  { label: "รอจัดส่ง", Icon: Package, count: 12, tint: "#a855f7", bg: "rgba(168,85,247,0.12)" },
-  { label: "จัดส่งแล้ว", Icon: Truck, count: 1, tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)" },
-];
-
-const MENU: { label: string; Icon: LucideIcon }[] = [
-  { label: "บัญชีของฉัน", Icon: User },
-  { label: "ที่อยู่จัดส่ง", Icon: MapPin },
-  { label: "สินค้าที่ชอบ", Icon: Heart },
-  { label: "คูปองของฉัน", Icon: Ticket },
+type OrderTab = "all" | "pending_group" | "preparing" | "shipped";
+const ORDER_STATUS: { label: string; Icon: LucideIcon; count: number; tint: string; bg: string; tab: OrderTab }[] = [
+  { label: "รอชำระเงิน", Icon: Wallet, count: 2, tint: "#f97316", bg: "rgba(249,115,22,0.12)", tab: "pending_group" },
+  { label: "รอตรวจสอบ", Icon: ClipboardCheck, count: 1, tint: "#0ea5e9", bg: "rgba(14,165,233,0.12)", tab: "pending_group" },
+  { label: "รอจัดส่ง", Icon: Package, count: 12, tint: "#a855f7", bg: "rgba(168,85,247,0.12)", tab: "preparing" },
+  { label: "จัดส่งแล้ว", Icon: Truck, count: 1, tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)", tab: "shipped" },
 ];
 
 const VIEW_SWITCH: { label: string; Icon: LucideIcon }[] = [
@@ -73,13 +67,13 @@ function Card({ children, style }: { children: ReactNode; style?: object }) {
   );
 }
 
-function MenuList({ items }: { items: { label: string; Icon: LucideIcon }[] }) {
+function MenuList({ items }: { items: { label: string; Icon: LucideIcon; onPress?: () => void }[] }) {
   return (
     <Card style={{ padding: 0, overflow: "hidden" }}>
       {items.map((m, i) => (
         <View key={m.label}>
           {i > 0 ? <View style={{ height: 1, backgroundColor: "#f0f0f0", marginLeft: 52 }} /> : null}
-          <Pressable className="flex-row items-center active:opacity-60" style={{ height: 54, paddingHorizontal: 16, gap: 12 }}>
+          <Pressable onPress={m.onPress} className="flex-row items-center active:opacity-60" style={{ height: 54, paddingHorizontal: 16, gap: 12 }}>
             <m.Icon size={20} color={BRAND_GREEN} strokeWidth={2} />
             <Text style={{ flex: 1, fontSize: 15, color: "#0a0a0a" }}>{m.label}</Text>
             <ChevronRight size={18} color="#c4c4c6" strokeWidth={2.2} />
@@ -94,6 +88,17 @@ export function AccountScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
+
+  // The native bottom-tab navigator doesn't reliably bubble navigate() up to
+  // the parent stack, so reach the stack explicitly via getParent().
+  const openOrders = (initialTab?: OrderTab) => {
+    const target = (nav.getParent() ?? nav) as Nav;
+    if (initialTab) target.navigate("Orders", { initialTab });
+    else target.navigate("Orders");
+  };
+  const go = (route: "AccountInfo" | "Address" | "Wishlist" | "Coupons") => {
+    ((nav.getParent() ?? nav) as Nav).navigate(route);
+  };
   const COLLAPSE = PROFILE_BLOCK; // scroll distance to fully hide the profile
 
   const onScroll = useAnimatedScrollHandler((e) => {
@@ -182,14 +187,14 @@ export function AccountScreen() {
           <Card>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }}>การสั่งซื้อของฉัน</Text>
-              <Pressable hitSlop={8} className="flex-row items-center active:opacity-60" style={{ gap: 2 }}>
+              <Pressable onPress={() => openOrders()} hitSlop={8} className="flex-row items-center active:opacity-60" style={{ gap: 2 }}>
                 <Text style={{ fontSize: 13, color: BRAND_GREEN }}>ดูทั้งหมด</Text>
                 <ChevronRight size={14} color={BRAND_GREEN} strokeWidth={2.4} />
               </Pressable>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               {ORDER_STATUS.map((s) => (
-                <Pressable key={s.label} className="items-center active:opacity-70" style={{ flex: 1, gap: 7 }}>
+                <Pressable key={s.label} onPress={() => openOrders(s.tab)} className="items-center active:opacity-70" style={{ flex: 1, gap: 7 }}>
                   <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.bg, alignItems: "center", justifyContent: "center" }}>
                     <s.Icon size={22} color={s.tint} strokeWidth={2} />
                     {s.count > 0 ? (
@@ -222,7 +227,15 @@ export function AccountScreen() {
           </Card>
 
           {/* Menu */}
-          <MenuList items={MENU} />
+          <MenuList
+            items={[
+              { label: "ประวัติการสั่งซื้อ", Icon: Package, onPress: () => openOrders() },
+              { label: "บัญชีของฉัน", Icon: User, onPress: () => go("AccountInfo") },
+              { label: "ที่อยู่จัดส่ง", Icon: MapPin, onPress: () => go("Address") },
+              { label: "สินค้าที่ชอบ", Icon: Heart, onPress: () => go("Wishlist") },
+              { label: "คูปองของฉัน", Icon: Ticket, onPress: () => go("Coupons") },
+            ]}
+          />
 
           {/* Switch view */}
           <View>

@@ -10,16 +10,27 @@ import { ShopScreen } from "../screens/ShopScreen";
 import { ProductsScreen } from "../screens/ProductsScreen";
 import { KnowledgeScreen } from "../screens/KnowledgeScreen";
 import { ArticleDetailScreen } from "../screens/ArticleDetailScreen";
+import { OrdersScreen } from "../screens/OrdersScreen";
 import { AccountScreen } from "../screens/AccountScreen";
+import { AccountInfoScreen } from "../screens/AccountInfoScreen";
+import { AddressScreen } from "../screens/AddressScreen";
+import { WishlistScreen } from "../screens/WishlistScreen";
+import { CouponsScreen } from "../screens/CouponsScreen";
 import { BRAND_GREEN } from "../theme/tokens";
 import type { Product } from "../types/Product";
 import type { Article } from "../data/articles";
+import type { OrderStatus } from "../data/orders";
 
 export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
   ProductDetail: { product: Product };
   ArticleDetail: { article: Article };
+  Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
+  AccountInfo: undefined;
+  Address: undefined;
+  Wishlist: undefined;
+  Coupons: undefined;
   Cart: undefined;
   Payment: undefined;
   Notification: undefined;
@@ -89,6 +100,15 @@ export function RootStack() {
         component={ArticleDetailScreen}
         options={{ animation: "slide_from_right" }}
       />
+      <Stack.Screen
+        name="Orders"
+        component={OrdersScreen}
+        options={{ animation: "slide_from_right" }}
+      />
+      <Stack.Screen name="AccountInfo" component={AccountInfoScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="Address" component={AddressScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="Wishlist" component={WishlistScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="Coupons" component={CouponsScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen
         name="Cart"
         component={CartScreen}
