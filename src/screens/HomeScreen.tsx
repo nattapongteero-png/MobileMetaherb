@@ -624,16 +624,8 @@ export function HomeScreen() {
             are the same height (no layout shift on swipe). Chosen to match
             the majority of banner images (banner_14, banner_15 = 3.825:1). */}
         {(() => {
-          const innerWidth = SCREEN_WIDTH - 32; // outer paddingHorizontal:16 both sides
-          const SIDE_WIDTH = (innerWidth - 10) / 2; // gap 10
-          const HERO_ASPECT = 3.825; // 1530÷400 — fits banner_14/15 perfectly,
-          // banner_6 (4.8:1) gets ~12% side crop in cover mode.
-          const HERO_HEIGHT = innerWidth / HERO_ASPECT;
-          // Side banners are uniform (3.39:1) so we can sample once.
-          const SIDE_ASPECT =
-            Image.resolveAssetSource(SIDE_BANNERS[0]).width /
-            Image.resolveAssetSource(SIDE_BANNERS[0]).height;
-          const SIDE_HEIGHT = SIDE_WIDTH / SIDE_ASPECT;
+          const HERO_HEIGHT = 120; // fixed hero (top) banner height
+          const SIDE_HEIGHT = 70; // fixed side (bottom) banner height
           return (
             <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 10 }}>
               {/* Hero carousel — FlatList paging gives a smooth slide
@@ -722,7 +714,7 @@ export function HomeScreen() {
                 </View>
               </View>
 
-              {/* 2 side promo banners — flatter, smaller below the hero */}
+              {/* 2 side promo banners — bigger (2.2:1) below the hero */}
               <View className="flex-row" style={{ gap: 10 }}>
                 {SIDE_BANNERS.map((src, i) => (
                   <View

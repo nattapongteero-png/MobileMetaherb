@@ -16,6 +16,7 @@ import { AccountInfoScreen } from "../screens/AccountInfoScreen";
 import { AddressScreen } from "../screens/AddressScreen";
 import { WishlistScreen } from "../screens/WishlistScreen";
 import { CouponsScreen } from "../screens/CouponsScreen";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { BRAND_GREEN } from "../theme/tokens";
 import type { Product } from "../types/Product";
 import type { Article } from "../data/articles";
@@ -47,6 +48,13 @@ export type MainTabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createNativeBottomTabNavigator<MainTabParamList>();
 
+// Wrap each tab in its own ErrorBoundary so a render error shows on-screen
+// instead of a blank tab.
+const HomeTab = () => (<ErrorBoundary><HomeScreen /></ErrorBoundary>);
+const ProductsTab = () => (<ErrorBoundary><ProductsScreen /></ErrorBoundary>);
+const KnowledgeTab = () => (<ErrorBoundary><KnowledgeScreen /></ErrorBoundary>);
+const AccountTab = () => (<ErrorBoundary><AccountScreen /></ErrorBoundary>);
+
 
 /**
  * Native iOS tab bar (UITabBarController via react-native-bottom-tabs) — gets
@@ -58,25 +66,28 @@ function MainTabs() {
     <Tab.Navigator
       tabBarActiveTintColor={BRAND_GREEN}
       tabBarInactiveTintColor="#8e8e93"
+      // Eagerly mount every tab (default is lazy:true, which leaves non-focused
+      // tabs as blank placeholders that never render under iOS 26 + New Arch).
+      screenOptions={{ lazy: false }}
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeTab}
         options={{ title: "หน้าแรก", tabBarIcon: () => ({ sfSymbol: "house.fill" }) }}
       />
       <Tab.Screen
         name="Products"
-        component={ProductsScreen}
+        component={ProductsTab}
         options={{ title: "ผลิตภัณฑ์", tabBarIcon: () => ({ sfSymbol: "leaf.fill" }) }}
       />
       <Tab.Screen
         name="Knowledge"
-        component={KnowledgeScreen}
+        component={KnowledgeTab}
         options={{ title: "สาระความรู้", tabBarIcon: () => ({ sfSymbol: "book.fill" }) }}
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={AccountTab}
         options={{ title: "ฉัน", tabBarIcon: () => ({ sfSymbol: "person.fill" }) }}
       />
     </Tab.Navigator>

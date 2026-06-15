@@ -13,6 +13,7 @@ import {
 } from "@expo-google-fonts/ibm-plex-sans-thai-looped";
 import { RootStack } from "./src/navigation/RootStack";
 import { SplashScreen } from "./src/components/SplashScreen";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 
 // Keep the branded splash up at least this long so a fast font load doesn't
 // flash it for a single frame.
@@ -88,7 +89,9 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          <RootStack />
+          <ErrorBoundary>
+            <RootStack />
+          </ErrorBoundary>
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
