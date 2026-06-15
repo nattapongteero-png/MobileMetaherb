@@ -96,7 +96,7 @@ export function AccountScreen() {
     if (initialTab) target.navigate("Orders", { initialTab });
     else target.navigate("Orders");
   };
-  const go = (route: "AccountInfo" | "Address" | "Wishlist" | "Coupons") => {
+  const go = (route: "AccountInfo" | "Address" | "Wishlist" | "Coupons" | "Login") => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
   const COLLAPSE = PROFILE_BLOCK; // scroll distance to fully hide the profile
@@ -245,7 +245,7 @@ export function AccountScreen() {
 
           {/* Logout */}
           <Card style={{ padding: 0, overflow: "hidden" }}>
-            <Pressable className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
+            <Pressable onPress={() => go("Login")} className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
               <LogOut size={18} color="#ef4444" strokeWidth={2.2} />
               <Text style={{ fontSize: 15, fontWeight: "600", color: "#ef4444" }}>ออกจากระบบ</Text>
             </Pressable>

@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createNativeBottomTabNavigator } from "@bottom-tabs/react-navigation";
 import { LoginScreen } from "../screens/LoginScreen";
+import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { ProductDetailScreen } from "../screens/ProductDetailScreen";
 import { CartScreen } from "../screens/CartScreen";
@@ -25,6 +26,7 @@ import type { OrderStatus } from "../data/orders";
 export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
+  Register: undefined;
   ProductDetail: { product: Product };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
@@ -140,7 +142,8 @@ export function RootStack() {
         component={ShopScreen}
         options={{ animation: "slide_from_right" }}
       />
-      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="Register" component={RegisterScreen} options={{ animation: "slide_from_right" }} />
     </Stack.Navigator>
   );
 }
