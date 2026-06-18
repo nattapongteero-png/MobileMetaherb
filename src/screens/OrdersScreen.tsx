@@ -17,7 +17,7 @@ import {
   Truck,
   Home,
   Check,
-  ShoppingBag,
+  ShoppingCart,
   CheckCircle2,
   type LucideIcon,
 } from "lucide-react-native";
@@ -272,7 +272,7 @@ function OrderCard({
               <Btn label="รีวิว" variant="amber" Icon={Star} onPress={() => onAction("review")} />
             </>
           ) : null}
-          {order.status === "completed" ? <Btn label="ซื้ออีกครั้ง" variant="primary" Icon={ShoppingBag} onPress={() => onAction("rebuy")} /> : null}
+          {order.status === "completed" ? <Btn label="ซื้ออีกครั้ง" variant="primary" Icon={ShoppingCart} onPress={() => onAction("rebuy")} /> : null}
           {order.status === "cancelled" ? <Btn label="สั่งซื้อใหม่" variant="primary" onPress={() => onAction("rebuy")} /> : null}
         </View>
       </View>
@@ -399,7 +399,7 @@ export function OrdersScreen() {
   const handleAction = (order: Order, a: Parameters<Parameters<typeof OrderCard>[0]["onAction"]>[0]) => {
     switch (a) {
       case "pay":
-        nav.navigate("Payment");
+        nav.navigate("VerifyPayment");
         break;
       case "cancel":
         Alert.alert("ยกเลิกคำสั่งซื้อ", `ต้องการยกเลิก ${order.id}?`, [
@@ -419,11 +419,13 @@ export function OrdersScreen() {
         setReviewId(order.id);
         break;
       case "rebuy":
-        nav.navigate("Main", { screen: "Products" } as never);
+        nav.navigate("Products" as never);
+        break;
+      case "complaint":
+        nav.navigate("ComplaintSelect", { orderId: order.id });
         break;
       case "edit":
       case "contact":
-      case "complaint":
         Alert.alert("กำลังพัฒนา", "ฟีเจอร์นี้อยู่ระหว่างพัฒนา");
         break;
     }
@@ -452,7 +454,7 @@ export function OrdersScreen() {
             <View style={{ alignItems: "center", paddingTop: 70 }}>
               <Package size={56} color="#d4d4d4" strokeWidth={1.5} />
               <Text style={{ fontSize: 14, color: TEXT_MUTED, marginTop: 12 }}>ยังไม่มีคำสั่งซื้อในหมวดนี้</Text>
-              <Pressable onPress={() => nav.navigate("Main", { screen: "Products" } as never)} hitSlop={8} className="active:opacity-60" style={{ marginTop: 10 }}>
+              <Pressable onPress={() => nav.navigate("Products" as never)} hitSlop={8} className="active:opacity-60" style={{ marginTop: 10 }}>
                 <Text style={{ fontSize: 13, color: BRAND_GREEN, fontWeight: "600" }}>เลือกซื้อสินค้า</Text>
               </Pressable>
             </View>

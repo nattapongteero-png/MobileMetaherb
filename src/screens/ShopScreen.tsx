@@ -103,12 +103,12 @@ const REVIEWS: Review[] = [
 type ShopProduct = Product & { category: string };
 
 const SHOP_PRODUCTS: ShopProduct[] = [
-  { id: "sp1", name: "อบเชยเทศ Cinnamon Varum 150g", price: 199, originalPrice: 249, discountPercent: 20, rating: 4.8, sold: "1.2k", image: require("../../assets/products/cinnamon.png"), category: "ผลิตภัณฑ์สมุนไพร" },
-  { id: "sp2", name: "ยาดมสมุนไพรเมต้าเฮิร์บ", price: 89, rating: 4.7, sold: "856", image: require("../../assets/products/herb-jar.png"), category: "ผลิตภัณฑ์สมุนไพร" },
-  { id: "sp3", name: "ชามะลิอินทรีย์", price: 159, originalPrice: 199, discountPercent: 20, rating: 4.9, sold: "2.1k", image: require("../../assets/products/dokjun.png"), category: "อาหารและเครื่องดื่ม" },
-  { id: "sp4", name: "กาแฟอินทรีย์เมต้า", price: 220, rating: 4.6, sold: "640", image: require("../../assets/products/coffee.png"), category: "อาหารและเครื่องดื่ม" },
-  { id: "sp5", name: "เลมอนซอฟต์เจล", price: 129, rating: 4.5, sold: "420", image: require("../../assets/products/lemon.png"), category: "ผลิตภัณฑ์สุขภาพ" },
-  { id: "sp6", name: "ชุดของขวัญสมุนไพร", price: 399, originalPrice: 499, discountPercent: 20, rating: 4.9, sold: "320", image: require("../../assets/products/gift-set.png"), category: "ชุดของชำร่วย/ของขวัญ" },
+  { id: "sp1", name: "อบเชยเทศ Cinnamon Varum 150g", price: 199, originalPrice: 249, discountPercent: 20, rating: 4.8, sold: "1.2k", image: require("../../assets/products/catalog/product-37.jpg"), category: "ผลิตภัณฑ์สมุนไพร" },
+  { id: "sp2", name: "ยาดมสมุนไพรเมต้าเฮิร์บ", price: 89, rating: 4.7, sold: "856", image: require("../../assets/products/catalog/product-10.jpg"), category: "ผลิตภัณฑ์สมุนไพร" },
+  { id: "sp3", name: "ชามะลิอินทรีย์", price: 159, originalPrice: 199, discountPercent: 20, rating: 4.9, sold: "2.1k", image: require("../../assets/products/catalog/product-16.jpg"), category: "อาหารและเครื่องดื่ม" },
+  { id: "sp4", name: "กาแฟอินทรีย์เมต้า", price: 220, rating: 4.6, sold: "640", image: require("../../assets/products/catalog/product-03.png"), category: "อาหารและเครื่องดื่ม" },
+  { id: "sp5", name: "เลมอนซอฟต์เจล", price: 129, rating: 4.5, sold: "420", image: require("../../assets/products/catalog/product-01.png"), category: "ผลิตภัณฑ์สุขภาพ" },
+  { id: "sp6", name: "ชุดของขวัญสมุนไพร", price: 399, originalPrice: 499, discountPercent: 20, rating: 4.9, sold: "320", image: require("../../assets/products/catalog/product-19.jpg"), category: "ชุดของชำร่วย/ของขวัญ" },
 ];
 
 // Display order matches the web's category dropdown — same labels.

@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, Modal, TextInput, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronLeft, Plus, Pencil, Trash2, MapPin, Phone } from "lucide-react-native";
-import { IconButton } from "../components/IconButton";
+import { Plus, Pencil, Trash2, MapPin, Phone } from "lucide-react-native";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
-import type { RootStackParamList } from "../navigation/RootStack";
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type Address = {
   id: string;
@@ -58,7 +50,6 @@ function Field({
 }
 
 export function AddressScreen() {
-  const nav = useNavigation<Nav>();
   const [addresses, setAddresses] = useState<Address[]>(INITIAL);
   const [editing, setEditing] = useState<Address | null>(null); // address being edited
   const [showForm, setShowForm] = useState(false);
@@ -98,20 +89,8 @@ export function AddressScreen() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
-
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View className="flex-row items-center" style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10, gap: 8 }}>
-          <IconButton onPress={() => nav.canGoBack() && nav.goBack()} variant="translucentDark" accessibilityLabel="ย้อนกลับ">
-            <ChevronLeft size={22} color="white" />
-          </IconButton>
-          <Text style={{ fontSize: 19, fontWeight: "700", color: "#fff" }}>ที่อยู่ของฉัน</Text>
-        </View>
-      </SafeAreaView>
-
-      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 130, gap: 12 }}>
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
           {addresses.map((a) => (
             <View key={a.id} style={{ backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: a.isDefault ? "rgba(49,151,84,0.4)" : "#ececed", padding: 14 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -168,7 +147,6 @@ export function AddressScreen() {
             <Text style={{ fontSize: 14, fontWeight: "600", color: BRAND_GREEN }}>เพิ่มที่อยู่ใหม่</Text>
           </Pressable>
         </ScrollView>
-      </View>
 
       {/* Add / edit modal */}
       <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => setShowForm(false)}>

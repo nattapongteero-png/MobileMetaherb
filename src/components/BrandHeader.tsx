@@ -1,10 +1,36 @@
 import { useRef, type ReactNode } from "react";
 import { Animated, Image, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Bell, Search, ShoppingBag } from "lucide-react-native";
-import { IconButton } from "./IconButton";
+import { Bell, ChevronLeft, Search, ShoppingCart } from "lucide-react-native";
+import { GlassIconButton } from "./GlassIconButton";
 import { CountBadge } from "./CountBadge";
 import { BRAND_GREEN } from "../theme/tokens";
+import { useCart } from "../context/CartContext";
+
+// Notification / cart header button — Liquid Glass (iOS 26) like the product
+// detail screen, 44px, with a count badge pinned to the top-right corner.
+function GlassHeaderButton({
+  onPress,
+  icon,
+  count,
+  accessibilityLabel,
+}: {
+  onPress: () => void;
+  icon: ReactNode;
+  count: number;
+  accessibilityLabel: string;
+}) {
+  return (
+    <View>
+      <GlassIconButton onPress={onPress} size={44} accessibilityLabel={accessibilityLabel}>
+        {icon}
+      </GlassIconButton>
+      <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
+        <CountBadge count={count} />
+      </View>
+    </View>
+  );
+}
 
 const LOGO = require("../../assets/logo.png");
 const LEAF_B = require("../../assets/herb-leaf-b.png");
@@ -19,6 +45,8 @@ type Props = {
   onChangeQuery?: (s: string) => void;
   onBell: () => void;
   onCart: () => void;
+  /** When set, a back button appears at the left of the header (subpage mode). */
+  onBack?: () => void;
   /** Show the search bar row. When false, the header is static (no collapse). */
   showSearch?: boolean;
   /** Custom control rendered in the header (green) where the search bar sits —
@@ -54,6 +82,7 @@ export function BrandHeader({
   onChangeQuery,
   onBell,
   onCart,
+  onBack,
   showSearch = true,
   bottomSlot,
   scrollY,
@@ -65,8 +94,11 @@ export function BrandHeader({
   showCart = true,
   searchPlaceholder = "ค้นหาสินค้า, สมุนไพร, ร้านค้า...",
   bellCount = 3,
-  cartCount = 2,
+  cartCount,
 }: Props) {
+  // Cart badge reflects the shared cart unless a screen overrides cartCount.
+  const { count: liveCartCount } = useCart();
+  const effectiveCartCount = cartCount ?? liveCartCount;
   // Fallback keeps the header in its expanded state when no scrollY is wired.
   const fallback = useRef(new Animated.Value(0)).current;
   const sy = scrollY ?? fallback;
@@ -92,8 +124,9 @@ export function BrandHeader({
     outputRange: [-TOP_ROW_HEIGHT, 0],
     extrapolate: "clamp",
   });
-  // Room the icons need in the search row: 1 icon ≈ 56, 2 icons ≈ 106.
-  const iconsRoom = showBell ? 106 : 56;
+  // Room the 44px glass icons need in the search row (at right:18, gap 12),
+  // keeping a ~12px gap from the search bar: 2 icons ≈ 118, 1 icon ≈ 64.
+  const iconsRoom = showBell ? 118 : 64;
   const searchBarMarginRight = sy.interpolate({
     inputRange: [0, TOP_ROW_HEIGHT],
     outputRange: [0, iconsRoom],
@@ -113,21 +146,27 @@ export function BrandHeader({
   );
 
   const bell = showBell ? (
-    <IconButton onPress={onBell} variant="translucentDark" accessibilityLabel="การแจ้งเตือน">
-      <Bell size={20} color="white" />
-      <View style={{ position: "absolute", top: -2, right: -4 }}>
-        <CountBadge count={bellCount} />
-      </View>
-    </IconButton>
+    <GlassHeaderButton
+      onPress={onBell}
+      icon={<Bell size={20} color="#1a1a1a" />}
+      count={bellCount}
+      accessibilityLabel="การแจ้งเตือน"
+    />
   ) : null;
 
   const cart = showCart ? (
-    <IconButton onPress={onCart} variant="translucentDark" accessibilityLabel="ตะกร้าสินค้า">
-      <ShoppingBag size={20} color="white" />
-      <View style={{ position: "absolute", top: -2, right: -4 }}>
-        <CountBadge count={cartCount} />
-      </View>
-    </IconButton>
+    <GlassHeaderButton
+      onPress={onCart}
+      icon={<ShoppingCart size={20} color="#1a1a1a" />}
+      count={effectiveCartCount}
+      accessibilityLabel="ตะกร้าสินค้า"
+    />
+  ) : null;
+
+  const back = onBack ? (
+    <GlassIconButton onPress={onBack} size={40} accessibilityLabel="ย้อนกลับ">
+      <ChevronLeft size={20} color="#1a1a1a" strokeWidth={2.4} />
+    </GlassIconButton>
   ) : null;
 
   const titleBlock = (
@@ -155,6 +194,7 @@ export function BrandHeader({
             className="flex-row items-center"
             style={{ height: TOP_ROW_HEIGHT, paddingLeft: 16, paddingRight: 18, gap: 12 }}
           >
+            {back}
             {showLogo ? <Image source={LOGO} style={{ width: 44, height: 44 }} resizeMode="contain" /> : null}
             {titleBlock}
             {bell}
@@ -189,6 +229,7 @@ export function BrandHeader({
           className="flex-row items-center"
           style={{ height: TOP_ROW_HEIGHT, paddingLeft: 16, paddingRight: 18, gap: 12 }}
         >
+          {back}
           {showLogo ? (
             <Image source={LOGO} style={{ width: 44, height: 44 }} resizeMode="contain" />
           ) : null}
@@ -204,24 +245,24 @@ export function BrandHeader({
           </View>
 
           {showBell ? (
-            <IconButton onPress={onBell} variant="translucentDark" accessibilityLabel="การแจ้งเตือน">
-              <Bell size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={bellCount} />
-              </View>
-            </IconButton>
+            <GlassHeaderButton
+              onPress={onBell}
+              icon={<Bell size={20} color="#1a1a1a" />}
+              count={bellCount}
+              accessibilityLabel="การแจ้งเตือน"
+            />
           ) : null}
-          <IconButton onPress={onCart} variant="translucentDark" accessibilityLabel="ตะกร้าสินค้า">
-            <ShoppingBag size={20} color="white" />
-            <View style={{ position: "absolute", top: -2, right: -4 }}>
-              <CountBadge count={cartCount} />
-            </View>
-          </IconButton>
+          <GlassHeaderButton
+            onPress={onCart}
+            icon={<ShoppingCart size={20} color="#1a1a1a" />}
+            count={effectiveCartCount}
+            accessibilityLabel="ตะกร้าสินค้า"
+          />
         </View>
       </Animated.View>
 
       {/* Sticky search row — bar grows to full width as the icons fade out */}
-      <View style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12, paddingTop: 4 }}>
+      <View style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12, paddingTop: 14 }}>
         <Animated.View style={{ marginRight: searchBarMarginRight }}>
           <View
             className="flex-row items-center rounded-full px-4"
@@ -262,19 +303,19 @@ export function BrandHeader({
           }}
         >
           {showBell ? (
-            <IconButton onPress={onBell} variant="translucentDark" accessibilityLabel="การแจ้งเตือน">
-              <Bell size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={bellCount} />
-              </View>
-            </IconButton>
+            <GlassHeaderButton
+              onPress={onBell}
+              icon={<Bell size={20} color="#1a1a1a" />}
+              count={bellCount}
+              accessibilityLabel="การแจ้งเตือน"
+            />
           ) : null}
-          <IconButton onPress={onCart} variant="translucentDark" accessibilityLabel="ตะกร้าสินค้า">
-            <ShoppingBag size={20} color="white" />
-            <View style={{ position: "absolute", top: -2, right: -4 }}>
-              <CountBadge count={cartCount} />
-            </View>
-          </IconButton>
+          <GlassHeaderButton
+            onPress={onCart}
+            icon={<ShoppingCart size={20} color="#1a1a1a" />}
+            count={effectiveCartCount}
+            accessibilityLabel="ตะกร้าสินค้า"
+          />
         </Animated.View>
       </View>
     </SafeAreaView>

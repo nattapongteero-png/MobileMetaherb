@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, Text, Image, Pressable, Dimensions } from "react-native";
+import { View, Text, Image, Pressable, Dimensions, Alert } from "react-native";
 import Reanimated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -24,8 +24,14 @@ import {
   LogOut,
   Store,
   ShieldCheck,
+  Info,
+  Sprout,
+  FlaskConical,
+  MessageCircle,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react-native";
+import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
 
@@ -47,11 +53,6 @@ const ORDER_STATUS: { label: string; Icon: LucideIcon; count: number; tint: stri
   { label: "รอตรวจสอบ", Icon: ClipboardCheck, count: 1, tint: "#0ea5e9", bg: "rgba(14,165,233,0.12)", tab: "pending_group" },
   { label: "รอจัดส่ง", Icon: Package, count: 12, tint: "#a855f7", bg: "rgba(168,85,247,0.12)", tab: "preparing" },
   { label: "จัดส่งแล้ว", Icon: Truck, count: 1, tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)", tab: "shipped" },
-];
-
-const VIEW_SWITCH: { label: string; Icon: LucideIcon }[] = [
-  { label: "ร้านค้าของฉัน", Icon: Store },
-  { label: "ตั้งค่าบนเว็บไซต์", Icon: ShieldCheck },
 ];
 
 function Card({ children, style }: { children: ReactNode; style?: object }) {
@@ -96,7 +97,21 @@ export function AccountScreen() {
     if (initialTab) target.navigate("Orders", { initialTab });
     else target.navigate("Orders");
   };
-  const go = (route: "AccountInfo" | "Address" | "Wishlist" | "Coupons" | "Login") => {
+  const go = (
+    route:
+      | "AccountInfo"
+      | "Address"
+      | "Wishlist"
+      | "Coupons"
+      | "Login"
+      | "Settings"
+      | "About"
+      | "HerbalMarket"
+      | "TrialProducts"
+      | "MyTrials"
+      | "Chat"
+      | "AIAssistant",
+  ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
   const COLLAPSE = PROFILE_BLOCK; // scroll distance to fully hide the profile
@@ -115,7 +130,7 @@ export function AccountScreen() {
     <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
       <StatusBar style="light" />
 
-      {/* Green header — safe-area strip stays, profile collapses to nothing */}
+      {/* Green header (matches Home) — profile collapses to nothing on scroll */}
       <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
         {/* Leaf watermark, clipped to the header */}
         <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
@@ -234,13 +249,46 @@ export function AccountScreen() {
               { label: "ที่อยู่จัดส่ง", Icon: MapPin, onPress: () => go("Address") },
               { label: "สินค้าที่ชอบ", Icon: Heart, onPress: () => go("Wishlist") },
               { label: "คูปองของฉัน", Icon: Ticket, onPress: () => go("Coupons") },
+              { label: "เกี่ยวกับเรา", Icon: Info, onPress: () => go("About") },
             ]}
           />
+
+          {/* More services */}
+          <View>
+            <Text style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 8, marginLeft: 4 }}>บริการเพิ่มเติม</Text>
+            <MenuList
+              items={[
+                { label: "ตลาดสมุนไพร", Icon: Sprout, onPress: () => go("HerbalMarket") },
+                { label: "สินค้าทดลองใช้", Icon: FlaskConical, onPress: () => go("TrialProducts") },
+                { label: "การทดลองของฉัน", Icon: ClipboardCheck, onPress: () => go("MyTrials") },
+              ]}
+            />
+          </View>
+
+          {/* Help */}
+          <View>
+            <Text style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 8, marginLeft: 4 }}>ช่วยเหลือ</Text>
+            <MenuList
+              items={[
+                { label: "ผู้ช่วย AI (เมต้า)", Icon: Sparkles, onPress: () => go("AIAssistant") },
+                { label: "แชทกับร้านค้า", Icon: MessageCircle, onPress: () => go("Chat") },
+              ]}
+            />
+          </View>
 
           {/* Switch view */}
           <View>
             <Text style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 8, marginLeft: 4 }}>สลับมุมมอง</Text>
-            <MenuList items={VIEW_SWITCH} />
+            <MenuList
+              items={[
+                {
+                  label: "ร้านค้าของฉัน",
+                  Icon: Store,
+                  onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดร้านค้ากำลังพัฒนา"),
+                },
+                { label: "ตั้งค่าบนเว็บไซต์", Icon: ShieldCheck, onPress: () => go("Settings") },
+              ]}
+            />
           </View>
 
           {/* Logout */}
@@ -251,6 +299,8 @@ export function AccountScreen() {
             </Pressable>
           </Card>
         </Reanimated.ScrollView>
+        {/* Black scroll-edge shade at the very bottom of the screen. */}
+        <BottomFade />
       </View>
     </View>
   );

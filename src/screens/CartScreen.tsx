@@ -1,29 +1,40 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   Pressable,
   Image,
   Dimensions,
   Platform,
+  Animated,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Check,
+  MessageCircle,
   Minus,
+  PackageX,
   Plus,
-  ShieldCheck,
-  ShoppingBag,
+  SearchX,
+  ShoppingCart,
   Trash2,
 } from "lucide-react-native";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { PageHeader } from "../components/PageHeader";
+import { BottomFade } from "../components/BottomFade";
 import { EmptyState } from "../components/EmptyState";
-import { BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { ShopAvatar } from "../components/ShopAvatar";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { CheckoutSheet, type CheckoutSheetHandle } from "../components/CheckoutSheet";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { useCart, type CartItem } from "../context/CartContext";
+import { getShop } from "../data/shops";
+import type { Product } from "../types/Product";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,101 +43,189 @@ const SCREEN_WIDTH =
     ? Math.min(Dimensions.get("window").width, 430)
     : Dimensions.get("window").width;
 
-type CartItem = {
-  id: string;
-  name: string;
-  option: string;
-  price: number;
-  originalPrice?: number;
-  quantity: number;
-  inStock: boolean;
-  image: number;
+/** Build a navigable Product from a cart line so tapping a row opens its detail
+ *  page. The cart stores only a subset of Product fields, so rating is borrowed
+ *  from the shop and discountPercent is derived from the original price. */
+function cartItemToProduct(item: CartItem): Product {
+  return {
+    id: item.id,
+    name: item.name,
+    price: item.price,
+    originalPrice: item.originalPrice,
+    discountPercent: item.originalPrice
+      ? Math.round((1 - item.price / item.originalPrice) * 100)
+      : undefined,
+    rating: getShop(item.shop).rating,
+    sold: "ขายดี",
+    image: item.image,
+  };
+}
+
+type CartItemRowProps = {
+  item: CartItem;
+  isLast: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onQty: (n: number) => void;
+  onRemove: () => void;
 };
 
-type Shop = {
-  name: string;
-  items: CartItem[];
-};
+/** A single cart line — shared by the per-shop sections and the out-of-stock
+ *  section. Out-of-stock items render disabled (no checkbox/stepper, dimmed). */
+function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove }: CartItemRowProps) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: "#f5f5f5",
+      }}
+    >
+      <View className="flex-row" style={{ gap: 12 }}>
+        <Pressable
+          onPress={onToggle}
+          hitSlop={14}
+          disabled={!item.inStock}
+          style={{ paddingTop: 28, paddingBottom: 4 }}
+        >
+          <Checkbox checked={selected} disabled={!item.inStock} />
+        </Pressable>
+        <Pressable
+          onPress={onOpen}
+          className="active:opacity-80"
+          accessibilityLabel={`ดูรายละเอียด ${item.name}`}
+          style={{ width: 76, height: 76, borderRadius: 8, backgroundColor: "#f5f5f5", overflow: "hidden" }}
+        >
+          <Image
+            source={item.image}
+            style={{ width: "100%", height: "100%", opacity: item.inStock ? 1 : 0.45 }}
+            resizeMode="cover"
+          />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <View className="flex-row" style={{ gap: 8 }}>
+            <Pressable onPress={onOpen} className="active:opacity-60" style={{ flex: 1 }}>
+              <Text
+                numberOfLines={2}
+                style={{ fontSize: 13, color: item.inStock ? "#0a0a0a" : "#a3a3a3", lineHeight: 18 }}
+              >
+                {item.name}
+              </Text>
+              <Text style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2, lineHeight: 14 }}>
+                {item.option}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onRemove}
+              hitSlop={14}
+              className="active:opacity-60"
+              style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center", marginTop: -6, marginRight: -6 }}
+            >
+              <Trash2 size={18} color="#a3a3a3" />
+            </Pressable>
+          </View>
 
-// Mock shop + cart data — replace with cart context once backend exists.
-const MOCK_SHOPS: Shop[] = [
-  {
-    name: "METAHERB Store",
-    items: [
-      {
-        id: "c1",
-        name: "อบเชยเทศ Cinnamon Varum 150g",
-        option: "ขนาด 150g",
-        price: 199,
-        originalPrice: 330,
-        quantity: 2,
-        inStock: true,
-        image: require("../../assets/products/cinnamon.png"),
-      },
-      {
-        id: "c2",
-        name: "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน",
-        option: "เซต 2 ขวด",
-        price: 89,
-        originalPrice: 150,
-        quantity: 1,
-        inStock: true,
-        image: require("../../assets/products/herb-jar.png"),
-      },
-    ],
-  },
-  {
-    name: "สมุนไพรบ้านสวน",
-    items: [
-      {
-        id: "c3",
-        name: "กาแฟดริป Dark Roast Arabica 9 ซอง",
-        option: "Dark Roast",
-        price: 220,
-        originalPrice: 320,
-        quantity: 1,
-        inStock: false,
-        image: require("../../assets/products/coffee.png"),
-      },
-    ],
-  },
-];
+          {/* In-stock: qty stepper + price. Out-of-stock: status tag + price. */}
+          <View className="flex-row items-center justify-between" style={{ marginTop: 10 }}>
+            {item.inStock ? (
+              <QtyStepper quantity={item.quantity} onChange={onQty} />
+            ) : (
+              <View
+                style={{ backgroundColor: "#e5e7eb", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}
+              >
+                <Text style={{ fontSize: 11, color: "#6b7280", fontWeight: "500", lineHeight: 14 }}>
+                  สินค้าหมด
+                </Text>
+              </View>
+            )}
+            <View style={{ alignItems: "flex-end" }}>
+              {item.originalPrice ? (
+                <Text
+                  style={{ fontSize: 11, color: TEXT_MUTED, textDecorationLine: "line-through", lineHeight: 14 }}
+                >
+                  ฿{(item.originalPrice * item.quantity).toFixed(0)}
+                </Text>
+              ) : null}
+              <Text style={{ fontSize: 16, fontWeight: "700", color: "#ee4d2d", lineHeight: 20 }}>
+                ฿{(item.price * item.quantity).toFixed(0)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export function CartScreen() {
   const nav = useNavigation<Nav>();
-  const [shops] = useState<Shop[]>(MOCK_SHOPS);
-  const allItems = useMemo(() => shops.flatMap((s) => s.items), [shops]);
-  const inStockIds = useMemo(
-    () => new Set(allItems.filter((i) => i.inStock).map((i) => i.id)),
-    [allItems],
-  );
+  const insets = useSafeAreaInsets();
+  const { items, updateQty, removeItem, removeMany } = useCart();
 
-  // Selection state — Set of item IDs the user has ticked.
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(inStockIds));
-  // Quantity state — id → quantity. Initialised from mock data.
-  const [quantities, setQuantities] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    allItems.forEach((i) => (init[i.id] = i.quantity));
-    return init;
-  });
-  // Removed items — track to remove without mutating state arrays.
-  const [removed, setRemoved] = useState<Set<string>>(() => new Set());
-
-  const visibleShops = useMemo(
+  // Search — filters the displayed rows by product name or shop. Selection and
+  // pricing keep operating on the full cart so the checkout total stays stable
+  // while the user is just narrowing the view.
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filteredItems = useMemo(
     () =>
-      shops
-        .map((s) => ({
-          ...s,
-          items: s.items.filter((i) => !removed.has(i.id)),
-        }))
-        .filter((s) => s.items.length > 0),
-    [shops, removed],
+      q
+        ? items.filter(
+            (i) =>
+              i.name.toLowerCase().includes(q) ||
+              i.shop.toLowerCase().includes(q),
+          )
+        : items,
+    [items, q],
   );
 
-  const visibleInStockItems = useMemo(
-    () => visibleShops.flatMap((s) => s.items).filter((i) => i.inStock),
-    [visibleShops],
+  // Group IN-STOCK cart lines into shops (preserve first-seen order). Out-of-
+  // stock lines are pulled out into their own section at the very bottom.
+  const visibleShops = useMemo(() => {
+    const order: string[] = [];
+    const byShop: Record<string, CartItem[]> = {};
+    filteredItems
+      .filter((i) => i.inStock)
+      .forEach((i) => {
+        if (!byShop[i.shop]) {
+          byShop[i.shop] = [];
+          order.push(i.shop);
+        }
+        byShop[i.shop].push(i);
+      });
+    return order.map((name) => ({ name, items: byShop[name] }));
+  }, [filteredItems]);
+
+  // All unavailable lines, regardless of shop — rendered last, always.
+  const outOfStockItems = useMemo(
+    () => filteredItems.filter((i) => !i.inStock),
+    [filteredItems],
   );
+
+  const visibleInStockItems = useMemo(() => items.filter((i) => i.inStock), [items]);
+
+  // Selection — ticked item IDs. New in-stock items auto-tick; gone IDs prune.
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(items.filter((i) => i.inStock).map((i) => i.id)),
+  );
+  const knownIds = useRef<Set<string>>(new Set(items.map((i) => i.id)));
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      items.forEach((i) => {
+        if (!knownIds.current.has(i.id)) {
+          if (i.inStock) next.add(i.id);
+          knownIds.current.add(i.id);
+        }
+      });
+      [...next].forEach((id) => {
+        if (!items.some((i) => i.id === id)) next.delete(id);
+      });
+      return next;
+    });
+  }, [items]);
 
   const allSelected =
     visibleInStockItems.length > 0 &&
@@ -164,59 +263,53 @@ export function CartScreen() {
     });
   };
 
-  const updateQty = (id: string, delta: number) => {
-    setQuantities((prev) => {
-      const current = prev[id] ?? 1;
-      const next = Math.max(1, Math.min(99, current + delta));
-      return { ...prev, [id]: next };
-    });
-  };
-
-  const removeItem = (id: string) => {
-    setRemoved((prev) => new Set(prev).add(id));
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  };
-
   const removeSelected = () => {
-    setRemoved((prev) => {
-      const next = new Set(prev);
-      selected.forEach((id) => next.add(id));
-      return next;
-    });
+    removeMany([...selected]);
     setSelected(new Set());
   };
 
-  // Pricing math (selected items only).
+  const openProduct = (item: CartItem) =>
+    nav.navigate("ProductDetail", { product: cartItemToProduct(item) });
+
+  // Collapse the checkout sheet as soon as the user scrolls to browse the list.
+  const sheetRef = useRef<CheckoutSheetHandle>(null);
+
+  // Pricing math (selected items only) — quantities live in the cart context.
   const selectedItems = visibleInStockItems.filter((i) => selected.has(i.id));
   const selectedCount = selectedItems.length;
-  const subtotal = selectedItems.reduce(
-    (sum, i) => sum + i.price * (quantities[i.id] ?? 1),
-    0,
-  );
+  const selectedPieces = selectedItems.reduce((s, i) => s + i.quantity, 0);
+  // Distinct suppliers in the selection — a PR is raised per supplier.
+  const supplierCount = new Set(selectedItems.map((i) => i.shop)).size;
+  const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const originalTotal = selectedItems.reduce(
-    (sum, i) => sum + (i.originalPrice ?? i.price) * (quantities[i.id] ?? 1),
+    (sum, i) => sum + (i.originalPrice ?? i.price) * i.quantity,
     0,
   );
   const discount = Math.max(0, originalTotal - subtotal);
   const grandTotal = subtotal;
 
+  const totalQty = useMemo(
+    () => items.reduce((s, i) => s + i.quantity, 0),
+    [items],
+  );
+
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
 
-      <PageHeader
+      <SubPageHeader
         title="ตะกร้าสินค้า"
-        subtitle={`(${visibleInStockItems.length + visibleShops.flatMap((s) => s.items).filter((i) => !i.inStock).length})`}
+        subtitle={totalQty > 0 ? `${totalQty} ชิ้นในตะกร้า` : "ตะกร้ายังว่างอยู่"}
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        query={query}
+        onChangeQuery={setQuery}
+        searchPlaceholder="ค้นหาในตะกร้า..."
       />
 
-      {visibleShops.length === 0 ? (
+      {items.length === 0 ? (
         <View className="flex-1 justify-center">
           <EmptyState
-            icon={<ShoppingBag size={36} color="#9ca3af" />}
+            icon={<ShoppingCart size={36} color="#9ca3af" />}
             title="ตะกร้ายังว่างอยู่"
             subtitle="ลองช้อปสินค้าที่คุณสนใจ"
             action={
@@ -237,11 +330,21 @@ export function CartScreen() {
             }
           />
         </View>
+      ) : visibleShops.length === 0 && outOfStockItems.length === 0 ? (
+        <View className="flex-1 justify-center">
+          <EmptyState
+            icon={<SearchX size={36} color="#9ca3af" />}
+            title="ไม่พบสินค้าในตะกร้า"
+            subtitle="ลองเปลี่ยนคำค้นหา"
+          />
+        </View>
       ) : (
         <>
+          <View style={{ flex: 1 }}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 110 }}
+            contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}
+            onScrollBeginDrag={() => sheetRef.current?.collapse()}
           >
             {/* Select-all bar */}
             <View
@@ -301,429 +404,253 @@ export function CartScreen() {
                     <Pressable
                       onPress={() => toggleShop(shop.name)}
                       hitSlop={14}
-                      style={{ padding: 4 }}
+                      style={{ paddingVertical: 4 }}
                     >
                       <Checkbox checked={allShopSelected} />
                     </Pressable>
-                    <View
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 11,
-                        backgroundColor: "#319754",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <ShoppingBag size={12} color="white" />
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        flex: 1,
-                        fontSize: 13,
-                        fontWeight: "500",
-                        color: "#0a0a0a",
-                        lineHeight: 18,
-                      }}
-                    >
-                      {shop.name}
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: "#319754",
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4,
-                      }}
-                    >
+                    <ShopAvatar name={shop.name} size={32} />
+                    <View className="flex-row items-center" style={{ flex: 1, gap: 6 }}>
                       <Text
+                        numberOfLines={1}
                         style={{
-                          color: "white",
-                          fontSize: 9,
-                          fontWeight: "600",
-                          lineHeight: 12,
+                          flexShrink: 1,
+                          fontSize: 13,
+                          fontWeight: "500",
+                          color: "#0a0a0a",
+                          lineHeight: 18,
                         }}
                       >
-                        แนะนำ
+                        {shop.name}
                       </Text>
+                      {/* "แนะนำ" pill — oval, hugging the shop name. */}
+                      <View
+                        style={{
+                          backgroundColor: "#319754",
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 999,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            fontSize: 9,
+                            fontWeight: "600",
+                            lineHeight: 12,
+                          }}
+                        >
+                          แนะนำ
+                        </Text>
+                      </View>
                     </View>
+
+                    {/* Chat with this shop — opens the store thread. */}
+                    <Pressable
+                      onPress={() => nav.navigate("Chat")}
+                      hitSlop={10}
+                      className="flex-row items-center active:opacity-60"
+                      accessibilityLabel={`แชทกับ ${shop.name}`}
+                      style={{ gap: 4, paddingLeft: 4 }}
+                    >
+                      <MessageCircle size={18} color="#319754" strokeWidth={2} />
+                      <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK, fontWeight: "500", lineHeight: 16 }}>
+                        แชท
+                      </Text>
+                    </Pressable>
                   </View>
 
                   {/* Items */}
                   {shop.items.map((item, idx) => (
-                    <View
+                    <CartItemRow
                       key={item.id}
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderBottomWidth: idx === shop.items.length - 1 ? 0 : 1,
-                        borderBottomColor: "#f5f5f5",
-                      }}
-                    >
-                      <View className="flex-row" style={{ gap: 12 }}>
-                        <Pressable
-                          onPress={() => toggleItem(item.id, item.inStock)}
-                          hitSlop={14}
-                          disabled={!item.inStock}
-                          style={{ paddingTop: 28, padding: 4 }}
-                        >
-                          <Checkbox
-                            checked={selected.has(item.id)}
-                            disabled={!item.inStock}
-                          />
-                        </Pressable>
-                        <View
-                          style={{
-                            width: 76,
-                            height: 76,
-                            borderRadius: 8,
-                            backgroundColor: "#f5f5f5",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <Image
-                            source={item.image}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              opacity: item.inStock ? 1 : 0.45,
-                            }}
-                            resizeMode="cover"
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View className="flex-row" style={{ gap: 8 }}>
-                            <View style={{ flex: 1 }}>
-                              <Text
-                                numberOfLines={2}
-                                style={{
-                                  fontSize: 13,
-                                  color: item.inStock ? "#0a0a0a" : "#a3a3a3",
-                                  lineHeight: 18,
-                                }}
-                              >
-                                {item.name}
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: TEXT_MUTED,
-                                  marginTop: 2,
-                                  lineHeight: 14,
-                                }}
-                              >
-                                {item.option}
-                              </Text>
-                              {!item.inStock ? (
-                                <View
-                                  style={{
-                                    alignSelf: "flex-start",
-                                    marginTop: 4,
-                                    backgroundColor: "#e5e7eb",
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 2,
-                                    borderRadius: 4,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10,
-                                      color: "#6b7280",
-                                      fontWeight: "500",
-                                      lineHeight: 13,
-                                    }}
-                                  >
-                                    สินค้าหมด
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </View>
-                            <Pressable
-                              onPress={() => removeItem(item.id)}
-                              hitSlop={14}
-                              className="active:opacity-60"
-                              style={{
-                                width: 32,
-                                height: 32,
-                                alignItems: "center",
-                                justifyContent: "center",
-                                marginTop: -6,
-                                marginRight: -6,
-                              }}
-                            >
-                              <Trash2 size={18} color="#a3a3a3" />
-                            </Pressable>
-                          </View>
-
-                          {/* Qty stepper + price */}
-                          <View
-                            className="flex-row items-center justify-between"
-                            style={{ marginTop: 10 }}
-                          >
-                            {item.inStock ? (
-                              <View
-                                className="flex-row items-center"
-                                style={{
-                                  borderWidth: 1,
-                                  borderColor: "#e5e7eb",
-                                  borderRadius: 8,
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {/* Fitts's Law: visual 36px + hitSlop 8 = ~52px
-                                    effective tap target, comfortably above the
-                                    44dp HIG minimum. */}
-                                <Pressable
-                                  onPress={() => updateQty(item.id, -1)}
-                                  hitSlop={8}
-                                  disabled={(quantities[item.id] ?? 1) <= 1}
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    opacity: (quantities[item.id] ?? 1) <= 1 ? 0.4 : 1,
-                                  }}
-                                >
-                                  <Minus size={16} color="#0a0a0a" />
-                                </Pressable>
-                                <View
-                                  style={{
-                                    width: 44,
-                                    height: 36,
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    borderLeftWidth: 1,
-                                    borderRightWidth: 1,
-                                    borderColor: "#e5e7eb",
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 14,
-                                      fontWeight: "600",
-                                      color: "#0a0a0a",
-                                      lineHeight: 18,
-                                    }}
-                                  >
-                                    {quantities[item.id] ?? 1}
-                                  </Text>
-                                </View>
-                                <Pressable
-                                  onPress={() => updateQty(item.id, 1)}
-                                  hitSlop={8}
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <Plus size={16} color="#0a0a0a" />
-                                </Pressable>
-                              </View>
-                            ) : (
-                              <View />
-                            )}
-                            <View style={{ alignItems: "flex-end" }}>
-                              {item.originalPrice ? (
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    color: TEXT_MUTED,
-                                    textDecorationLine: "line-through",
-                                    lineHeight: 14,
-                                  }}
-                                >
-                                  ฿{(item.originalPrice * (quantities[item.id] ?? 1)).toFixed(0)}
-                                </Text>
-                              ) : null}
-                              <Text
-                                style={{
-                                  fontSize: 16,
-                                  fontWeight: "700",
-                                  color: "#ee4d2d",
-                                  lineHeight: 20,
-                                }}
-                              >
-                                ฿{(item.price * (quantities[item.id] ?? 1)).toFixed(0)}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
+                      item={item}
+                      isLast={idx === shop.items.length - 1}
+                      selected={selected.has(item.id)}
+                      onToggle={() => toggleItem(item.id, item.inStock)}
+                      onOpen={() => openProduct(item)}
+                      onQty={(n) => updateQty(item.id, n)}
+                      onRemove={() => removeItem(item.id)}
+                    />
                   ))}
-
                 </View>
               );
             })}
 
-            {/* Summary card */}
-            <View className="bg-white" style={{ marginTop: 8, padding: 16 }}>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "#0a0a0a",
-                  marginBottom: 12,
-                  lineHeight: 20,
-                }}
-              >
-                สรุปคำสั่งซื้อ
-              </Text>
-              {(() => {
-                const rows: Array<[string, string, string]> = [
-                  ["รายการที่เลือก", `${selectedCount} รายการ`, "#319754"],
-                  [
-                    `ยอดสินค้า (${selectedItems.reduce((s, i) => s + (quantities[i.id] ?? 1), 0)} ชิ้น)`,
-                    `฿${subtotal.toFixed(0)}`,
-                    "#0a0a0a",
-                  ],
-                ];
-                if (discount > 0) {
-                  rows.push(["ส่วนลด", `-฿${discount.toFixed(0)}`, "#ee4d2d"]);
-                }
-                rows.push(["ค่าจัดส่ง", "ฟรี", "#319754"]);
-                return rows.map(([label, val, color]) => (
-                  <View
-                    key={label}
-                    className="flex-row items-center justify-between"
-                    style={{ marginBottom: 8 }}
-                  >
-                    <Text style={{ fontSize: 13, color: "#525252", lineHeight: 18 }}>
-                      {label}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color,
-                        fontWeight: "500",
-                        lineHeight: 18,
-                      }}
-                    >
-                      {val}
+            {/* Out-of-stock section — all unavailable items, every shop pooled
+                together, pinned to the bottom of the list. */}
+            {outOfStockItems.length > 0 ? (
+              <View className="bg-white" style={{ marginTop: 8 }}>
+                <View
+                  className="flex-row items-center justify-between"
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    backgroundColor: "#fafafa",
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#f0f0f0",
+                  }}
+                >
+                  <View className="flex-row items-center" style={{ gap: 8 }}>
+                    <PackageX size={16} color="#9ca3af" strokeWidth={2} />
+                    <Text style={{ fontSize: 13, fontWeight: "500", color: "#6b7280", lineHeight: 18 }}>
+                      สินค้าที่หมด ({outOfStockItems.length})
                     </Text>
                   </View>
-                ));
-              })()}
-              <View
-                className="flex-row items-center justify-between"
-                style={{
-                  borderTopWidth: 1,
-                  borderTopColor: "#f0f0f0",
-                  marginTop: 8,
-                  paddingTop: 12,
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a", lineHeight: 18 }}>
-                  รวมทั้งสิ้น
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 22,
-                    fontWeight: "700",
-                    color: "#ee4d2d",
-                    lineHeight: 26,
-                  }}
-                >
-                  ฿{grandTotal.toFixed(0)}
-                </Text>
+                  <Pressable
+                    onPress={() => removeMany(outOfStockItems.map((i) => i.id))}
+                    hitSlop={10}
+                    className="active:opacity-60"
+                    style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+                  >
+                    <Text style={{ fontSize: 13, color: "#ef4444", lineHeight: 18 }}>ลบทั้งหมด</Text>
+                  </Pressable>
+                </View>
+                {outOfStockItems.map((item, idx) => (
+                  <CartItemRow
+                    key={item.id}
+                    item={item}
+                    isLast={idx === outOfStockItems.length - 1}
+                    selected={false}
+                    onToggle={() => {}}
+                    onOpen={() => openProduct(item)}
+                    onQty={() => {}}
+                    onRemove={() => removeItem(item.id)}
+                  />
+                ))}
               </View>
-              <View
-                className="flex-row items-center"
-                style={{ marginTop: 12, gap: 6 }}
-              >
-                <ShieldCheck size={14} color="#319754" />
-                <Text style={{ fontSize: 11, color: "#525252", lineHeight: 14 }}>
-                  คุ้มครองการสั่งซื้อโดย METAHERB
-                </Text>
-              </View>
-            </View>
+            ) : null}
+
           </ScrollView>
+            {/* Top fade — rows dissolve as they scroll up under the header. */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={["#fafafa", "rgba(250,250,250,0)"]}
+              style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+            />
+            {/* Black scroll-edge shade at the very bottom of the screen. */}
+            <BottomFade />
+          </View>
 
-          {/* Sticky bottom checkout bar */}
-          <SafeAreaView edges={["bottom"]} className="bg-white border-t border-gray-200">
-            <View
-              className="flex-row items-center"
-              style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 12 }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>
-                  รวม{" "}
-                  <Text style={{ color: "#0a0a0a", fontWeight: "500" }}>
-                    {selectedCount}
-                  </Text>{" "}
-                  รายการ
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 22,
-                    fontWeight: "700",
-                    color: "#ee4d2d",
-                    lineHeight: 28,
-                    marginTop: 4,
-                  }}
-                >
-                  ฿{grandTotal.toFixed(0)}
-                </Text>
-              </View>
-              {/* Continue shopping — secondary outline */}
-              <Pressable
-                onPress={() => nav.goBack()}
-                className="active:opacity-70"
-                style={{
-                  paddingHorizontal: 14,
-                  height: 44,
-                  borderRadius: 9999,
-                  borderWidth: 1,
-                  borderColor: "#319754",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: BRAND_GREEN_DARK,
-                    fontSize: 13,
-                    fontWeight: "600",
-                    lineHeight: 18,
-                  }}
-                >
-                  ช็อปปิ้งต่อ
-                </Text>
-              </Pressable>
-
-              {/* Pay — primary CTA */}
-              <Pressable
-                onPress={() => selectedCount > 0 && nav.navigate("Payment")}
-                disabled={selectedCount === 0}
-                className="active:opacity-80"
-                style={{
-                  backgroundColor: selectedCount === 0 ? "#d4d4d4" : "#319754",
-                  paddingHorizontal: 16,
-                  height: 44,
-                  borderRadius: 9999,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "white",
-                    fontSize: 13,
-                    fontWeight: "600",
-                    lineHeight: 18,
-                  }}
-                >
-                  ชำระเงิน ({selectedCount})
-                </Text>
-              </Pressable>
-            </View>
-          </SafeAreaView>
+          {/* Apple Maps-style floating sheet — drag the grabber up to expand
+              the order summary; collapsed it shows total + pay. */}
+          <CheckoutSheet
+            ref={sheetRef}
+            selectedCount={selectedCount}
+            totalPieces={selectedPieces}
+            subtotal={subtotal}
+            discount={discount}
+            grandTotal={grandTotal}
+            payDisabled={selectedCount === 0}
+            onPay={() => nav.navigate("Payment")}
+            // TODO: wire to the real PR / RFQ flows once their destinations exist.
+            onPR={() => {}}
+            onRFQ={() => {}}
+            supplierCount={supplierCount}
+          />
         </>
       )}
+    </View>
+  );
+}
+
+// Springy +/- button — scales down on press for tactile feedback. Mirrors the
+// StepButton on ProductDetailScreen so the control feels identical everywhere
+// (Jakob's Law — learn the stepper once, use it on every surface).
+function StepButton({
+  onPress,
+  disabled,
+  children,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const spring = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, friction: 5, tension: 220 }).start();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      disabled={disabled}
+      onPressIn={() => {
+        if (!disabled) spring(0.8);
+      }}
+      onPressOut={() => spring(1)}
+    >
+      <Animated.View
+        style={{
+          width: 36,
+          height: 36,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.4 : 1,
+          transform: [{ scale }],
+        }}
+      >
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// Pill-shaped quantity stepper with a typable center field. Local text state
+// lets the user clear and retype freely; it commits a clamped value on blur and
+// re-syncs whenever the external quantity changes (e.g. via the +/- buttons).
+function QtyStepper({
+  quantity,
+  onChange,
+}: {
+  quantity: number;
+  onChange: (n: number) => void;
+}) {
+  const [text, setText] = useState(String(quantity));
+  useEffect(() => {
+    setText(String(quantity));
+  }, [quantity]);
+
+  return (
+    <View
+      className="flex-row items-center"
+      style={{
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+        borderRadius: 999,
+        overflow: "hidden",
+      }}
+    >
+      <StepButton onPress={() => onChange(quantity - 1)} disabled={quantity <= 1}>
+        <Minus size={16} color="#0a0a0a" />
+      </StepButton>
+      <TextInput
+        value={text}
+        onChangeText={(t) => {
+          const digits = t.replace(/[^0-9]/g, "");
+          setText(digits);
+          const n = parseInt(digits, 10);
+          if (!Number.isNaN(n) && n >= 1) onChange(n);
+        }}
+        onEndEditing={() => {
+          const n = parseInt(text, 10);
+          const v = Number.isNaN(n) || n < 1 ? 1 : Math.min(99, n);
+          setText(String(v));
+          onChange(v);
+        }}
+        keyboardType="number-pad"
+        selectTextOnFocus
+        style={{
+          width: 40,
+          height: 36,
+          textAlign: "center",
+          fontSize: 14,
+          fontWeight: "600",
+          color: "#0a0a0a",
+          padding: 0,
+        }}
+      />
+      <StepButton onPress={() => onChange(quantity + 1)} disabled={quantity >= 99}>
+        <Plus size={16} color="#0a0a0a" />
+      </StepButton>
     </View>
   );
 }
@@ -735,21 +662,35 @@ function Checkbox({
   checked: boolean;
   disabled?: boolean;
 }) {
+  // Spring the tick in/out so toggling feels tactile (Doherty Threshold —
+  // sub-400ms feedback). Drives both the check's scale and the fill's pop.
+  const anim = useRef(new Animated.Value(checked ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: checked ? 1 : 0,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 240,
+    }).start();
+  }, [checked, anim]);
+
   return (
     <View
       style={{
-        width: 20,
-        height: 20,
-        borderRadius: 4,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         borderWidth: 1.5,
-        borderColor: disabled ? "#d4d4d4" : checked ? "#319754" : "#a3a3a3",
-        backgroundColor: checked ? "#319754" : "transparent",
+        borderColor: disabled ? "#d4d4d4" : checked ? BRAND_GREEN : "#c4c4c4",
+        backgroundColor: checked ? BRAND_GREEN : "white",
         opacity: disabled ? 0.5 : 1,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      {checked ? <Check size={14} color="white" strokeWidth={3} /> : null}
+      <Animated.View style={{ opacity: anim, transform: [{ scale: anim }] }}>
+        <Check size={13} color="white" strokeWidth={3.5} />
+      </Animated.View>
     </View>
   );
 }

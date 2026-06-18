@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, Dimensions, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronLeft, Heart, Star, ShoppingCart } from "lucide-react-native";
-import { IconButton } from "../components/IconButton";
+import { Heart, Star, ShoppingCart } from "lucide-react-native";
 import { ALL_PRODUCTS } from "../data/catalog";
 import { BRAND_GREEN, STAR_YELLOW, TEXT_MUTED } from "../theme/tokens";
 import type { Product } from "../types/Product";
@@ -75,29 +72,17 @@ export function WishlistScreen() {
   const remove = (id: string) => setFavIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
 
   return (
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
-
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View className="flex-row items-center" style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10, gap: 8 }}>
-          <IconButton onPress={() => nav.canGoBack() && nav.goBack()} variant="translucentDark" accessibilityLabel="ย้อนกลับ">
-            <ChevronLeft size={22} color="white" />
-          </IconButton>
-          <Text style={{ fontSize: 19, fontWeight: "700", color: "#fff" }}>สินค้าที่ชอบ</Text>
-        </View>
-      </SafeAreaView>
-
-      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
-        {products.length === 0 ? (
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      {products.length === 0 ? (
           <View style={{ alignItems: "center", paddingTop: 80 }}>
             <Heart size={60} color="#e0e0e0" strokeWidth={1.5} />
             <Text style={{ fontSize: 15, color: TEXT_MUTED, marginTop: 14 }}>ยังไม่มีสินค้าที่ถูกใจ</Text>
-            <Pressable onPress={() => nav.navigate("Main", { screen: "Products" } as never)} className="active:opacity-80" style={{ marginTop: 16, backgroundColor: BRAND_GREEN, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 }}>
+            <Pressable onPress={() => nav.navigate("Products" as never)} className="active:opacity-80" style={{ marginTop: 16, backgroundColor: BRAND_GREEN, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 }}>
               <Text style={{ fontSize: 14, fontWeight: "600", color: "#fff" }}>เลือกซื้อสินค้า</Text>
             </Pressable>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 130 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
             <Text style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 12 }}>{products.length} รายการ</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
               {products.map((p) => (
@@ -112,7 +97,6 @@ export function WishlistScreen() {
             </View>
           </ScrollView>
         )}
-      </View>
     </View>
   );
 }

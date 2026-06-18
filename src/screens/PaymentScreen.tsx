@@ -1,32 +1,39 @@
-import { useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   Pressable,
   Image,
+  TextInput,
   Dimensions,
   Platform,
 } from "react-native";
-import { BottomSheet } from "../components/BottomSheet";
-import { PageHeader } from "../components/PageHeader";
-import { BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { PAYMENT_METHODS, BANK_APPS } from "../data/paymentMethods";
+import { SAVED_CARDS } from "../data/savedCards";
+import { CardBrandIcon } from "../components/CardBrandIcon";
+import { maskPhone } from "./TrueMoneyLinkScreen";
+import { usePayment } from "../context/PaymentContext";
+import { SHIPPING_METHODS } from "../data/shippingMethods";
+import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
+import { CHECKOUT_ITEMS as ITEMS } from "../data/checkoutItems";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { BottomFade } from "../components/BottomFade";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GlassView } from "expo-glass-effect";
+import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  Banknote,
-  Check,
-  ChevronRight,
+  Coins,
   CreditCard,
-  Landmark,
   MapPin,
-  Plus,
-  QrCode,
   ShieldCheck,
+  Store,
   Tag,
   Truck,
+  Zap,
 } from "lucide-react-native";
 import type { RootStackParamList } from "../navigation/RootStack";
 
@@ -38,70 +45,108 @@ const SCREEN_WIDTH =
     : Dimensions.get("window").width;
 
 // Mock order data — same shape as the web PaymentPage flow.
-const ITEMS = [
-  {
-    id: "p1",
-    name: "อบเชยเทศ Cinnamon Varum 150g",
-    option: "ขนาด 150g",
-    price: 199,
-    quantity: 2,
-    image: require("../../assets/products/cinnamon.png"),
-  },
-  {
-    id: "p2",
-    name: "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน",
-    option: "เซต 2 ขวด",
-    price: 89,
-    quantity: 1,
-    image: require("../../assets/products/herb-jar.png"),
-  },
-];
+// MetaHerb Coin — mock wallet balance + conversion (1,000 coins = ฿1).
+const COIN_BALANCE = 12500;
+const COINS_PER_BAHT = 1000;
+const COIN_AMBER = "#f59e0b";
 
-const PAYMENT_METHODS = [
-  { id: "promptpay", label: "PromptPay", desc: "สแกน QR ผ่านแอปธนาคาร", Icon: QrCode },
-  { id: "bank", label: "โอนผ่านธนาคาร", desc: "โอนเข้าบัญชีร้านค้า", Icon: Landmark },
-  { id: "credit", label: "บัตรเครดิต / เดบิต", desc: "Visa, Mastercard, JCB", Icon: CreditCard },
-  { id: "cod", label: "เก็บเงินปลายทาง", desc: "ชำระเมื่อรับสินค้า", Icon: Banknote },
-] as const;
-
-const COUPONS = [
-  { code: "NEWMEMBER", title: "ลด 50฿ สำหรับสมาชิกใหม่", discount: 50 },
-  { code: "SAVE100", title: "ลด 100฿ ขั้นต่ำ 400฿", discount: 100 },
-  { code: "HERB10", title: "ลด 10% สูงสุด 80฿", discount: 80 },
-];
+/** Group digits with commas, e.g. 12500 → "12,500". */
+const groupNum = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 export function PaymentScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const [selectedPayment, setSelectedPayment] = useState<string>("promptpay");
-  const [selectedCouponIdx, setSelectedCouponIdx] = useState<number | null>(null);
-  const [showCouponSheet, setShowCouponSheet] = useState(false);
+  // Payment selection lives in context so it survives the picker + TrueMoney
+  // link modals without passing callbacks/params across the stack.
+  const {
+    selectedPayment,
+    trueMoneyPhone,
+    selectedShipping,
+    selectedCouponIdx,
+    coinsUsed,
+    setCoinsUsed,
+    addresses,
+    selectedAddressId,
+  } = usePayment();
+  const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
+
+  const selectedShippingMethod =
+    SHIPPING_METHODS.find((s) => s.id === selectedShipping) ?? SHIPPING_METHODS[0];
 
   // Pricing math
+  const selectedCoupon = selectedCouponIdx !== null ? COUPONS[selectedCouponIdx] : null;
   const subtotal = ITEMS.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const discount =
-    selectedCouponIdx !== null ? COUPONS[selectedCouponIdx].discount : 0;
+  const discount = selectedCoupon ? couponDiscount(selectedCoupon, subtotal) : 0;
   const vat = Math.round((subtotal - discount) * 0.07);
-  const shipping: number = 0;
-  const grandTotal = subtotal - discount + vat + shipping;
+  // A free-shipping coupon waives the carrier fee.
+  const freeShip = selectedCoupon?.type === "freeship";
+  const shipping = freeShip ? 0 : selectedShippingMethod.price;
+  // MetaHerb Coin discount (1,000 coins = ฿1).
+  const coinDiscount = Math.floor(coinsUsed / COINS_PER_BAHT);
+  const grandTotal = subtotal - discount + vat + shipping - coinDiscount;
+  const selectedMethod =
+    PAYMENT_METHODS.find((m) => m.id === selectedPayment) ??
+    BANK_APPS.find((a) => a.id === selectedPayment);
+  const selectedCard = SAVED_CARDS.find((c) => c.id === selectedPayment);
+  const selLabel = selectedCard ? selectedCard.name : selectedMethod?.label;
+  const selDesc = selectedCard
+    ? `บัตรเครดิต/เดบิต •••• ${selectedCard.last4}`
+    : selectedPayment === "truemoney" && trueMoneyPhone
+    ? `ผูกบัญชีแล้ว • ${maskPhone(trueMoneyPhone)}`
+    : selectedMethod?.desc;
+  const openAddressSheet = () => nav.navigate("AddressSelect");
+  const openPaymentSheet = () => nav.navigate("PaymentMethod");
+  const openShippingSheet = () => nav.navigate("ShippingMethod");
+  const openCouponSheet = () => nav.navigate("CouponSelect");
+
+  const placeOrder = () => {
+    const orderId = `MH${Date.now().toString().slice(-9)}`;
+    // PromptPay → show a QR for the amount; other methods → straight to success.
+    if (selectedPayment === "promptpay") {
+      nav.navigate("PromptPayQR", { total: grandTotal, orderId });
+    } else {
+      nav.navigate("PaymentSuccess", {
+        orderId,
+        total: grandTotal,
+        methodLabel: selLabel ?? "",
+        methodDesc: selDesc ?? "",
+      });
+    }
+  };
+  // Coupon badge icon + colour follow the coupon type.
+  const CouponTypeIcon = selectedCoupon
+    ? selectedCoupon.type === "freeship"
+      ? Truck
+      : selectedCoupon.shop
+      ? Store
+      : Tag
+    : Tag;
+  const couponIconColor = selectedCoupon?.type === "freeship" ? "#00bfa5" : "#319754";
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
 
-      <PageHeader title="ชำระเงิน" />
+      <SubPageHeader
+        title="ชำระเงิน"
+        subtitle="ตรวจสอบและยืนยันคำสั่งซื้อ"
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+      />
 
+      <View style={{ flex: 1 }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
       >
         {/* Address section — whole card tappable to change (Jakob's Law) */}
-        <Section title="ที่อยู่จัดส่ง" Icon={MapPin}>
+        <Section title="ที่อยู่จัดส่ง" Icon={MapPin} rightLabel="เปลี่ยน" onRightPress={openAddressSheet}>
           <Pressable
+            onPress={openAddressSheet}
             className="active:opacity-90"
             style={{
               backgroundColor: "rgba(242,242,247,0.6)",
-              borderRadius: 12,
+              borderRadius: 24,
               padding: 14,
               gap: 10,
             }}
@@ -117,39 +162,34 @@ export function PaymentScreen() {
                   flexShrink: 1,
                 }}
               >
-                ณัฐพงษ์ ธีโรภาส
+                {selectedAddress.name}
               </Text>
-              <View
-                style={{
-                  backgroundColor: "#08f",
-                  paddingHorizontal: 8,
-                  paddingVertical: 2,
-                  borderRadius: 4,
-                }}
-              >
-                <Text
+              {selectedAddress.isDefault ? (
+                <View
                   style={{
-                    color: "white",
-                    fontSize: 10,
-                    fontWeight: "700",
-                    lineHeight: 13,
+                    backgroundColor: "#08f",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 999,
                   }}
                 >
-                  ค่าเริ่มต้น
-                </Text>
-              </View>
-              <View style={{ flex: 1 }} />
-              <View className="flex-row items-center" style={{ gap: 2 }}>
-                <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK, lineHeight: 16, fontWeight: "500" }}>
-                  เปลี่ยน
-                </Text>
-                <ChevronRight size={14} color="#319754" />
-              </View>
+                  <Text
+                    style={{
+                      color: "white",
+                      fontSize: 10,
+                      fontWeight: "700",
+                      lineHeight: 13,
+                    }}
+                  >
+                    ค่าเริ่มต้น
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <View style={{ height: 1, backgroundColor: "#d4d4d8" }} />
             <View>
               <Text style={{ fontSize: 14, color: "#0a0a0a", lineHeight: 19 }}>
-                061-421-3111
+                {selectedAddress.phone}
               </Text>
               <Text
                 style={{
@@ -159,29 +199,11 @@ export function PaymentScreen() {
                   marginTop: 4,
                 }}
               >
-                เลขที่ 2 ชั้น 2 ซอยสุขสวัสดิ์ 33{"\n"}แขวงราษฎร์บูรณะ เขตราษฎร์บูรณะ กรุงเทพมหานคร 10140
+                {selectedAddress.detail}
+                {"\n"}
+                {selectedAddress.area}
               </Text>
             </View>
-          </Pressable>
-
-          {/* Add new address — proper outline button (Fitts: 44dp tap area) */}
-          <Pressable
-            className="flex-row items-center justify-center active:opacity-70"
-            style={{
-              marginTop: 12,
-              height: 44,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: "#319754",
-              borderStyle: "dashed",
-              backgroundColor: "rgba(49,151,84,0.04)",
-              gap: 6,
-            }}
-          >
-            <Plus size={16} color="#319754" strokeWidth={2.4} />
-            <Text style={{ fontSize: 13, fontWeight: "500", color: BRAND_GREEN_DARK, lineHeight: 18 }}>
-              เพิ่มที่อยู่ใหม่
-            </Text>
           </Pressable>
         </Section>
 
@@ -243,16 +265,30 @@ export function PaymentScreen() {
                         จำนวน {item.quantity} ชิ้น
                       </Text>
                     </View>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontWeight: "600",
-                        color: "#0a0a0a",
-                        lineHeight: 20,
-                      }}
-                    >
-                      ฿{(item.price * item.quantity).toFixed(0)}
-                    </Text>
+                    <View style={{ alignItems: "flex-end" }}>
+                      {item.originalPrice ? (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: TEXT_MUTED,
+                            textDecorationLine: "line-through",
+                            lineHeight: 14,
+                          }}
+                        >
+                          ฿{(item.originalPrice * item.quantity).toFixed(0)}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: "600",
+                          color: "#0a0a0a",
+                          lineHeight: 20,
+                        }}
+                      >
+                        ฿{(item.price * item.quantity).toFixed(0)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -261,12 +297,13 @@ export function PaymentScreen() {
         </Section>
 
         {/* Shipping method */}
-        <Section title="วิธีจัดส่ง" Icon={Truck}>
-          <View
-            className="flex-row items-center justify-between"
+        <Section title="วิธีจัดส่ง" Icon={Truck} rightLabel="เปลี่ยน" onRightPress={openShippingSheet}>
+          <Pressable
+            onPress={openShippingSheet}
+            className="flex-row items-center justify-between active:opacity-70"
             style={{
               backgroundColor: "#f9fafb",
-              borderRadius: 10,
+              borderRadius: 24,
               paddingHorizontal: 14,
               paddingVertical: 12,
               gap: 12,
@@ -277,7 +314,7 @@ export function PaymentScreen() {
                 style={{
                   width: 40,
                   height: 40,
-                  borderRadius: 8,
+                  borderRadius: 16,
                   borderWidth: 1,
                   borderColor: "#e5e7eb",
                   backgroundColor: "white",
@@ -285,159 +322,195 @@ export function PaymentScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    fontWeight: "700",
-                    color: "#0a0a0a",
-                    lineHeight: 13,
-                  }}
-                >
-                  J&T
-                </Text>
+                {selectedShippingMethod.image ? (
+                  <Image source={selectedShippingMethod.image} style={{ width: 28, height: 28 }} resizeMode="contain" />
+                ) : selectedShippingMethod.express ? (
+                  <Zap size={20} color="#f59e0b" fill="#f59e0b" />
+                ) : (
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#0a0a0a", lineHeight: 13 }}>
+                    {selectedShippingMethod.code}
+                  </Text>
+                )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "500",
-                    color: "#0a0a0a",
-                    lineHeight: 18,
-                  }}
-                >
-                  J&T Express
-                </Text>
+                <View className="flex-row items-center" style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "500", color: "#0a0a0a", lineHeight: 18 }}>
+                    {selectedShippingMethod.name}
+                  </Text>
+                  {selectedShippingMethod.express ? (
+                    <View style={{ backgroundColor: "rgba(245,158,11,0.14)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#f59e0b" }}>ด่วน</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>
-                  ได้รับภายใน 2-3 วันทำการ
+                  {selectedShippingMethod.desc}
                 </Text>
               </View>
             </View>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: BRAND_GREEN_DARK, lineHeight: 18 }}>
-              ฟรี
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: "600",
+                color: shipping === 0 ? BRAND_GREEN_DARK : "#0a0a0a",
+                lineHeight: 18,
+              }}
+            >
+              {shipping === 0 ? "ฟรี" : `฿${shipping}`}
             </Text>
-          </View>
+          </Pressable>
         </Section>
 
         {/* Payment method — radio cards */}
-        <Section title="ช่องทางชำระเงิน" Icon={CreditCard}>
-          <View style={{ gap: 10 }}>
-            {PAYMENT_METHODS.map((m) => {
-              const active = selectedPayment === m.id;
-              return (
-                <Pressable
-                  key={m.id}
-                  onPress={() => setSelectedPayment(m.id)}
-                  hitSlop={4}
-                  className="flex-row items-center active:opacity-80"
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    borderRadius: 10,
-                    borderWidth: 1.5,
-                    borderColor: active ? "#319754" : "#e5e7eb",
-                    backgroundColor: active ? "rgba(49,151,84,0.06)" : "white",
-                    gap: 12,
-                  }}
-                >
-                  <m.Icon size={22} color={active ? "#319754" : "#9ca3af"} />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: active ? "600" : "500",
-                        color: "#0a0a0a",
-                        lineHeight: 18,
-                      }}
-                    >
-                      {m.label}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14, marginTop: 2 }}>
-                      {m.desc}
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 1.5,
-                      borderColor: active ? "#319754" : "#a3a3a3",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {active ? (
-                      <View
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: "#319754",
-                        }}
-                      />
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+        <Section
+          title="ช่องทางชำระเงิน"
+          Icon={CreditCard}
+          rightLabel="เปลี่ยน"
+          onRightPress={openPaymentSheet}
+        >
+          <Pressable
+            onPress={openPaymentSheet}
+            className="flex-row items-center active:opacity-90"
+            style={{
+              backgroundColor: "#f9fafb",
+              borderRadius: 24,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              gap: 12,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                backgroundColor: "white",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
+              {selectedCard ? (
+                <CardBrandIcon brand={selectedCard.brand} size={30} />
+              ) : selectedMethod?.image ? (
+                <Image source={selectedMethod.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              ) : selectedMethod?.Icon ? (
+                <selectedMethod.Icon size={22} color="#319754" />
+              ) : null}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: "#0a0a0a", lineHeight: 18 }}>
+                {selLabel}
+              </Text>
+              <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>
+                {selDesc}
+              </Text>
+            </View>
+          </Pressable>
         </Section>
 
         {/* Coupon — opens bottom sheet on tap */}
-        <Section title="คูปองส่วนลด" Icon={Tag}>
+        <Section
+          title="คูปอง"
+          Icon={Tag}
+          rightLabel={selectedCoupon ? "เปลี่ยน" : "เลือก"}
+          onRightPress={openCouponSheet}
+        >
           <Pressable
-            onPress={() => setShowCouponSheet(true)}
+            onPress={openCouponSheet}
             hitSlop={4}
             className="flex-row items-center active:opacity-80"
             style={{
               paddingHorizontal: 14,
               paddingVertical: 12,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: "#e5e7eb",
-              backgroundColor: "white",
-              gap: 10,
+              borderRadius: 24,
+              backgroundColor: "#f9fafb",
+              gap: 12,
             }}
           >
-            <View style={{ flex: 1 }}>
-              {selectedCouponIdx !== null ? (
-                <>
-                  <View
-                    style={{
-                      alignSelf: "flex-start",
-                      backgroundColor: "rgba(49,151,84,0.1)",
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                      marginBottom: 4,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: BRAND_GREEN_DARK,
-                        fontWeight: "700",
-                        lineHeight: 13,
-                      }}
-                    >
-                      {COUPONS[selectedCouponIdx].code}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 13, color: "#0a0a0a", lineHeight: 18 }}>
-                    {COUPONS[selectedCouponIdx].title}
+            {selectedCoupon ? (
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: "#e5e7eb",
+                    backgroundColor: "white",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CouponTypeIcon size={22} color={couponIconColor} />
+                </View>
+                <Text style={{ fontSize: 14, color: "#0a0a0a" }}>{selectedCoupon.sublabel}</Text>
+                {/* Spacer pushes the discount tag to the far right (like the shipping price). */}
+                <View style={{ flex: 1 }} />
+                <View
+                  style={{
+                    flexShrink: 1,
+                    backgroundColor: "rgba(49,151,84,0.12)",
+                    borderRadius: 999,
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK, fontWeight: "600" }} numberOfLines={1}>
+                    {selectedCoupon.title}
                   </Text>
-                </>
-              ) : (
-                <Text style={{ fontSize: 14, color: "#525252", lineHeight: 18 }}>
-                  เลือกคูปองส่วนลด ({COUPONS.length} คูปองพร้อมใช้)
-                </Text>
-              )}
-            </View>
-            <Text style={{ fontSize: 13, color: "#0088ff", lineHeight: 18 }}>
-              {selectedCouponIdx !== null ? "เปลี่ยน" : "เลือก"}
-            </Text>
-            <ChevronRight size={16} color="#737373" />
+                </View>
+              </View>
+            ) : (
+              <Text style={{ flex: 1, fontSize: 14, color: "#525252", lineHeight: 18 }}>
+                เลือกคูปองส่วนลด / ส่งฟรี ({COUPONS.length} คูปองพร้อมใช้)
+              </Text>
+            )}
           </Pressable>
+        </Section>
+
+        {/* MetaHerb Coin — redeem coins as a discount */}
+        <Section
+          title="ใช้ MetaHerb Coin"
+          Icon={Coins}
+          rightSlot={
+            <Text style={{ fontSize: 13, color: COIN_AMBER, fontWeight: "700", lineHeight: 18 }}>
+              มีอยู่ {groupNum(COIN_BALANCE)} เหรียญ
+            </Text>
+          }
+        >
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingLeft: 16, padding: 8, gap: 10 }}
+          >
+            <TextInput
+              value={coinsUsed > 0 ? String(coinsUsed) : ""}
+              onChangeText={(t) => {
+                const n = parseInt(t.replace(/[^0-9]/g, ""), 10);
+                setCoinsUsed(Number.isNaN(n) ? 0 : Math.min(n, COIN_BALANCE));
+              }}
+              placeholder={`${groupNum(COINS_PER_BAHT)} เหรียญ = ฿1`}
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              style={{ flex: 1, fontSize: 14, color: "#0a0a0a", paddingVertical: 8 }}
+            />
+            <Pressable
+              onPress={() => setCoinsUsed(coinsUsed >= COIN_BALANCE ? 0 : COIN_BALANCE)}
+              className="active:opacity-80 items-center justify-center"
+              style={{ backgroundColor: COIN_AMBER, borderRadius: 999, paddingHorizontal: 16, height: 36 }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
+                {coinsUsed >= COIN_BALANCE ? "ยกเลิก" : "ใช้ทั้งหมด"}
+              </Text>
+            </Pressable>
+          </View>
+          {coinDiscount > 0 ? (
+            <Text style={{ fontSize: 12, color: COIN_AMBER, marginTop: 8, marginLeft: 4 }}>
+              ใช้ {groupNum(coinsUsed)} เหรียญ = ส่วนลด ฿{coinDiscount}
+            </Text>
+          ) : null}
         </Section>
 
         {/* Summary breakdown */}
@@ -445,8 +518,9 @@ export function PaymentScreen() {
           {[
             [`ยอดสินค้า (${ITEMS.reduce((s, i) => s + i.quantity, 0)} ชิ้น)`, `฿${subtotal.toFixed(0)}`, "#0a0a0a"],
             ...(discount > 0 ? [["ส่วนลดคูปอง", `-฿${discount.toFixed(0)}`, "#319754"] as [string, string, string]] : []),
+            ...(coinDiscount > 0 ? [["ใช้ MetaHerb Coin", `-฿${coinDiscount}`, "#319754"] as [string, string, string]] : []),
             ["VAT 7%", `฿${vat.toFixed(0)}`, "#0a0a0a"],
-            ["ค่าจัดส่ง", shipping === 0 ? "ฟรี" : `฿${shipping.toFixed(0)}`, "#319754"],
+            ["ค่าจัดส่ง", shipping === 0 ? "ฟรี" : `฿${shipping.toFixed(0)}`, shipping === 0 ? "#319754" : "#0a0a0a"],
           ].map(([label, val, color]) => (
             <View
               key={label}
@@ -499,134 +573,75 @@ export function PaymentScreen() {
           </View>
         </Section>
       </ScrollView>
+        {/* Top fade — rows dissolve into the header as they scroll up. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#fafafa", "rgba(250,250,250,0)"]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+        />
+      </View>
 
-      {/* Sticky bottom — confirm CTA */}
-      <SafeAreaView edges={["bottom"]} className="bg-white border-t border-gray-200">
+      {/* Black scroll-edge shade at the very bottom of the screen. */}
+      <BottomFade />
+
+      {/* Floating Liquid Glass confirm bar — same language as the cart /
+          product-detail action sheets (hovers above the bottom). */}
+      <View
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}
+      >
         <View
-          className="flex-row items-center"
-          style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 12 }}
+          style={{
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
+          }}
         >
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>
-              ยอดชำระทั้งสิ้น
-            </Text>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "700",
-                color: "#ee4d2d",
-                lineHeight: 28,
-                marginTop: 4,
-              }}
-            >
-              ฿{grandTotal.toFixed(0)}
-            </Text>
-          </View>
-          <Pressable
-            className="active:opacity-80"
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
             style={{
-              backgroundColor: "#319754",
-              paddingHorizontal: 24,
-              height: 48,
-              borderRadius: 9999,
+              height: 68,
+              borderRadius: 34,
+              overflow: "hidden",
+              flexDirection: "row",
               alignItems: "center",
-              justifyContent: "center",
+              paddingHorizontal: 16,
+              gap: 12,
             }}
           >
-            <Text
+            <View style={{ flex: 1, paddingLeft: 2 }}>
+              <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ยอดชำระทั้งสิ้น</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={{ fontSize: 20, fontWeight: "700", color: "#ee4d2d", lineHeight: 24 }}
+              >
+                ฿{grandTotal.toFixed(0)}
+              </Text>
+            </View>
+            <Pressable
+              onPress={placeOrder}
+              className="flex-row items-center justify-center active:opacity-80"
               style={{
-                color: "white",
-                fontSize: 14,
-                fontWeight: "600",
-                lineHeight: 18,
+                height: 50,
+                borderRadius: 9999,
+                backgroundColor: "#319754",
+                paddingHorizontal: 24,
               }}
             >
-              ยืนยันคำสั่งซื้อ
-            </Text>
-          </Pressable>
+              <Text style={{ color: "white", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>
+                ยืนยันคำสั่งซื้อ
+              </Text>
+            </Pressable>
+          </GlassView>
         </View>
-      </SafeAreaView>
+      </View>
 
-      {/* Coupon picker — uses shared BottomSheet */}
-      <BottomSheet
-        visible={showCouponSheet}
-        onClose={() => setShowCouponSheet(false)}
-        title="เลือกคูปองส่วนลด"
-      >
-        <View style={{ padding: 16, gap: 10 }}>
-          {COUPONS.map((c, idx) => {
-            const active = selectedCouponIdx === idx;
-            return (
-              <Pressable
-                key={c.code}
-                onPress={() => {
-                  setSelectedCouponIdx(active ? null : idx);
-                  setShowCouponSheet(false);
-                }}
-                className="flex-row items-center active:opacity-80"
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: active ? "#319754" : "#e5e7eb",
-                  backgroundColor: active ? "rgba(49,151,84,0.06)" : "white",
-                  gap: 12,
-                }}
-              >
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 10,
-                    backgroundColor: "#319754",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Tag size={20} color="white" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: BRAND_GREEN_DARK,
-                      lineHeight: 17,
-                    }}
-                  >
-                    {c.code}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: "#0a0a0a",
-                      marginTop: 2,
-                      lineHeight: 18,
-                    }}
-                  >
-                    {c.title}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    borderWidth: 1.5,
-                    borderColor: active ? "#319754" : "#a3a3a3",
-                    backgroundColor: active ? "#319754" : "transparent",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {active ? <Check size={14} color="white" strokeWidth={3} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </BottomSheet>
     </View>
   );
 }
@@ -635,11 +650,15 @@ function Section({
   title,
   Icon,
   rightLabel,
+  onRightPress,
+  rightSlot,
   children,
 }: {
   title: string;
   Icon?: React.ComponentType<{ size?: number; color?: string }>;
   rightLabel?: string;
+  onRightPress?: () => void;
+  rightSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -664,8 +683,10 @@ function Section({
             {title}
           </Text>
         </View>
-        {rightLabel ? (
-          <Pressable hitSlop={6} className="active:opacity-60">
+        {rightSlot ? (
+          rightSlot
+        ) : rightLabel ? (
+          <Pressable hitSlop={6} onPress={onRightPress} className="active:opacity-60">
             <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>
               {rightLabel}
             </Text>

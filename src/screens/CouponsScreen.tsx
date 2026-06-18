@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronLeft, ChevronRight, Clock, Ticket, ShoppingBag } from "lucide-react-native";
-import { IconButton } from "../components/IconButton";
-import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { ChevronRight, Clock, Ticket, ShoppingCart } from "lucide-react-native";
+import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import { COUPONS, type Coupon } from "../data/coupons";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
 type FilterKey = "all" | "discount" | "free_shipping" | "used" | "expired";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -87,19 +85,7 @@ export function CouponsScreen() {
   const filtered = COUPONS.filter((c) => matches(c, filter));
 
   return (
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
-
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View className="flex-row items-center" style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10, gap: 8 }}>
-          <IconButton onPress={() => nav.canGoBack() && nav.goBack()} variant="translucentDark" accessibilityLabel="ย้อนกลับ">
-            <ChevronLeft size={22} color="white" />
-          </IconButton>
-          <Text style={{ fontSize: 19, fontWeight: "700", color: "#fff" }}>คูปองของฉัน</Text>
-        </View>
-      </SafeAreaView>
-
-      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
         {/* Filter pills */}
         <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
@@ -123,10 +109,10 @@ export function CouponsScreen() {
           </ScrollView>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 130, gap: 12 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
           {/* Collect-more banner */}
           <Pressable
-            onPress={() => Alert.alert("เก็บคูปองเพิ่ม", "ไปหน้ารวมคูปอง (อยู่ระหว่างพัฒนา)")}
+            onPress={() => nav.navigate("CouponCollect")}
             className="flex-row items-center justify-between active:opacity-90"
             style={{ backgroundColor: BRAND_GREEN, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderStyle: "dashed", paddingHorizontal: 14, paddingVertical: 14 }}
           >
@@ -146,13 +132,12 @@ export function CouponsScreen() {
           ) : (
             <View style={{ alignItems: "center", paddingTop: 60 }}>
               <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
-                <ShoppingBag size={32} color="#ccc" strokeWidth={1.6} />
+                <ShoppingCart size={32} color="#ccc" strokeWidth={1.6} />
               </View>
               <Text style={{ fontSize: 15, fontWeight: "600", color: "#999", marginTop: 12 }}>ยังไม่มีคูปองในหมวดนี้</Text>
             </View>
           )}
         </ScrollView>
-      </View>
     </View>
   );
 }

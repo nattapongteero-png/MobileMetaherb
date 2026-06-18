@@ -14,6 +14,9 @@ import {
 import { RootStack } from "./src/navigation/RootStack";
 import { SplashScreen } from "./src/components/SplashScreen";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { CartProvider } from "./src/context/CartContext";
+import { ProductFilterProvider } from "./src/context/ProductFilterContext";
+import { PaymentProvider } from "./src/context/PaymentContext";
 
 // Keep the branded splash up at least this long so a fast font load doesn't
 // flash it for a single frame.
@@ -90,7 +93,13 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer>
           <ErrorBoundary>
-            <RootStack />
+            <CartProvider>
+              <ProductFilterProvider>
+                <PaymentProvider>
+                  <RootStack />
+                </PaymentProvider>
+              </ProductFilterProvider>
+            </CartProvider>
           </ErrorBoundary>
         </NavigationContainer>
       </SafeAreaProvider>

@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   Pressable,
   Image,
   Animated,
+  Easing,
   Dimensions,
+  Modal,
   Platform,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,25 +23,89 @@ import {
   Heart,
   MessageCircle,
   Minus,
+  Package,
   Plus,
   Share2,
-  ShoppingBag,
+  ShoppingCart,
   Star,
   Store,
+  X,
   Zap,
 } from "lucide-react-native";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { IconButton } from "../components/IconButton";
+import { GlassIconButton } from "../components/GlassIconButton";
 import { CountBadge } from "../components/CountBadge";
+import { BottomFade } from "../components/BottomFade";
+import { GlassView } from "expo-glass-effect";
+import { LinearGradient } from "expo-linear-gradient";
+import { ProductCard } from "../components/ProductCard";
+import { REAL_PRODUCTS } from "../data/realProducts";
+import { useCart } from "../context/CartContext";
+import { shopForKey } from "../data/shops";
+import { ShopAvatar } from "../components/ShopAvatar";
+import type { Product } from "../types/Product";
 import { STAR_YELLOW, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 
 const SCREEN_WIDTH =
   Platform.OS === "web"
     ? Math.min(Dimensions.get("window").width, 430)
     : Dimensions.get("window").width;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+// Recommended products — paged 2-per-page with animated dots, same UX as the
+// home product rails (Jakob's Law).
+function RecommendedPager({ products }: { products: Product[] }) {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const cardWidth = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+  const pages: Product[][] = [];
+  for (let i = 0; i < products.length; i += 2) pages.push(products.slice(i, i + 2));
+
+  return (
+    <View>
+      <Animated.ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
+      >
+        {pages.map((pair, pi) => (
+          <View
+            key={`rec-${pi}`}
+            style={{ width: SCREEN_WIDTH, paddingHorizontal: 16, flexDirection: "row", gap: 12 }}
+          >
+            {pair.map((p) => (
+              <View key={p.id}>
+                <ProductCard product={p} width={cardWidth} />
+              </View>
+            ))}
+            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+          </View>
+        ))}
+      </Animated.ScrollView>
+      {pages.length > 1 ? (
+        <View className="flex-row items-center justify-center mt-3" style={{ gap: 6 }}>
+          {pages.map((_, i) => {
+            const inputRange = [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH];
+            const width = scrollX.interpolate({ inputRange, outputRange: [6, 18, 6], extrapolate: "clamp" });
+            const backgroundColor = scrollX.interpolate({
+              inputRange,
+              outputRange: ["#d4d4d4", "#319754", "#d4d4d4"],
+              extrapolate: "clamp",
+            });
+            return <Animated.View key={i} style={{ height: 6, width, borderRadius: 3, backgroundColor }} />;
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 const OPTIONS = ["50g", "100g", "250g", "500g"];
 
@@ -77,12 +144,77 @@ function MiniCountdown({ initialSeconds }: { initialSeconds: number }) {
   );
 }
 
+// Product option pill with a springy press animation (scale down on press,
+// bounce back on release).
+function OptionPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const spring = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, friction: 5, tension: 220 }).start();
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => spring(0.9)}
+      onPressOut={() => spring(1)}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale }],
+          paddingHorizontal: 16,
+          paddingVertical: 6,
+          borderRadius: 9999,
+          borderWidth: 1,
+          borderColor: active ? "#319754" : "#e5e5e5",
+          backgroundColor: active ? "rgba(49,151,84,0.08)" : "transparent",
+        }}
+      >
+        <Text style={{ fontSize: 13, color: active ? "#319754" : "#0a0a0a", fontWeight: active ? "600" : "400", lineHeight: 18 }}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// Quantity −/+ button with a springy press animation.
+function StepButton({ onPress, disabled, children }: { onPress: () => void; disabled?: boolean; children: ReactNode }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const spring = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, friction: 5, tension: 220 }).start();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      disabled={disabled}
+      onPressIn={() => { if (!disabled) spring(0.8); }}
+      onPressOut={() => spring(1)}
+    >
+      <Animated.View
+        style={{
+          width: 36,
+          height: 36,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.4 : 1,
+          transform: [{ scale }],
+        }}
+      >
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function ProductDetailScreen({ route }: Props) {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { product } = route.params;
+  const { addToCart, count: cartCount } = useCart();
+  const shop = shopForKey(product.id);
 
   const [galleryIdx, setGalleryIdx] = useState(0);
+  // Full-screen image viewer (tap a hero image to open; swipe between images).
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStart, setViewerStart] = useState(0);
   const [selectedOption, setSelectedOption] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
@@ -135,27 +267,55 @@ export function ProductDetailScreen({ route }: Props) {
     }
   };
   const galleryScrollX = useRef(new Animated.Value(0)).current;
+  // Stretchy hero (iOS style): scrolls away normally on scroll-up, zooms in on
+  // pull-down. Driven by the vertical scroll position.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const heroScale = scrollY.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0],
+    outputRange: [2, 1],
+    extrapolateLeft: "extend", // keep filling if pulled further down
+    extrapolateRight: "clamp", // no zoom while scrolling up
+  });
+  const heroTranslateY = scrollY.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0],
+    outputRange: [-SCREEN_WIDTH / 2, 0],
+    extrapolateLeft: "extend",
+    extrapolateRight: "clamp",
+  });
+  // App-bar background + title fade in as the hero scrolls past (Apple style).
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.6],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+  // Dark scrim at the very top — keeps the glass buttons legible over a bright
+  // hero image; fades out as the (light) app-bar background fades in.
+  const headerScrimOpacity = scrollY.interpolate({
+    inputRange: [0, SCREEN_WIDTH * 0.5],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
   const flyAnim = useRef(new Animated.Value(0)).current;
-  // Tracks vertical scroll so the sticky header fades from transparent over
-  // the hero image to a solid green bar once the user scrolls past it.
-  const detailScrollY = useRef(new Animated.Value(0)).current;
-  const HEADER_FADE_START = SCREEN_WIDTH * 0.55;
-  const HEADER_FADE_END = SCREEN_WIDTH * 0.92;
-  const headerBg = detailScrollY.interpolate({
-    inputRange: [HEADER_FADE_START, HEADER_FADE_END],
-    outputRange: ["rgba(49,151,84,0)", "rgba(49,151,84,1)"],
-    extrapolate: "clamp",
-  });
-  const headerTitleOpacity = detailScrollY.interpolate({
-    inputRange: [HEADER_FADE_END - 30, HEADER_FADE_END],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-  const headerBorderOpacity = detailScrollY.interpolate({
-    inputRange: [HEADER_FADE_END - 10, HEADER_FADE_END + 10],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
+  // Cart icon bounce when the flown image lands.
+  const cartBump = useRef(new Animated.Value(1)).current;
+  const bumpCart = () => {
+    cartBump.setValue(1);
+    Animated.sequence([
+      Animated.timing(cartBump, {
+        toValue: 1.28,
+        duration: 170,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(cartBump, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 9,
+        stiffness: 170,
+        mass: 0.7,
+      }),
+    ]).start();
+  };
   // Image counter pill — hidden by default; fades in on scroll, fades out 2s
   // after the user stops swiping. Times chosen per Laws of UX:
   //   • Show 180ms (Doherty: feels instant)
@@ -186,12 +346,26 @@ export function ProductDetailScreen({ route }: Props) {
 
   const stock = 10;
   const priceColor = product.discountPercent ? "#bc1b06" : "#226a3b";
+  // "สินค้าเหมาะกับคุณ" — other catalog products, excluding the current one.
+  const recommended = REAL_PRODUCTS.filter((p) => p.id !== product.id).slice(0, 8);
 
-  // 4-image gallery — reuse the product image (mockup) so user can swipe & see
-  // the typical multi-angle pattern from real shops.
-  const galleryImages = [product.image, product.image, product.image, product.image];
+  // Each product ships one real photo; repeat it so the hero stays swipeable
+  // (the dots + counter signal "you can slide"). Same shot per slide on purpose.
+  const galleryImages = [product.image, product.image, product.image];
+  const hasGallery = galleryImages.length > 1;
 
   const handleAddToCart = () => {
+    // Actually add the line to the shared cart (badge + CartScreen update).
+    addToCart({
+      id: `p-${product.id}-${selectedOption}`,
+      name: product.name,
+      option: `ขนาด ${OPTIONS[selectedOption]}`,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      image: product.image,
+      quantity,
+      shop: shop.name,
+    });
     // Peak-End: fly the product image to the cart icon (delightful moment),
     // then briefly flip the button to ✓ "เพิ่มแล้ว".
     setFlying(true);
@@ -202,6 +376,7 @@ export function ProductDetailScreen({ route }: Props) {
       useNativeDriver: true,
     }).start(() => {
       setFlying(false);
+      bumpCart();
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 1400);
     });
@@ -213,15 +388,22 @@ export function ProductDetailScreen({ route }: Props) {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: detailScrollY } } }],
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false },
         )}
         scrollEventThrottle={16}
       >
-        {/* Hero gallery — full-width swipeable carousel */}
-        <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: "#f5f5f5" }}>
+        {/* Stretchy hero — scrolls away on scroll-up; zooms in on pull-down (iOS) */}
+        <Animated.View
+          style={{
+            width: SCREEN_WIDTH,
+            height: SCREEN_WIDTH,
+            backgroundColor: "#f5f5f5",
+            transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
+          }}
+        >
           <Animated.FlatList
             data={galleryImages}
             keyExtractor={(_: unknown, i: number) => `g-${i}`}
@@ -236,16 +418,24 @@ export function ProductDetailScreen({ route }: Props) {
             onMomentumScrollEnd={(e) => {
               setGalleryIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH));
             }}
-            renderItem={({ item }) => (
-              <Image
-                source={item as number}
-                style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
-                resizeMode="cover"
-              />
+            renderItem={({ item, index }) => (
+              <Pressable
+                onPress={() => {
+                  setViewerStart(index);
+                  setViewerOpen(true);
+                }}
+              >
+                <Image
+                  source={item as number}
+                  style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                  resizeMode="cover"
+                />
+              </Pressable>
             )}
           />
 
-          {/* Image counter pill — fades in on scroll, hides 2s after rest */}
+          {/* Image counter pill — only when there's more than one photo */}
+          {hasGallery ? (
           <Animated.View
             pointerEvents="none"
             style={{
@@ -263,8 +453,10 @@ export function ProductDetailScreen({ route }: Props) {
               {galleryIdx + 1} / {galleryImages.length}
             </Text>
           </Animated.View>
+          ) : null}
 
-          {/* Dots indicator at bottom of gallery */}
+          {/* Dots indicator at bottom of gallery — only when multi-image */}
+          {hasGallery ? (
           <View
             className="absolute left-0 right-0 flex-row items-center justify-center"
             style={{ bottom: 12, gap: 6 }}
@@ -294,7 +486,11 @@ export function ProductDetailScreen({ route }: Props) {
               );
             })}
           </View>
-        </View>
+          ) : null}
+        </Animated.View>
+
+        {/* Content */}
+        <View style={{ backgroundColor: "#fafafa" }}>
 
         {/* Flash sale strip — full-bleed (no padding L/R/top, no radius) */}
         {product.isFlashSale ? (
@@ -373,7 +569,7 @@ export function ProductDetailScreen({ route }: Props) {
           }}
         >
           {!product.isFlashSale ? (
-            <View className="flex-row items-center" style={{ gap: 10, marginBottom: 8 }}>
+            <View className="flex-row items-center" style={{ gap: 10, marginBottom: 10 }}>
               <Text style={{ fontSize: 26, fontWeight: "700", color: priceColor, lineHeight: 30 }}>
                 ฿{product.price.toFixed(0)}
               </Text>
@@ -412,7 +608,7 @@ export function ProductDetailScreen({ route }: Props) {
               fontWeight: "500",
               color: "#0a0a0a",
               lineHeight: 24,
-              marginBottom: 8,
+              marginBottom: 10,
             }}
           >
             {product.name}
@@ -457,42 +653,21 @@ export function ProductDetailScreen({ route }: Props) {
           style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}
         >
           <Text style={{ fontSize: 14, color: "#525252", marginBottom: 10, lineHeight: 18 }}>
-            ตัวเลือก
+            ตัวเลือกสินค้า
           </Text>
           <View className="flex-row flex-wrap" style={{ gap: 8, marginBottom: 16 }}>
-            {OPTIONS.map((opt, i) => {
-              const active = selectedOption === i;
-              return (
-                <Pressable
-                  key={opt}
-                  onPress={() => setSelectedOption(i)}
-                  className="active:opacity-70"
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 6,
-                    borderRadius: 9999,
-                    borderWidth: 1,
-                    borderColor: active ? "#319754" : "#e5e5e5",
-                    backgroundColor: active ? "rgba(49,151,84,0.08)" : "transparent",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: active ? "#319754" : "#0a0a0a",
-                      fontWeight: active ? "600" : "400",
-                      lineHeight: 18,
-                    }}
-                  >
-                    {opt}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {OPTIONS.map((opt, i) => (
+              <OptionPill
+                key={opt}
+                label={opt}
+                active={selectedOption === i}
+                onPress={() => setSelectedOption(i)}
+              />
+            ))}
           </View>
 
           <Text style={{ fontSize: 14, color: "#525252", marginBottom: 10, lineHeight: 18 }}>
-            จำนวน
+            จำนวนสินค้า
           </Text>
           <View className="flex-row items-center" style={{ gap: 14 }}>
             {/* Same stepper UI as CartScreen — consistent quantity control
@@ -502,64 +677,44 @@ export function ProductDetailScreen({ route }: Props) {
               style={{
                 borderWidth: 1,
                 borderColor: "#e5e7eb",
-                borderRadius: 8,
+                borderRadius: 999,
                 overflow: "hidden",
               }}
             >
-              <Pressable
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                hitSlop={8}
-                disabled={quantity <= 1}
-                style={{
-                  width: 36,
-                  height: 36,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: quantity <= 1 ? 0.4 : 1,
-                }}
-              >
+              <StepButton onPress={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1}>
                 <Minus size={16} color="#0a0a0a" />
-              </Pressable>
-              <View
+              </StepButton>
+              <TextInput
+                value={quantity ? String(quantity) : ""}
+                onChangeText={(t) => {
+                  const n = parseInt(t.replace(/[^0-9]/g, ""), 10);
+                  setQuantity(Number.isNaN(n) ? 0 : Math.min(stock, n));
+                }}
+                onEndEditing={() => setQuantity((q) => (q < 1 ? 1 : q))}
+                keyboardType="number-pad"
+                selectTextOnFocus
+                placeholder="1"
+                placeholderTextColor="#9ca3af"
                 style={{
                   width: 44,
                   height: 36,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderLeftWidth: 1,
-                  borderRightWidth: 1,
-                  borderColor: "#e5e7eb",
+                  textAlign: "center",
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color: "#0a0a0a",
+                  padding: 0,
                 }}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "600",
-                    color: "#0a0a0a",
-                    lineHeight: 18,
-                  }}
-                >
-                  {quantity}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setQuantity(Math.min(stock, quantity + 1))}
-                hitSlop={8}
-                disabled={quantity >= stock}
-                style={{
-                  width: 36,
-                  height: 36,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: quantity >= stock ? 0.4 : 1,
-                }}
-              >
+              />
+              <StepButton onPress={() => setQuantity(Math.min(stock, quantity + 1))} disabled={quantity >= stock}>
                 <Plus size={16} color="#0a0a0a" />
-              </Pressable>
+              </StepButton>
             </View>
-            <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>
-              เหลือ {stock} ชิ้น
-            </Text>
+            <View className="flex-row items-center" style={{ gap: 6 }}>
+              <Package size={16} color="#737373" strokeWidth={2} />
+              <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>
+                เหลือเพียง {stock} ชิ้น
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -569,17 +724,22 @@ export function ProductDetailScreen({ route }: Props) {
           style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}
         >
           <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", marginBottom: 10, lineHeight: 24 }}>
-            รายละเอียดสินค้า
+            รายละเอียดผลิตภัณฑ์
           </Text>
-          <Text style={{ fontSize: 13, color: "#525252", lineHeight: 22, marginBottom: 12 }}>
+          <Text style={{ fontSize: 13, color: "#525252", lineHeight: 22, marginBottom: 18 }}>
             สมุนไพรไทยคุณภาพพรีเมียม คัดสรรจากแหล่งผลิตธรรมชาติ ผ่านกระบวนการผลิตที่ได้มาตรฐาน
             สะอาด ปลอดภัย เพื่อสุขภาพที่ดีของคุณและคนที่คุณรัก
           </Text>
+
+          {/* ข้อมูลจำเพาะ — specs sub-section (separate heading like the web) */}
+          <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", marginBottom: 10, lineHeight: 24 }}>
+            ข้อมูลจำเพาะ
+          </Text>
           {[
-            ["น้ำหนัก", "150 กรัม"],
-            ["ประเภท", "สมุนไพรอบแห้ง"],
-            ["รหัสสินค้า", `MH-${product.id.toUpperCase()}-2569`],
-            ["รูปแบบ", "แบ่งบรรจุ"],
+            ["น้ำหนักสุทธิ:", "150 กรัม"],
+            ["ประเภท:", "สมุนไพรอบแห้ง"],
+            ["รหัสสินค้า:", `MH-${product.id.toUpperCase()}-2569`],
+            ["รูปแบบ:", "แบ่งบรรจุ"],
           ].map(([k, v]) => (
             <View
               key={k}
@@ -590,7 +750,7 @@ export function ProductDetailScreen({ route }: Props) {
                 borderTopColor: "#f0f0f0",
               }}
             >
-              <Text style={{ fontSize: 13, color: "#737373", width: 100, lineHeight: 18 }}>{k}</Text>
+              <Text style={{ fontSize: 13, color: "#737373", width: 110, lineHeight: 18 }}>{k}</Text>
               <Text style={{ fontSize: 13, color: "#0a0a0a", lineHeight: 18, flex: 1 }}>{v}</Text>
             </View>
           ))}
@@ -602,58 +762,43 @@ export function ProductDetailScreen({ route }: Props) {
           style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}
         >
           <View className="flex-row items-center" style={{ gap: 12 }}>
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                backgroundColor: "#319754",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Store size={22} color="white" />
-            </View>
+            {/* Avatar — shop logo / initial */}
+            <ShopAvatar name={shop.name} size={52} />
+
+            {/* Name + metrics below the name */}
             <View className="flex-1">
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a", lineHeight: 18 }}>
-                METAHERB Store
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>
+                {shop.name}
               </Text>
-              <Text style={{ fontSize: 11, color: "#737373", lineHeight: 14, marginTop: 2 }}>
-                สมุนไพรไทย · ตอบกลับใน 1 ชม.
-              </Text>
+              <View className="flex-row flex-wrap items-center" style={{ gap: 12, marginTop: 4 }}>
+                <View className="flex-row items-center" style={{ gap: 4 }}>
+                  <Star size={12} color={STAR_YELLOW} fill={STAR_YELLOW} />
+                  <Text style={{ fontSize: 11, color: "#737373", lineHeight: 15 }}>
+                    คะแนนร้านค้า <Text style={{ color: "#0a0a0a", fontWeight: "700" }}>{shop.rating}/5</Text>
+                  </Text>
+                </View>
+                <View className="flex-row items-center" style={{ gap: 4 }}>
+                  <Heart size={12} color="#737373" strokeWidth={2} />
+                  <Text style={{ fontSize: 11, color: "#737373", lineHeight: 15 }}>
+                    ถูกใจสินค้า <Text style={{ color: "#0a0a0a", fontWeight: "700" }}>{shop.likes}</Text>
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
-          <View className="flex-row" style={{ gap: 8, marginTop: 12 }}>
+
+            {/* Circular action buttons */}
             <Pressable
               onPress={() => nav.navigate("Shop")}
-              className="flex-1 flex-row items-center justify-center active:opacity-70"
-              style={{
-                borderWidth: 1,
-                borderColor: "#319754",
-                borderRadius: 9999,
-                paddingVertical: 8,
-                gap: 6,
-              }}
+              className="active:opacity-70"
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
             >
-              <Store size={16} color="#319754" />
-              <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, fontWeight: "500", lineHeight: 18 }}>
-                เข้าชมร้าน
-              </Text>
+              <Store size={18} color="#319754" />
             </Pressable>
             <Pressable
-              className="flex-1 flex-row items-center justify-center active:opacity-70"
-              style={{
-                borderWidth: 1,
-                borderColor: "#319754",
-                borderRadius: 9999,
-                paddingVertical: 8,
-                gap: 6,
-              }}
+              className="active:opacity-70"
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
             >
-              <MessageCircle size={16} color="#319754" />
-              <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, fontWeight: "500", lineHeight: 18 }}>
-                แชทเลย
-              </Text>
+              <MessageCircle size={18} color="#319754" />
             </Pressable>
           </View>
         </View>
@@ -665,7 +810,7 @@ export function ProductDetailScreen({ route }: Props) {
         >
           <View className="flex-row items-center justify-between" style={{ marginBottom: 12 }}>
             <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", lineHeight: 24 }}>
-              รีวิวจากผู้ซื้อ
+              รีวิวสินค้า
             </Text>
             <Pressable hitSlop={6} className="flex-row items-center active:opacity-60" style={{ gap: 4 }}>
               <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ดูทั้งหมด</Text>
@@ -746,144 +891,189 @@ export function ProductDetailScreen({ route }: Props) {
             </View>
           ))}
         </View>
+
+        {/* สินค้าเหมาะกับคุณ — recommended products rail */}
+        <View className="bg-white" style={{ paddingVertical: 16, marginTop: 8 }}>
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", lineHeight: 24 }}>
+              สินค้าเหมาะกับคุณ
+            </Text>
+            <Pressable
+              onPress={() => nav.navigate("Products")}
+              hitSlop={6}
+              className="flex-row items-center active:opacity-60"
+              style={{ gap: 4 }}
+            >
+              <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ดูทั้งหมด</Text>
+              <ChevronRight size={14} color="#737373" />
+            </Pressable>
+          </View>
+          <RecommendedPager products={recommended} />
+        </View>
+        </View>
       </Animated.ScrollView>
 
-      {/* Sticky header — transparent over the hero image, fades to solid
-          green as the user scrolls past the gallery. Stays mounted outside
-          ScrollView so it doesn't scroll away. */}
+      {/* Dark scrim over the hero so the glass buttons stay legible; fades out
+          as you scroll (the light app-bar takes over). */}
       <Animated.View
-        pointerEvents="box-none"
+        pointerEvents="none"
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           right: 0,
-          backgroundColor: headerBg,
+          height: insets.top + 64,
+          opacity: headerScrimOpacity,
         }}
       >
-        <SafeAreaView edges={["top"]} pointerEvents="box-none">
-          <View
-            className="flex-row items-center"
-            style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, gap: 8 }}
-            pointerEvents="box-none"
-          >
-            <IconButton
-              onPress={() => nav.canGoBack() && nav.goBack()}
-              variant="translucentDark"
-            >
-              <ChevronLeft size={22} color="white" />
-            </IconButton>
-
-            {/* Product name — fades in once header turns solid */}
-            <Animated.Text
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                opacity: headerTitleOpacity,
-                color: "white",
-                fontSize: 15,
-                fontWeight: "600",
-                lineHeight: 20,
-              }}
-            >
-              {product.name}
-            </Animated.Text>
-
-            <View className="flex-row" style={{ gap: 8 }}>
-              <IconButton
-                onPress={onToggleWishlist}
-                variant="translucentDark"
-                accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
-                accessibilityState={{ selected: wishlisted }}
-              >
-                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                  <Heart
-                    size={20}
-                    color={wishlisted ? "#ff383c" : "white"}
-                    fill={wishlisted ? "#ff383c" : "transparent"}
-                  />
-                </Animated.View>
-              </IconButton>
-
-              {/* Cart icon — destination of the fly-to-cart animation */}
-              <IconButton
-                onPress={() => nav.navigate("Cart")}
-                variant="translucentDark"
-              >
-                <ShoppingBag size={20} color="white" />
-                <View style={{ position: "absolute", top: -2, right: -4 }}>
-                  <CountBadge count={2} />
-                </View>
-              </IconButton>
-
-              <IconButton variant="translucentDark">
-                <Share2 size={20} color="white" />
-              </IconButton>
-            </View>
-          </View>
-        </SafeAreaView>
-        {/* Bottom border that fades in with the solid bg */}
-        <Animated.View
-          style={{
-            height: 1,
-            backgroundColor: "rgba(0,0,0,0.08)",
-            opacity: headerBorderOpacity,
-          }}
+        <LinearGradient
+          colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0)"]}
+          style={{ flex: 1 }}
         />
       </Animated.View>
 
-      {/* Sticky bottom action bar — always reachable (Fitts's Law) */}
-      <SafeAreaView edges={["bottom"]} className="bg-white border-t border-gray-200">
+      {/* App-bar — soft white→transparent gradient that eases in as you scroll up */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top + 72,
+          opacity: headerBgOpacity,
+        }}
+      >
+        <LinearGradient
+          colors={["#ffffff", "rgba(255,255,255,0)"]}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+
+      {/* Floating Liquid Glass controls over the cover (App Store style) */}
+      <SafeAreaView edges={["top"]} pointerEvents="box-none" style={{ position: "absolute", top: 0, left: 0, right: 0 }}>
         <View
-          className="flex-row items-center"
-          style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}
+          className="flex-row items-center justify-between"
+          style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 8 }}
+          pointerEvents="box-none"
         >
-          {/* Small icon actions on the left */}
-          <Pressable
-            hitSlop={6}
-            className="active:opacity-70 items-center"
-            style={{ width: 48, gap: 2 }}
-          >
-            <Store size={22} color="#319754" />
-            <Text style={{ fontSize: 10, color: BRAND_GREEN_DARK, lineHeight: 13 }}>ร้านค้า</Text>
-          </Pressable>
-          <Pressable
-            hitSlop={6}
-            className="active:opacity-70 items-center"
-            style={{ width: 48, gap: 2 }}
-          >
-            <MessageCircle size={22} color="#319754" />
-            <Text style={{ fontSize: 10, color: BRAND_GREEN_DARK, lineHeight: 13 }}>แชท</Text>
+          <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel="ย้อนกลับ">
+            <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
+          </GlassIconButton>
+
+          <View className="flex-row" style={{ gap: 8 }}>
+            <GlassIconButton
+              onPress={onToggleWishlist}
+              accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
+              accessibilityState={{ selected: wishlisted }}
+            >
+              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                <Heart size={20} color={wishlisted ? "#ff383c" : "#1a1a1a"} fill={wishlisted ? "#ff383c" : "transparent"} />
+              </Animated.View>
+            </GlassIconButton>
+
+            <Animated.View style={{ transform: [{ scale: cartBump }] }}>
+              <GlassIconButton onPress={() => nav.navigate("Cart")} accessibilityLabel="ตะกร้าสินค้า">
+                <ShoppingCart size={20} color="#1a1a1a" />
+              </GlassIconButton>
+              <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
+                <CountBadge count={cartCount} />
+              </View>
+            </Animated.View>
+
+            <GlassIconButton accessibilityLabel="แชร์">
+              <Share2 size={20} color="#1a1a1a" />
+            </GlassIconButton>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* Black scroll-edge shade at the very bottom of the screen. */}
+      <BottomFade />
+
+      {/* Floating Liquid Glass action sheet — hovers above the bottom (Apple Maps) */}
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingHorizontal: 24,
+          paddingBottom: 18,
+        }}
+      >
+        <View
+          style={{
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
+          }}
+        >
+        <GlassView
+          glassEffectStyle="regular"
+          colorScheme="light"
+          style={{
+            height: 68,
+            borderRadius: 34,
+            overflow: "hidden",
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            gap: 8,
+          }}
+        >
+          {/* Chat — Liquid Glass circular button */}
+          <Pressable hitSlop={6} className="active:opacity-70">
+            <GlassView
+              glassEffectStyle="regular"
+              colorScheme="light"
+              tintColor="rgba(49,151,84,0.1)"
+              isInteractive
+              style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
+            >
+              <MessageCircle size={22} color="#319754" />
+            </GlassView>
           </Pressable>
 
-          {/* Add to Cart — outline secondary */}
+          {/* Add to cart — Liquid Glass circular button (solid green when added) */}
           <Pressable
             onPress={handleAddToCart}
             disabled={addedToCart}
-            className="flex-1 flex-row items-center justify-center active:opacity-80"
-            style={{
-              height: 44,
-              borderRadius: 9999,
-              backgroundColor: addedToCart ? "#319754" : "rgba(219,139,10,0.08)",
-              borderWidth: 1,
-              borderColor: addedToCart ? "#319754" : "#db8b0a",
-              gap: 6,
-            }}
+            hitSlop={6}
+            className="active:opacity-70"
           >
             {addedToCart ? (
-              <>
-                <CheckCircle2 size={18} color="white" />
-                <Text style={{ color: "white", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>
-                  เพิ่มแล้ว
-                </Text>
-              </>
+              <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: "#319754", alignItems: "center", justifyContent: "center" }}>
+                <CheckCircle2 size={22} color="white" />
+              </View>
             ) : (
-              <>
-                <ShoppingBag size={18} color="#db8b0a" />
-                <Text style={{ color: "#db8b0a", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>
-                  เพิ่มลงตะกร้า
-                </Text>
-              </>
+              <GlassView
+                glassEffectStyle="regular"
+                colorScheme="light"
+                tintColor="rgba(219,139,10,0.1)"
+                isInteractive
+                style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
+              >
+                <ShoppingCart size={22} color="#db8b0a" strokeWidth={2} />
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 9,
+                    right: 9,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: "#db8b0a",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Plus size={8} color="#fff" strokeWidth={3.5} />
+                </View>
+              </GlassView>
             )}
           </Pressable>
 
@@ -891,7 +1081,7 @@ export function ProductDetailScreen({ route }: Props) {
           <Pressable
             className="flex-1 flex-row items-center justify-center active:opacity-80"
             style={{
-              height: 44,
+              height: 50,
               borderRadius: 9999,
               backgroundColor: "#319754",
               gap: 6,
@@ -899,11 +1089,12 @@ export function ProductDetailScreen({ route }: Props) {
           >
             <Zap size={16} color="white" fill="white" />
             <Text style={{ color: "white", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>
-              ซื้อเลย
+              ซื้อสินค้า
             </Text>
           </Pressable>
+        </GlassView>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Fly-to-cart overlay — animates a copy of the product image from
           the gallery center toward the cart icon in the top bar. Outside
@@ -1003,6 +1194,43 @@ export function ProductDetailScreen({ route }: Props) {
           </View>
         </Animated.View>
       ) : null}
+
+      {/* Full-screen image viewer — tap a hero image to open; swipe between them */}
+      <Modal
+        visible={viewerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerOpen(false)}
+        statusBarTranslucent
+      >
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: viewerStart * SCREEN_WIDTH, y: 0 }}
+          >
+            {galleryImages.map((img, i) => (
+              <View
+                key={`viewer-${i}`}
+                style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT, alignItems: "center", justifyContent: "center" }}
+              >
+                <Image
+                  source={img as number}
+                  style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                  resizeMode="contain"
+                />
+              </View>
+            ))}
+          </ScrollView>
+          {/* Close button — Liquid Glass (iOS 26), top-right */}
+          <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
+            <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
+              <X size={20} color="#ffffff" strokeWidth={2.6} />
+            </GlassIconButton>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

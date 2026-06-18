@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Image, Pressable, Animated, Dimensions, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Eye, ChevronRight, Play } from "lucide-react-native";
-import { BrandHeader } from "../components/BrandHeader";
+import { LinearGradient } from "expo-linear-gradient";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { BottomFade } from "../components/BottomFade";
 import { ARTICLES, VIDEOS, type Article, type VideoItem } from "../data/articles";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -21,9 +23,6 @@ const SCREEN_WIDTH =
 
 const VIDEO_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 5) / 4); // 4:5 portrait
-
-// Tab capsule sits in the header (12px padding each side); inner padding 4.
-const TAB_SEG_W = (SCREEN_WIDTH - 24 - 8) / 2;
 
 function Pill({ children, style }: { children: React.ReactNode; style?: object }) {
   return (
@@ -124,6 +123,9 @@ function VideoCard({ v }: { v: VideoItem }) {
 /** Capsule (วงรี) tab switcher with a white pill that slides between tabs. */
 function AnimatedTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   const pos = useRef(new Animated.Value(tab === "videos" ? 1 : 0)).current;
+  // Measure the track so the sliding pill matches the real width (independent
+  // of the header's horizontal padding).
+  const [segW, setSegW] = useState(0);
 
   useEffect(() => {
     Animated.spring(pos, {
@@ -134,7 +136,7 @@ function AnimatedTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void 
     }).start();
   }, [tab, pos]);
 
-  const translateX = pos.interpolate({ inputRange: [0, 1], outputRange: [0, TAB_SEG_W] });
+  const translateX = pos.interpolate({ inputRange: [0, 1], outputRange: [0, segW] });
 
   const seg = (key: Tab, label: string) => (
     <Pressable
@@ -142,31 +144,46 @@ function AnimatedTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void 
       onPress={() => onChange(key)}
       style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
     >
-      <Text style={{ fontSize: 14, fontWeight: tab === key ? "700" : "600", color: tab === key ? BRAND_GREEN : "#ffffff" }}>
+      <Text style={{ fontSize: 14, fontWeight: tab === key ? "700" : "600", color: tab === key ? "#ffffff" : "#6b7280" }}>
         {label}
       </Text>
     </Pressable>
   );
 
   return (
-    <View style={{ height: 44, borderRadius: 999, overflow: "hidden", backgroundColor: "rgba(0,0,0,0.25)", padding: 4 }}>
-      {/* Sliding white pill */}
-      <Animated.View
-        style={{
-          position: "absolute",
-          top: 4,
-          left: 4,
-          width: TAB_SEG_W,
-          height: 36,
-          borderRadius: 999,
-          backgroundColor: "#ffffff",
-          transform: [{ translateX }],
-          shadowColor: "#000",
-          shadowOpacity: 0.12,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
-        }}
-      />
+    <View
+      onLayout={(e) => setSegW((e.nativeEvent.layout.width - 8) / 2)}
+      style={{
+        height: 44,
+        borderRadius: 999,
+        backgroundColor: "#ffffff",
+        padding: 4,
+        shadowColor: "#0a3d22",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 5,
+        elevation: 2,
+      }}
+    >
+      {/* Sliding pill — width/offset derived from the measured track */}
+      {segW > 0 ? (
+        <Animated.View
+          style={{
+            position: "absolute",
+            top: 4,
+            left: 4,
+            width: segW,
+            height: 36,
+            borderRadius: 999,
+            backgroundColor: BRAND_GREEN,
+            transform: [{ translateX }],
+            shadowColor: "#000",
+            shadowOpacity: 0.12,
+            shadowRadius: 4,
+            shadowOffset: { width: 0, height: 2 },
+          }}
+        />
+      ) : null}
       <View style={{ flex: 1, flexDirection: "row" }}>
         {seg("articles", "บทความ")}
         {seg("videos", "วิดีโอ")}
@@ -177,36 +194,25 @@ function AnimatedTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void 
 
 export function KnowledgeScreen() {
   const nav = useNavigation<Nav>();
+  const route = useRoute();
+  const initialTab = (route.params as { tab?: Tab } | undefined)?.tab ?? "articles";
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [tab, setTab] = useState<Tab>("articles");
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <StatusBar style="dark" />
 
-      <BrandHeader
+      <SubPageHeader
         title="สาระความรู้"
         subtitle="บทความ & วิดีโอสมุนไพร"
-        titleSize={20}
-        showLogo={false}
-        showBell={true}
-        showCart={true}
         showSearch={false}
-        onBell={() => nav.navigate("Notification")}
+        onBack={() => nav.canGoBack() && nav.goBack()}
         onCart={() => nav.navigate("Cart")}
-        scrollY={scrollY}
         bottomSlot={<AnimatedTabs tab={tab} onChange={setTab} />}
       />
 
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#fafafa",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          overflow: "hidden",
-        }}
-      >
+      <View style={{ flex: 1 }}>
         <Animated.ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
@@ -225,6 +231,15 @@ export function KnowledgeScreen() {
             </View>
           )}
         </Animated.ScrollView>
+
+        {/* Top fade — content dissolves into the header as it scrolls up */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#fafafa", "rgba(250,250,250,0)"]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+        />
+        {/* Black scroll-edge shade at the very bottom of the screen. */}
+        <BottomFade />
       </View>
     </View>
   );

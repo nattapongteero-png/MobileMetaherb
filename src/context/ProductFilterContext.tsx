@@ -1,24 +1,28 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import {
   ALL_PRODUCTS,
-  PRICE_RANGES,
   type CatalogProduct,
   type CategoryKey,
-  type TypeKey,
 } from "../data/catalog";
 
 export type CatFilter = CategoryKey | "all";
-export type SortKey = "popular" | "priceAsc" | "priceDesc";
+export type KindFilter = "all" | "flash" | "promo" | "recommended";
+export type SortKey = "newest" | "popular" | "priceAsc" | "priceDesc";
+
+// Price slider bounds — derived from the catalog, rounded up to a tidy ceiling.
+export const PRICE_MIN = 0;
+export const PRICE_MAX = Math.ceil(Math.max(...ALL_PRODUCTS.map((p) => p.price)) / 10) * 10;
 
 type Ctx = {
   query: string;
   setQuery: (s: string) => void;
   cat: CatFilter;
   setCat: (c: CatFilter) => void;
-  types: TypeKey[];
-  toggleType: (t: TypeKey) => void;
-  priceKey: string;
-  setPriceKey: (k: string) => void;
+  kind: KindFilter;
+  setKind: (k: KindFilter) => void;
+  priceMin: number;
+  priceMax: number;
+  setPrice: (min: number, max: number) => void;
   sort: SortKey;
   setSort: (s: SortKey) => void;
   reset: () => void;
@@ -30,34 +34,40 @@ type Ctx = {
 
 const FilterContext = createContext<Ctx | null>(null);
 
-/** Shares product-filter state between the Products screen and the native
- *  filter sheet (presented as a separate screen). */
+/** Shares product-filter state between the Products screen and the filter sheet. */
 export function ProductFilterProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<CatFilter>("all");
-  const [types, setTypes] = useState<TypeKey[]>([]);
-  const [priceKey, setPriceKey] = useState("all");
-  const [sort, setSort] = useState<SortKey>("popular");
+  const [kind, setKind] = useState<KindFilter>("all");
+  const [priceMin, setPriceMin] = useState(PRICE_MIN);
+  const [priceMax, setPriceMax] = useState(PRICE_MAX);
+  const [sort, setSort] = useState<SortKey>("newest");
 
   const products = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const range = PRICE_RANGES.find((r) => r.key === priceKey) ?? PRICE_RANGES[0];
     const list = ALL_PRODUCTS.filter((p) => {
       const inCat = cat === "all" || p.category === cat;
-      const inType = types.length === 0 || types.includes(p.type);
-      const inPrice = p.price >= range.min && p.price < range.max;
+      const inKind =
+        kind === "all" ||
+        (kind === "flash" && !!p.isFlashSale) ||
+        (kind === "promo" && (!!p.discountPercent || !!p.hasCoupon)) ||
+        (kind === "recommended" && !!p.isRecommended);
+      const inPrice = p.price >= priceMin && p.price <= priceMax;
       const inQuery = q.length === 0 || p.name.toLowerCase().includes(q);
-      return inCat && inType && inPrice && inQuery;
+      return inCat && inKind && inPrice && inQuery;
     });
     const sorted = [...list];
     if (sort === "priceAsc") sorted.sort((a, b) => a.price - b.price);
     else if (sort === "priceDesc") sorted.sort((a, b) => b.price - a.price);
-    else sorted.sort((a, b) => b.rating - a.rating);
+    else if (sort === "newest") sorted.sort((a, b) => Number(b.id) - Number(a.id));
+    else sorted.sort((a, b) => b.rating - a.rating); // popular
     return sorted;
-  }, [query, cat, types, priceKey, sort]);
+  }, [query, cat, kind, priceMin, priceMax, sort]);
 
   const activeCount =
-    (cat !== "all" ? 1 : 0) + types.length + (priceKey !== "all" ? 1 : 0);
+    (cat !== "all" ? 1 : 0) +
+    (kind !== "all" ? 1 : 0) +
+    (priceMin > PRICE_MIN || priceMax < PRICE_MAX ? 1 : 0);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -65,23 +75,27 @@ export function ProductFilterProvider({ children }: { children: ReactNode }) {
       setQuery,
       cat,
       setCat,
-      types,
-      toggleType: (k) =>
-        setTypes((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k])),
-      priceKey,
-      setPriceKey,
+      kind,
+      setKind,
+      priceMin,
+      priceMax,
+      setPrice: (min, max) => {
+        setPriceMin(min);
+        setPriceMax(max);
+      },
       sort,
       setSort,
       reset: () => {
         setCat("all");
-        setTypes([]);
-        setPriceKey("all");
-        setSort("popular");
+        setKind("all");
+        setPriceMin(PRICE_MIN);
+        setPriceMax(PRICE_MAX);
+        setSort("newest");
       },
       products,
       activeCount,
     }),
-    [query, cat, types, priceKey, sort, products, activeCount],
+    [query, cat, kind, priceMin, priceMax, sort, products, activeCount],
   );
 
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;

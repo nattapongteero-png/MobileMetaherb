@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { View, Text, Image, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Star } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import type { Product } from "../types/Product";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { STAR_YELLOW, TEXT_MUTED } from "../theme/tokens";
+import { STAR_YELLOW } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,14 +31,20 @@ function getCardTag(p: Product): CardTag {
   return null;
 }
 
+// Uniform height for all image-overlay tags across the home cards so
+// "ลด" / "แนะนำ" / "คงเหลือ" / "เหลือ …" pills line up at the same height.
+const OVERLAY_TAG_H = 22;
+
 function TagPill({ color, label }: { color: string; label: string }) {
   return (
     <View
       style={{
         backgroundColor: color,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
+        height: OVERLAY_TAG_H,
+        paddingHorizontal: 9,
         borderRadius: 9999,
+        alignItems: "center",
+        justifyContent: "center",
         shadowColor: color,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.4,
@@ -50,86 +55,15 @@ function TagPill({ color, label }: { color: string; label: string }) {
       <Text
         style={{
           color: "white",
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: "600",
           lineHeight: 14,
           includeFontPadding: false,
-          textAlignVertical: "center",
         }}
       >
         {label}
       </Text>
     </View>
-  );
-}
-
-/**
- * Bottom overlay for flash-sale cards. Two pieces of info, stacked:
- *   1) Scarcity copy ("ขายไปแล้ว N%" or "🔥 เหลือ ~M ชิ้นสุดท้าย" when low)
- *   2) Goal-gradient progress bar (color shifts amber → red as % grows)
- */
-function FlashSaleOverlay({ soldPercent }: { soldPercent?: number }) {
-  const pct = Math.max(5, Math.min(99, soldPercent ?? 50));
-  // Low stock when ≥ 70% sold — approximate remaining count for urgency copy.
-  const lowStock = pct >= 70;
-  const approxLeft = Math.max(2, Math.round((100 - pct) / 8));
-
-  // Color shifts from amber (#f97316) to red (#dc2626) as sold ratio rises —
-  // visual "heat" that reinforces urgency without needing words.
-  const barColor =
-    pct >= 80 ? "#dc2626" : pct >= 60 ? "#ea580c" : "#f59e0b";
-
-  return (
-    <LinearGradient
-      pointerEvents="none"
-      // Soft scrim — fully transparent up top, deeper toward the bottom so the
-      // text + bar always have a legible base regardless of the product photo.
-      colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.85)"]}
-      locations={[0, 0.5, 1]}
-      style={{
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        // Match card's horizontal info padding (10) so left/right edges align
-        // visually with the title/price below it. Top has plenty of gradient
-        // runway; bottom balances against the white info section seam.
-        paddingHorizontal: 10,
-        paddingTop: 28,
-        paddingBottom: 10,
-      }}
-    >
-      <Text
-        style={{
-          color: "white",
-          fontSize: 10,
-          fontWeight: "700",
-          lineHeight: 13,
-          includeFontPadding: false,
-          marginBottom: 6,
-        }}
-        numberOfLines={1}
-      >
-        {lowStock ? `🔥 เหลือ ~${approxLeft} ชิ้นสุดท้าย` : `ขายไปแล้ว ${pct}%`}
-      </Text>
-      <View
-        style={{
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: "rgba(255,255,255,0.3)",
-          overflow: "hidden",
-        }}
-      >
-        <View
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            backgroundColor: barColor,
-            borderRadius: 2,
-          }}
-        />
-      </View>
-    </LinearGradient>
   );
 }
 
@@ -193,10 +127,10 @@ export function ProductCard({ product, width }: { product: Product; width: numbe
           resizeMode="cover"
         />
 
-        {/* Top-right tag pill */}
+        {/* Top-right discount tag — "ลด N%" (matches web home cards) */}
         {tag === "flashsale" || tag === "discount" ? (
           <View className="absolute top-0 right-0 p-1.5">
-            <TagPill color="#e62e05" label={`-${product.discountPercent}%`} />
+            <TagPill color="#e62e05" label={`ลด ${product.discountPercent}%`} />
           </View>
         ) : null}
         {tag === "recommended" ? (
@@ -205,11 +139,24 @@ export function ProductCard({ product, width }: { product: Product; width: numbe
           </View>
         ) : null}
 
-        {/* Flash sale progress + urgency overlay (replaces old countdown
-            badge). Visualizes `soldPercent` as a goal-gradient bar with
-            scarcity copy when stock runs low. */}
+        {/* Flash sale badge bottom-left with live per-card countdown — same as
+            the web flash cards (rounded-tr corner, blurred red pill). */}
         {tag === "flashsale" ? (
-          <FlashSaleOverlay soldPercent={product.soldPercent} />
+          <View
+            className="absolute bottom-0 left-0 flex-row items-center"
+            style={{
+              backgroundColor: "rgba(230,46,5,0.85)",
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderTopRightRadius: 12,
+              gap: 6,
+            }}
+          >
+            <Text style={{ color: "white", fontSize: 11, fontWeight: "600", includeFontPadding: false }}>
+              Flash Sale
+            </Text>
+            <MiniCountdown initialSeconds={product.flashSaleEndsIn || 3600} />
+          </View>
         ) : null}
       </View>
 
@@ -218,7 +165,7 @@ export function ProductCard({ product, width }: { product: Product; width: numbe
         <Text
           numberOfLines={1}
           style={{
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: "500",
             color: "#0a0a0a",
             includeFontPadding: false,
@@ -228,51 +175,46 @@ export function ProductCard({ product, width }: { product: Product; width: numbe
           {product.name}
         </Text>
 
-        <View className="flex-row items-end" style={{ gap: 8 }}>
+        <View className="flex-row items-center" style={{ gap: 8 }}>
           <Text
             style={{
-              fontSize: 17,
-              fontWeight: "700",
+              fontSize: 14,
+              fontWeight: "600",
               color: priceColor,
               includeFontPadding: false,
-              lineHeight: 20,
+              lineHeight: 19,
             }}
           >
-            ฿{product.price.toFixed(0)}
+            ฿ {product.price.toFixed(2)}
           </Text>
           {product.originalPrice ? (
             <Text
               style={{
-                fontSize: 11,
-                color: TEXT_MUTED,
+                fontSize: 10,
+                color: "#a3a3a3",
                 textDecorationLine: "line-through",
-                marginBottom: 2,
                 includeFontPadding: false,
               }}
             >
-              ฿{product.originalPrice.toFixed(0)}
+              ฿{product.originalPrice.toFixed(2)}
             </Text>
           ) : null}
-          {product.hasCoupon ? (
-            <View style={{ marginBottom: 1 }}>
-              <CouponIcon />
-            </View>
-          ) : null}
+          {product.hasCoupon ? <CouponIcon /> : null}
         </View>
 
         <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center" style={{ gap: 4 }}>
-            <Star size={12} color={STAR_YELLOW} fill={STAR_YELLOW} />
-            <Text style={{ fontSize: 11, color: "#525252", includeFontPadding: false }}>
-              {product.rating}
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <Star size={14} color={STAR_YELLOW} fill={STAR_YELLOW} />
+            <Text style={{ fontSize: 10, color: "#0a0a0a", includeFontPadding: false }}>
+              {product.rating}/5
             </Text>
           </View>
           <Text
             style={{
-              fontSize: 11,
-              color: "#737373",
+              fontSize: 10,
+              color: "#0a0a0a",
               includeFontPadding: false,
-              lineHeight: 16,
+              lineHeight: 14,
             }}
           >
             {product.sold}

@@ -1,22 +1,23 @@
-import { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMemo, useRef, useState } from "react";
+import { View, Text, ScrollView, Pressable, Animated } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GlassView } from "expo-glass-effect";
+import { useNavigation } from "@react-navigation/native";
 import {
   Bell,
   CheckCheck,
   Megaphone,
   MessageCircle,
-  Monitor,
+  Sparkles,
   Package,
+  Wallet,
 } from "lucide-react-native";
-import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
-import { BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 
-// Same 4 types + colour scheme as the web NotificationDropdown so the look
-// stays consistent across surfaces.
-type NotifType = "order" | "promo" | "system" | "chat";
+type NotifType = "order" | "promo" | "chat" | "system" | "payment";
 
 type Notif = {
   id: string;
@@ -44,8 +45,9 @@ const TYPE_META: Record<
   // chipBg = 50-shade tint + chipFg = 700-shade for AA-passing chip text.
   order: { Icon: Package, solid: "#2563eb", chipBg: "#eff6ff", chipFg: "#1d4ed8", label: "คำสั่งซื้อ" },
   promo: { Icon: Megaphone, solid: "#ea580c", chipBg: "#fff7ed", chipFg: "#c2410c", label: "โปรโมชั่น" },
-  system: { Icon: Monitor, solid: "#9333ea", chipBg: "#faf5ff", chipFg: "#7e22ce", label: "ระบบ" },
-  chat: { Icon: MessageCircle, solid: "#059669", chipBg: "#ecfdf5", chipFg: "#15803d", label: "แชท" },
+  chat: { Icon: MessageCircle, solid: "#059669", chipBg: "#ecfdf5", chipFg: "#15803d", label: "ข้อความ" },
+  system: { Icon: Sparkles, solid: "#9333ea", chipBg: "#faf5ff", chipFg: "#7e22ce", label: "อัพเดทจากเมต้า" },
+  payment: { Icon: Wallet, solid: "#0d9488", chipBg: "#f0fdfa", chipFg: "#0f766e", label: "การเงิน" },
 };
 
 // Mirrors the seed data in the web's NotificationContext.
@@ -77,12 +79,20 @@ const SEED_NOTIFS: Notif[] = [
   },
   {
     id: "n4",
-    type: "order",
+    type: "payment",
     title: "ยืนยันการชำระเงินสำเร็จ",
     message:
       "คำสั่งซื้อ ORD-20260218-03572 ชำระเงินสำเร็จ กำลังจัดเตรียมสินค้า",
     time: "6 ชม. ที่แล้ว",
     read: true,
+  },
+  {
+    id: "n7",
+    type: "payment",
+    title: "คืนเงินสำเร็จ",
+    message: "คืนเงิน ฿250 เข้าบัญชีของคุณแล้ว จากการยกเลิกคำสั่งซื้อ ORD-20260215-02901",
+    time: "3 วันที่แล้ว",
+    read: false,
   },
   {
     id: "n5",
@@ -102,7 +112,50 @@ const SEED_NOTIFS: Notif[] = [
   },
 ];
 
-type FilterTab = "all" | "unread";
+type FilterTab = "all" | NotifType;
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "ทั้งหมด" },
+  { key: "order", label: "คำสั่งซื้อ" },
+  { key: "promo", label: "โปรโมชั่น" },
+  { key: "chat", label: "ข้อความ" },
+  { key: "system", label: "อัพเดทจากเมต้า" },
+  { key: "payment", label: "การเงิน" },
+];
+
+// Liquid Glass category chip — same look/feel as the Products page chips.
+function NotifChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const spring = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, friction: 5, tension: 220 }).start();
+  return (
+    <Pressable onPress={onPress} hitSlop={4} onPressIn={() => spring(0.92)} onPressOut={() => spring(1)}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <GlassView
+          glassEffectStyle="regular"
+          colorScheme="light"
+          tintColor={active ? "rgba(49,151,84,0.22)" : "rgba(255,255,255,0.5)"}
+          isInteractive
+          style={{
+            height: 34,
+            paddingHorizontal: 16,
+            borderRadius: 999,
+            overflow: "hidden",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: active ? "rgba(49,151,84,0.45)" : "rgba(0,0,0,0.06)",
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? BRAND_GREEN_DARK : "#374151" }}>
+            {label}
+          </Text>
+        </GlassView>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export function NotificationScreen() {
   const insets = useSafeAreaInsets();
@@ -112,9 +165,11 @@ export function NotificationScreen() {
   const unreadCount = useMemo(() => notifs.filter((n) => !n.read).length, [notifs]);
 
   const visible = useMemo(
-    () => (filter === "unread" ? notifs.filter((n) => !n.read) : notifs),
+    () => (filter === "all" ? notifs : notifs.filter((n) => n.type === filter)),
     [notifs, filter],
   );
+
+  const nav = useNavigation();
 
   const markAsRead = (id: string) => {
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
@@ -124,103 +179,53 @@ export function NotificationScreen() {
     setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  // Horizontal category chips, fixed under the header (same role as the
+  // product-kind chips on the Products page).
+  const filterBar = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+    >
+      {FILTER_TABS.map((tab) => (
+        <NotifChip
+          key={tab.key}
+          label={tab.label}
+          active={filter === tab.key}
+          onPress={() => setFilter(tab.key)}
+        />
+      ))}
+    </ScrollView>
+  );
+
+  // "Mark all read" replaces the cart action in the header's right slot.
+  const markAllSlot =
+    unreadCount > 0 ? (
+      <Pressable
+        onPress={markAllRead}
+        hitSlop={8}
+        className="flex-row items-center active:opacity-60"
+        style={{ gap: 4 }}
+      >
+        <CheckCheck size={16} color={BRAND_GREEN} />
+        <Text style={{ color: BRAND_GREEN_DARK, fontSize: 13, fontWeight: "600" }}>อ่านทั้งหมด</Text>
+      </Pressable>
+    ) : (
+      <View />
+    );
+
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
 
-      <PageHeader
+      <SubPageHeader
         title="การแจ้งเตือน"
-        subtitle={unreadCount > 0 ? `(${unreadCount} ยังไม่อ่าน)` : undefined}
-        rightSlot={
-          unreadCount > 0 ? (
-            <Pressable
-              onPress={markAllRead}
-              hitSlop={8}
-              className="flex-row items-center active:opacity-60"
-              style={{ gap: 4, paddingHorizontal: 8, paddingVertical: 6 }}
-            >
-              <CheckCheck size={16} color="#319754" />
-              <Text style={{ color: BRAND_GREEN_DARK, fontSize: 13, fontWeight: "500" }}>
-                อ่านทั้งหมด
-              </Text>
-            </Pressable>
-          ) : null
-        }
+        subtitle={unreadCount > 0 ? `มี ${unreadCount} รายการที่ยังไม่อ่าน` : "อ่านครบทุกรายการแล้ว"}
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+        rightSlot={markAllSlot}
+        bottomSlot={filterBar}
       />
-
-      {/* Filter tabs — rendered as a sibling of ScrollView (NOT a sticky
-          header inside it) so iOS bounce/overscroll on the list doesn't
-          drag the tabs along. They stay truly fixed below the header. */}
-      <View
-        className="flex-row"
-        style={{
-          paddingHorizontal: 12,
-          paddingTop: 12,
-          paddingBottom: 10,
-          gap: 8,
-          backgroundColor: "#fafafa",
-          borderBottomWidth: 1,
-          borderBottomColor: "#f0f0f0",
-        }}
-      >
-          {(
-            [
-              { key: "all", label: "ทั้งหมด", count: notifs.length },
-              { key: "unread", label: "ยังไม่อ่าน", count: unreadCount },
-            ] as const
-          ).map((tab) => {
-            const active = filter === tab.key;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setFilter(tab.key)}
-                className="flex-row items-center active:opacity-70"
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                  borderRadius: 999,
-                  backgroundColor: active ? "#319754" : "white",
-                  borderWidth: 1,
-                  borderColor: active ? "#319754" : "#e5e7eb",
-                  gap: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: active ? "600" : "500",
-                    color: active ? "white" : "#525252",
-                  }}
-                >
-                  {tab.label}
-                </Text>
-                <View
-                  style={{
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    paddingHorizontal: 5,
-                    backgroundColor: active ? "rgba(255,255,255,0.25)" : "#f5f5f5",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "700",
-                      color: active ? "white" : "#737373",
-                      includeFontPadding: false,
-                      lineHeight: 12,
-                    }}
-                  >
-                    {tab.count}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-      </View>
 
       {/* List */}
       <ScrollView
@@ -229,7 +234,7 @@ export function NotificationScreen() {
         }}
       >
         {visible.length === 0 ? (
-          <EmptyNotifs unreadFilter={filter === "unread"} />
+          <EmptyNotifs filtered={filter !== "all"} />
         ) : (
           visible.map((n) => (
             <NotifRow key={n.id} notif={n} onPress={() => markAsRead(n.id)} />
@@ -253,7 +258,7 @@ function NotifRow({ notif, onPress }: { notif: Notif; onPress: () => void }) {
         paddingHorizontal: 16,
         paddingVertical: 14,
         gap: 12,
-        backgroundColor: unread ? "rgba(49,151,84,0.08)" : "white",
+        backgroundColor: "transparent",
         borderBottomWidth: 1,
         borderBottomColor: "#f5f5f5",
       }}
@@ -296,7 +301,7 @@ function NotifRow({ notif, onPress }: { notif: Notif; onPress: () => void }) {
                 width: 8,
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: "#319754",
+                backgroundColor: "#ef4444",
                 marginTop: 6,
               }}
             />
@@ -338,14 +343,14 @@ function NotifRow({ notif, onPress }: { notif: Notif; onPress: () => void }) {
   );
 }
 
-function EmptyNotifs({ unreadFilter }: { unreadFilter: boolean }) {
+function EmptyNotifs({ filtered }: { filtered: boolean }) {
   return (
     <EmptyState
       icon={<Bell size={36} color="#d4d4d4" />}
-      title={unreadFilter ? "อ่านครบทุกข้อความแล้ว" : "ยังไม่มีการแจ้งเตือน"}
+      title={filtered ? "ไม่มีการแจ้งเตือนในหมวดนี้" : "ยังไม่มีการแจ้งเตือน"}
       subtitle={
-        unreadFilter
-          ? "เรียบร้อย! เราจะแจ้งให้ทราบเมื่อมีอะไรใหม่"
+        filtered
+          ? "ลองเลือกหมวดอื่น หรือกลับมาดูใหม่ภายหลัง"
           : "การแจ้งเตือนสำคัญจะปรากฏที่นี่"
       }
     />

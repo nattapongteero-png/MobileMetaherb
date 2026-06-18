@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { X } from "lucide-react-native";
+import { Check, X } from "lucide-react-native";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
@@ -22,6 +22,9 @@ type Props = {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** When set, the header switches to the iOS filter-sheet style (close-X left,
+   *  centered title, green ✓ done button right) and calls this on done. */
+  onDone?: () => void;
   /** Min height as ratio of screen (default 0.6). */
   minHeightRatio?: number;
   /** Max height as ratio of screen (default 0.9). */
@@ -41,6 +44,7 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  onDone,
   minHeightRatio = 0.6,
   maxHeightRatio = 0.9,
 }: Props) {
@@ -153,35 +157,75 @@ export function BottomSheet({
               />
             </View>
 
-            {/* Header */}
-            <View
-              className="flex-row items-center justify-between"
-              style={{
-                paddingHorizontal: 16,
-                paddingBottom: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: "#f0f0f0",
-              }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: "600", color: "#0a0a0a", lineHeight: 22 }}>
-                {title}
-              </Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={10}
-                className="active:opacity-60"
+            {/* Header — iOS filter-sheet style (X / title / green ✓) when onDone
+                is set, otherwise the default title + close. */}
+            {onDone ? (
+              <View
+                className="flex-row items-center justify-between"
+                style={{ paddingHorizontal: 16, paddingBottom: 12 }}
+              >
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={6}
+                  className="active:opacity-70"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: "rgba(118,118,128,0.14)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <X size={22} color="#1a1a1a" strokeWidth={2.4} />
+                </Pressable>
+                <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
+                <Pressable
+                  onPress={onDone}
+                  hitSlop={6}
+                  className="active:opacity-80"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: "#319754",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Check size={22} color="#fff" strokeWidth={3} />
+                </Pressable>
+              </View>
+            ) : (
+              <View
+                className="flex-row items-center justify-between"
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: "#f5f5f5",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  paddingHorizontal: 16,
+                  paddingBottom: 12,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#f0f0f0",
                 }}
               >
-                <X size={18} color="#525252" />
-              </Pressable>
-            </View>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#0a0a0a", lineHeight: 22 }}>
+                  {title}
+                </Text>
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={10}
+                  className="active:opacity-60"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: "#f5f5f5",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <X size={18} color="#525252" />
+                </Pressable>
+              </View>
+            )}
 
             {/* Content area — caller controls padding/layout */}
             <View

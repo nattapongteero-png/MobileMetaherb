@@ -17,17 +17,31 @@ import {
   ChevronRight,
   Leaf,
   Search,
-  ShoppingBag,
+  ShoppingCart,
   Star,
+  Eye,
+  Play,
+  Store,
+  FlaskConical,
+  BadgeCheck,
+  Clock,
+  Ban,
+  Sparkles,
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { Product, ProductImage } from "../types/Product";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { ProductCard } from "../components/ProductCard";
-import { FlashSaleHero } from "../components/FlashSaleHero";
-import { IconButton } from "../components/IconButton";
+import { BottomFade } from "../components/BottomFade";
+import { GlassIconButton } from "../components/GlassIconButton";
 import { CountBadge } from "../components/CountBadge";
+import { ARTICLES, VIDEOS, type Article, type VideoItem } from "../data/articles";
+import { REAL_FLASH_SALE, REAL_RECOMMENDED, REAL_PROMO } from "../data/realProducts";
+import { MATERIALS, type HerbalMaterial } from "./HerbalMarketScreen";
+import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
+import { useCart } from "../context/CartContext";
+import { useProductFilter, type KindFilter } from "../context/ProductFilterContext";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -65,95 +79,12 @@ const SIDE_BANNERS = [
   require("../../assets/banner/banner_26_1778215046.jpg"),
 ];
 
-const IMG_CINNAMON = require("../../assets/products/cinnamon.png");
-const IMG_COFFEE = require("../../assets/products/coffee.png");
-const IMG_GIFT_RIBBON = require("../../assets/products/gift-ribbon.png");
-const IMG_GIFT_SET = require("../../assets/products/gift-set.png");
-const IMG_HERB_JAR = require("../../assets/products/herb-jar.png");
-const IMG_DOKJUN = require("../../assets/products/dokjun.png");
-const IMG_LEMON = require("../../assets/products/lemon.png");
-
-// Each entry pairs a name with the image that visually represents it,
-// so shuffling stays coherent (no "coffee name + cinnamon image" mismatches).
-const PRODUCT_POOL: { name: string; image: number }[] = [
-  { name: "อบเชยเทศ Cinnamon Varum 150g", image: IMG_CINNAMON },
-  { name: "มะตูมแห้งหั่นชง 200g", image: IMG_CINNAMON },
-  { name: "ชาสมุนไพร 9 ชนิด รวมในซองเดียว", image: IMG_CINNAMON },
-
-  { name: "กาแฟดริป Dark Roast Arabica 9 ซอง", image: IMG_COFFEE },
-  { name: "กาแฟคั่วเข้ม Signature Blend 200g", image: IMG_COFFEE },
-
-  { name: "ชุดของขวัญพรีเมียม ผูกโบว์", image: IMG_GIFT_RIBBON },
-  { name: "ชุดของขวัญ Limited Edition", image: IMG_GIFT_RIBBON },
-
-  { name: "ชุดของขวัญคุกกี้สมุนไพร", image: IMG_GIFT_SET },
-  { name: "ชุดของขวัญ Cookies & Tea Set", image: IMG_GIFT_SET },
-
-  { name: "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน", image: IMG_HERB_JAR },
-  { name: "เมต้าเฮิร์บ Herbal Inhaler Classic", image: IMG_HERB_JAR },
-  { name: "ขมิ้นชันแคปซูล 60 เม็ด", image: IMG_HERB_JAR },
-  { name: "น้ำผึ้งดิบจากป่าธรรมชาติ 350ml", image: IMG_HERB_JAR },
-
-  { name: "ดอกจันอบแห้ง คัดพิเศษ 30g", image: IMG_DOKJUN },
-  { name: "ใบบัวบกอบแห้ง 30g", image: IMG_DOKJUN },
-  { name: "อัญชันแห้ง พรีเมียม 100g", image: IMG_DOKJUN },
-  { name: "กระชายอบแห้ง 100g", image: IMG_DOKJUN },
-
-  { name: "เปลือกมะนาวอบแห้ง 50g", image: IMG_LEMON },
-  { name: "ตะไคร้แห้งหั่นฝอย 80g", image: IMG_LEMON },
-];
-
-function shuffleArr<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function makeProduct(
-  idx: number,
-  item: { name: string; image: number },
-  opts: { flashSale?: boolean; recommended?: boolean },
-): Product {
-  // Price rounded to nearest 5 baht between 45–445
-  const price = Math.round((45 + Math.random() * 400) / 5) * 5;
-  const hasDiscount = Math.random() > 0.25;
-  const discountPercent = hasDiscount ? Math.floor(Math.random() * 30) + 15 : undefined;
-  const originalPrice = discountPercent
-    ? Math.round(price / (1 - discountPercent / 100) / 5) * 5
-    : undefined;
-  const rating = Math.round((Math.random() * 9 + 41)) / 10; // 4.1 - 5.0
-  const soldCount = Math.floor(Math.random() * 380) + 40;
-  return {
-    id: `${opts.flashSale ? "fs" : "r"}${idx + 1}`,
-    name: item.name,
-    price,
-    originalPrice,
-    discountPercent,
-    rating,
-    sold: `ขายได้ ${soldCount}+`,
-    image: item.image,
-    isFlashSale: opts.flashSale,
-    isRecommended: opts.recommended,
-    isFreeShipping: Math.random() > 0.5,
-    hasCoupon: Math.random() > 0.5,
-    flashSaleEndsIn: opts.flashSale
-      ? Math.floor(Math.random() * 50000) + 3600
-      : undefined,
-    soldPercent: opts.flashSale ? Math.floor(Math.random() * 60) + 30 : undefined,
-  };
-}
-
-// Shuffle the {name, image} pool once on module load → split into two sections
-const SHUFFLED_POOL = shuffleArr(PRODUCT_POOL);
-const FLASH_SALE: Product[] = SHUFFLED_POOL.slice(0, 6).map((p, i) =>
-  makeProduct(i, p, { flashSale: true }),
-);
-const RECOMMENDED: Product[] = SHUFFLED_POOL.slice(6, 12).map((p, i) =>
-  makeProduct(i, p, { recommended: true }),
-);
+// Home rails now draw from the real METAHERB product samples (real names,
+// prices, photos) ported from the web app — see src/data/realProducts.ts.
+// Each rail is paged 2-per-page, so we cap at 6 items (3 pages).
+const FLASH_SALE: Product[] = REAL_FLASH_SALE.slice(0, 6);
+const RECOMMENDED: Product[] = REAL_RECOMMENDED.slice(0, 6);
+const PROMO: Product[] = REAL_PROMO.slice(0, 6);
 
 function FlashSaleCountdown() {
   const [time, setTime] = useState({ h: 12, m: 13, s: 8 });
@@ -176,12 +107,12 @@ function FlashSaleCountdown() {
       {[pad(time.h), pad(time.m), pad(time.s)].map((t, i) => (
         <View key={i} className="flex-row items-center" style={{ gap: 4 }}>
           <View
-            className="bg-[#bc1b06] items-center justify-center"
-            style={{ width: 28, paddingVertical: 3, borderRadius: 6 }}
+            className="bg-[#e62e05] items-center justify-center"
+            style={{ width: 30, paddingVertical: 4, borderRadius: 8 }}
           >
-            <Text className="text-[13px] text-white font-semibold">{t}</Text>
+            <Text className="text-[15px] text-white font-semibold" style={{ includeFontPadding: false }}>{t}</Text>
           </View>
-          {i < 2 && <Text className="text-[14px] text-black font-semibold">:</Text>}
+          {i < 2 && <Text className="text-[15px] text-black font-semibold">:</Text>}
         </View>
       ))}
     </View>
@@ -226,18 +157,30 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-function PagedProductList({ products }: { products: Product[] }) {
+/**
+ * Generic 2-per-page horizontal pager with the animated dot indicator —
+ * the same UX as the Flash Sale / Recommended product rows. Used by the
+ * product rails AND the ตลาดสมุนไพร / ผลิตภัณฑ์ทดสอบ teasers so paging feels
+ * identical across the home page (Jakob's Law).
+ */
+function PagedPairs<T>({
+  data,
+  keyOf,
+  renderCard,
+}: {
+  data: T[];
+  keyOf: (item: T) => string;
+  renderCard: (item: T, width: number) => React.ReactNode;
+}) {
   const scrollX = useRef(new Animated.Value(0)).current;
   const cardWidth = Math.floor(
     (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2,
   );
-  const pages = chunk(products, 2);
+  const pages = chunk(data, 2);
 
   return (
     <View>
-      <Animated.FlatList
-        data={pages}
-        keyExtractor={(_: Product[], i: number) => `page-${i}`}
+      <Animated.ScrollView
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -246,25 +189,25 @@ function PagedProductList({ products }: { products: Product[] }) {
           { useNativeDriver: false },
         )}
         scrollEventThrottle={16}
-        renderItem={({ item }) => {
-          const pair = item as Product[];
-          return (
-            <View
-              style={{
-                width: SCREEN_WIDTH,
-                paddingHorizontal: HORIZONTAL_PADDING,
-                flexDirection: "row",
-                gap: CARD_GAP,
-              }}
-            >
-              {pair.map((p) => (
-                <ProductCard key={p.id} product={p} width={cardWidth} />
-              ))}
-              {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
-            </View>
-          );
-        }}
-      />
+      >
+        {pages.map((pair, pageIdx) => (
+          <View
+            key={`page-${pageIdx}`}
+            style={{
+              width: SCREEN_WIDTH,
+              paddingHorizontal: HORIZONTAL_PADDING,
+              flexDirection: "row",
+              alignItems: "stretch",
+              gap: CARD_GAP,
+            }}
+          >
+            {pair.map((it) => (
+              <View key={keyOf(it)}>{renderCard(it, cardWidth)}</View>
+            ))}
+            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+          </View>
+        ))}
+      </Animated.ScrollView>
       {pages.length > 1 ? (
         <View
           className="flex-row items-center justify-center mt-3"
@@ -304,8 +247,380 @@ function PagedProductList({ products }: { products: Product[] }) {
   );
 }
 
+function PagedProductList({ products }: { products: Product[] }) {
+  return (
+    <PagedPairs
+      data={products}
+      keyOf={(p) => p.id}
+      renderCard={(p, w) => <ProductCard product={p} width={w} />}
+    />
+  );
+}
+
+/** One article per page, paging-snapped + animated dots — same swipe feel as
+ *  the Flash Sale rail, but full-width cards (one at a time). */
+function PagedArticles({
+  articles,
+  onOpen,
+}: {
+  articles: Article[];
+  onOpen: (a: Article) => void;
+}) {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  return (
+    <View>
+      <Animated.ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
+      >
+        {articles.map((a) => (
+          <View
+            key={a.id}
+            style={{ width: SCREEN_WIDTH, paddingHorizontal: HORIZONTAL_PADDING }}
+          >
+            <ArticleRow a={a} onPress={() => onOpen(a)} />
+          </View>
+        ))}
+      </Animated.ScrollView>
+      {articles.length > 1 ? (
+        <View
+          className="flex-row items-center justify-center mt-3"
+          style={{ gap: 6 }}
+        >
+          {articles.map((_, i) => {
+            const inputRange = [
+              (i - 1) * SCREEN_WIDTH,
+              i * SCREEN_WIDTH,
+              (i + 1) * SCREEN_WIDTH,
+            ];
+            const width = scrollX.interpolate({
+              inputRange,
+              outputRange: [6, 18, 6],
+              extrapolate: "clamp",
+            });
+            const backgroundColor = scrollX.interpolate({
+              inputRange,
+              outputRange: ["#d4d4d4", "#319754", "#d4d4d4"],
+              extrapolate: "clamp",
+            });
+            return (
+              <Animated.View
+                key={i}
+                style={{ height: 6, width, borderRadius: 3, backgroundColor }}
+              />
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const AMBER = "#af6f08"; // articles accent (matches web blog cards)
+// Uniform height for image-overlay tags (ลด / แนะนำ / คงเหลือ / เหลือ …) so they
+// all line up at the same height across the home cards.
+const OVERLAY_TAG_H = 22;
+
+function MarketCard({ m, width, onPress }: { m: HerbalMaterial; width: number; onPress: () => void }) {
+  // Synthetic "sold" — same formula the web uses for the home market card.
+  const sold = Math.floor(m.stock * (m.rating / 5) * 0.45);
+  return (
+    <Pressable
+      onPress={onPress}
+      className="active:opacity-90"
+      style={{ width, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" }}
+    >
+      {/* Image — 4:3 like the web market card */}
+      <View style={{ width: "100%", height: 176, backgroundColor: "#f3f4f6" }}>
+        <Image source={m.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+        {m.supplierVerified ? (
+          <View
+            style={{
+              position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: 12,
+              backgroundColor: "#fff", alignItems: "center", justifyContent: "center",
+              shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+            }}
+          >
+            <BadgeCheck size={15} color="#319754" />
+          </View>
+        ) : null}
+        <View style={{ position: "absolute", left: 8, bottom: 8, height: OVERLAY_TAG_H, paddingHorizontal: 9, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600", lineHeight: 14, includeFontPadding: false }}>คงเหลือ {m.stock.toLocaleString()} กก.</Text>
+        </View>
+      </View>
+      {/* Body */}
+      <View style={{ padding: 12, gap: 8 }}>
+        <View style={{ gap: 4 }}>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }}>{m.name}</Text>
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#319754" }} />
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: "#6b7280" }}>{m.supplier}</Text>
+          </View>
+        </View>
+        {/* Price / MOQ panel */}
+        <View className="flex-row items-end justify-between" style={{ backgroundColor: "#fafafa", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+          <View>
+            <Text style={{ fontSize: 10, color: "#6b7280" }}>ราคา/กก.</Text>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#319754", lineHeight: 22 }}>฿{m.pricePerKg.toLocaleString()}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ fontSize: 10, color: "#6b7280" }}>MOQ</Text>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#0a0a0a" }}>{m.moq} กก.</Text>
+          </View>
+        </View>
+        {/* Rating + sold */}
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center" style={{ gap: 4 }}>
+            <Star size={14} color="#f59e0b" fill="#f59e0b" strokeWidth={0} />
+            <Text style={{ fontSize: 11, color: "#0a0a0a" }}>{m.rating}/5</Text>
+          </View>
+          <Text numberOfLines={1} style={{ fontSize: 10, color: "#6b7280" }}>ขายแล้ว {sold.toLocaleString()} กก.</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// Tier palette keyed by prior rating — same as the web TrialCard.
+const TRIAL_TIER = {
+  high: { bg: "#e6f5ec", bar: "#319754", text: "#1d5b32" },
+  mid: { bg: "#fff0db", bar: "#f59e0b", text: "#92400e" },
+  low: { bg: "#ffe0e0", bar: "#dc2626", text: "#991b1b" },
+  new: { bg: "#e0eaf5", bar: "#6b7280", text: "#1e3a5f" },
+} as const;
+
+function TrialMiniCard({ p, width, onPress }: { p: TrialProduct; width: number; onPress: () => void }) {
+  const spotsLeft = p.spotsTotal - p.spotsTaken;
+  const seatsTakenPct = (p.spotsTaken / p.spotsTotal) * 100;
+  const seatsFreePct = 100 - seatsTakenPct;
+  const isClosed = spotsLeft <= 0 || p.endsInDays <= 0;
+  const isUrgent = !isClosed && spotsLeft > 0 && spotsLeft <= 5;
+  const isFirstBatch = p.prevAvgRating == null;
+  const rating = p.prevAvgRating ?? 0;
+  const tier = isFirstBatch ? "new" : rating >= 4 ? "high" : rating >= 3 ? "mid" : "low";
+  const palette = TRIAL_TIER[tier];
+  const satisfactionPct = isFirstBatch ? 0 : Math.round((rating / 5) * 100);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className="active:opacity-90"
+      style={{ width, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden", opacity: isClosed ? 0.7 : 1 }}
+    >
+      {/* Hero — tier-colored bg + image (own top radius so the image clips on iOS) */}
+      <View style={{ width: "100%", height: 176, backgroundColor: palette.bg, borderTopLeftRadius: 15, borderTopRightRadius: 15, overflow: "hidden" }}>
+        <Image source={p.imageSrc ?? { uri: p.image }} style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }} resizeMode="cover" />
+        {/* Top-left status badge — only meaningful states */}
+        {isClosed ? (
+          <View style={{ position: "absolute", left: 10, top: 10, height: OVERLAY_TAG_H, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "rgba(31,41,55,0.85)", borderRadius: 999, paddingHorizontal: 9 }}>
+            <Ban size={12} color="#fff" strokeWidth={2.4} />
+            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600", lineHeight: 14, includeFontPadding: false }}>ปิดรับสมัคร</Text>
+          </View>
+        ) : isUrgent ? (
+          <View style={{ position: "absolute", left: 10, top: 10, height: OVERLAY_TAG_H, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: palette.bar, borderRadius: 999, paddingHorizontal: 9 }}>
+            <Sparkles size={12} color="#fff" strokeWidth={2.4} />
+            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600", lineHeight: 14, includeFontPadding: false }}>เหลือ {spotsLeft} ที่!</Text>
+          </View>
+        ) : null}
+        {/* Bottom-left days-left badge */}
+        {!isClosed ? (
+          <View style={{ position: "absolute", left: 10, bottom: 10, height: OVERLAY_TAG_H, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 999, paddingHorizontal: 9 }}>
+            <Clock size={12} color="#fff" strokeWidth={2.4} />
+            <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600", lineHeight: 14, includeFontPadding: false }}>เหลือ {p.endsInDays} วัน</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Body */}
+      <View style={{ padding: 12, gap: 8, flex: 1 }}>
+        <View>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#1a1a1a" }}>{p.name}</Text>
+          {p.studioName ? (
+            <View className="flex-row items-center" style={{ gap: 6, marginTop: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#319754" }} />
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: "#6b7280" }}>{p.studioName}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text numberOfLines={2} style={{ fontSize: 12, color: "#4b5563", lineHeight: 17, minHeight: 34 }}>{p.tagline}</Text>
+
+        {/* Rating block */}
+        {isFirstBatch ? (
+          <Text style={{ fontSize: 11, color: "#6b7280" }}>
+            <Text style={{ color: palette.text, fontWeight: "700" }}>รุ่นแรก</Text> · ยังไม่มีคะแนน
+          </Text>
+        ) : (
+          <View className="flex-row items-center" style={{ gap: 6 }}>
+            <Text style={{ fontSize: 11, color: "#f59e0b", fontWeight: "700" }}>★ {p.prevAvgRating!.toFixed(1)}</Text>
+            <Text style={{ fontSize: 11, color: "#6b7280" }}>· {satisfactionPct}% พึงพอใจ</Text>
+            <Text style={{ flex: 1, textAlign: "right", fontSize: 11, color: "#9ca3af" }}>({p.prevRatingCount})</Text>
+          </View>
+        )}
+
+        {/* Seats block */}
+        <View>
+          <View className="flex-row items-center justify-between">
+            <Text style={{ fontSize: 11, color: "#6b7280" }}>ที่นั่ง {p.spotsTaken}/{p.spotsTotal}</Text>
+            {isUrgent ? (
+              <Text style={{ fontSize: 11, color: palette.bar, fontWeight: "600" }}>เหลือ {spotsLeft} ที่นั่ง</Text>
+            ) : (
+              <Text style={{ fontSize: 11, color: "#6b7280" }}>{Math.round(seatsFreePct)}% ว่าง</Text>
+            )}
+          </View>
+          <View style={{ height: 5, borderRadius: 3, backgroundColor: "#f3f4f6", overflow: "hidden", marginTop: 6 }}>
+            <View style={{ width: `${seatsTakenPct}%`, height: "100%", borderRadius: 3, backgroundColor: isUrgent ? palette.bar : "#9ca3af" }} />
+          </View>
+        </View>
+
+        {/* CTA */}
+        <Pressable
+          onPress={onPress}
+          disabled={isClosed}
+          className="active:opacity-90"
+          style={{ marginTop: 4, height: 40, borderRadius: 999, alignItems: "center", justifyContent: "center", backgroundColor: isClosed ? "#d1d5db" : isUrgent ? palette.bar : "#319754" }}
+        >
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+            {isClosed ? "ปิดรับสมัครแล้ว" : isUrgent ? `รับด่วน — เหลือ ${spotsLeft} ที่นั่ง!` : "ขอเข้าร่วมทดสอบ"}
+          </Text>
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+}
+
+// Header notification / cart button — Liquid Glass (iOS 26) like the product
+// detail screen, with a count badge pinned to the top-right corner.
+function HeaderGlassButton({
+  onPress,
+  icon,
+  count,
+  accessibilityLabel,
+}: {
+  onPress: () => void;
+  icon: React.ReactNode;
+  count: number;
+  accessibilityLabel: string;
+}) {
+  return (
+    <View>
+      <GlassIconButton onPress={onPress} size={44} accessibilityLabel={accessibilityLabel}>
+        {icon}
+      </GlassIconButton>
+      <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
+        <CountBadge count={count} />
+      </View>
+    </View>
+  );
+}
+
+// Small dark overlay pill (views / date) — matches the สาระความรู้ article card.
+function ArticleOverlayPill({ children }: { children: React.ReactNode }) {
+  return (
+    <View
+      className="flex-row items-center self-start"
+      style={{ gap: 5, backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}
+    >
+      {children}
+    </View>
+  );
+}
+
+// Article card styled to match the หน้าสาระความรู้ (Knowledge) blog cards:
+// wide image on the left with views + date overlaid, content centered on the right.
+function ArticleRow({ a, onPress }: { a: Article; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="active:opacity-90"
+      style={{ flexDirection: "row", height: 132, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden" }}
+    >
+      {/* Image left with views (top) + date (bottom) overlay pills. */}
+      <View style={{ width: 130 }}>
+        <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+        <View style={{ flex: 1, justifyContent: "space-between", padding: 8 }}>
+          <ArticleOverlayPill>
+            <Eye size={11} color="#fff" />
+            <Text style={{ fontSize: 10, color: "#fff" }}>{a.views.toLocaleString()}</Text>
+          </ArticleOverlayPill>
+          <ArticleOverlayPill>
+            <Text style={{ fontSize: 10, color: "#fff" }}>{a.date}</Text>
+          </ArticleOverlayPill>
+        </View>
+      </View>
+
+      {/* Content right — title (1 line), desc (2 lines), อ่านเพิ่มเติม pinned bottom. */}
+      <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12 }}>
+        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a", lineHeight: 19 }}>{a.title}</Text>
+        <Text numberOfLines={2} style={{ fontSize: 12, color: "#525252", lineHeight: 17, marginTop: 4 }}>{a.desc}</Text>
+        <View
+          className="flex-row items-center self-start"
+          style={{ gap: 4, marginTop: "auto", backgroundColor: "rgba(175,111,8,0.1)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: "600", color: AMBER }}>อ่านเพิ่มเติม</Text>
+          <ChevronRight size={13} color={AMBER} strokeWidth={2.4} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// Video card matching the สาระความรู้ (Knowledge) video tab: 4:5 portrait tile,
+// views pill top-left, full-width centered title at the bottom, center play button.
+function VideoTile({ v, width, onPress }: { v: VideoItem; width: number; onPress: () => void }) {
+  const height = Math.round((width * 5) / 4); // 4:5 portrait — same as Knowledge
+  return (
+    <Pressable onPress={onPress} className="active:opacity-90" style={{ width, height, borderRadius: 16, overflow: "hidden", backgroundColor: "#e5e5e5" }}>
+      <Image source={{ uri: v.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+      <View style={{ flex: 1, justifyContent: "space-between", padding: 10 }}>
+        <View className="flex-row items-center self-start" style={{ gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Eye size={12} color="#fff" />
+          <Text style={{ color: "#fff", fontSize: 11 }}>{v.views}</Text>
+        </View>
+        <View style={{ backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 }}>
+          <Text numberOfLines={1} style={{ color: "#fff", fontSize: 11, textAlign: "center" }}>{v.title}</Text>
+        </View>
+      </View>
+      <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, alignItems: "center", justifyContent: "center" }} pointerEvents="none">
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" }}>
+          <Play size={20} color="#fff" fill="#fff" />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/** Recommended videos — paged 2-per-page with dots, same swipe feel as the web. */
+function PagedVideoList({ videos, onOpen }: { videos: VideoItem[]; onOpen: (v: VideoItem) => void }) {
+  return (
+    <PagedPairs
+      data={videos}
+      keyOf={(v) => String(v.id)}
+      renderCard={(v, w) => <VideoTile v={v} width={w} onPress={() => onOpen(v)} />}
+    />
+  );
+}
+
 export function HomeScreen() {
   const nav = useNavigation<Nav>();
+  const { count: cartCount } = useCart();
+  const filter = useProductFilter();
+  // Products & Knowledge are no longer bottom tabs — push them as stack screens
+  // from a section's "ดูทั้งหมด". Knowledge takes a tab param (articles/videos).
+  // Open Products pre-filtered to the section's kind (all/flash/promo/recommended).
+  const goProducts = (kind: KindFilter = "all") => {
+    filter.setCat("all");
+    filter.setKind(kind);
+    nav.navigate("Products");
+  };
+  const goKnowledge = (tab: "articles" | "videos") =>
+    nav.navigate("Knowledge", { tab });
   const [bannerIdx, setBannerIdx] = useState(0);
   const [search, setSearch] = useState("");
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -330,8 +645,6 @@ export function HomeScreen() {
     }, 4000);
     return () => clearInterval(id);
   }, [bannerIdx, bannerInnerWidth]);
-
-  const cardWidth = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
 
   // Collapsible header: logo + wordmark row shrinks to 0 as user scrolls past ~60px.
   const HEADER_TOP_ROW_HEIGHT = 60;
@@ -362,7 +675,9 @@ export function HomeScreen() {
   // 106 = bell 38 + gap 12 + cart 38 + leading gap 12 + 6 margin for badge
   const searchBarMarginRight = scrollY.interpolate({
     inputRange: [0, HEADER_TOP_ROW_HEIGHT],
-    outputRange: [0, 106],
+    // Reserves room for the two 44px glass icons (2×44 + 12 gap) at right:18,
+    // keeping a ~12px gap from the search bar.
+    outputRange: [0, 118],
     extrapolate: "clamp",
   });
 
@@ -499,26 +814,20 @@ export function HomeScreen() {
             </View>
 
             {/* Bell — same x as search-row bell (paddingRight 18 matches) */}
-            <IconButton
+            <HeaderGlassButton
               onPress={() => nav.navigate("Notification")}
-              variant="translucentDark"
-            >
-              <Bell size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={3} />
-              </View>
-            </IconButton>
+              icon={<Bell size={20} color="#1a1a1a" />}
+              count={3}
+              accessibilityLabel="การแจ้งเตือน"
+            />
 
             {/* Cart — same x as search-row cart */}
-            <IconButton
+            <HeaderGlassButton
               onPress={() => nav.navigate("Cart")}
-              variant="translucentDark"
-            >
-              <ShoppingBag size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={2} />
-              </View>
-            </IconButton>
+              icon={<ShoppingCart size={20} color="#1a1a1a" />}
+              count={cartCount}
+              accessibilityLabel="ตะกร้าสินค้า"
+            />
           </View>
         </Animated.View>
 
@@ -532,7 +841,7 @@ export function HomeScreen() {
             paddingLeft: 12,
             paddingRight: 12,
             paddingBottom: 12,
-            paddingTop: 4,
+            paddingTop: 14,
           }}
         >
           {/* Search bar — full-width pill with animated right margin */}
@@ -580,24 +889,18 @@ export function HomeScreen() {
               transform: [{ translateY: iconsTranslateY }],
             }}
           >
-            <IconButton
+            <HeaderGlassButton
               onPress={() => nav.navigate("Notification")}
-              variant="translucentDark"
-            >
-              <Bell size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={3} />
-              </View>
-            </IconButton>
-            <IconButton
+              icon={<Bell size={20} color="#1a1a1a" />}
+              count={3}
+              accessibilityLabel="การแจ้งเตือน"
+            />
+            <HeaderGlassButton
               onPress={() => nav.navigate("Cart")}
-              variant="translucentDark"
-            >
-              <ShoppingBag size={20} color="white" />
-              <View style={{ position: "absolute", top: -2, right: -4 }}>
-                <CountBadge count={2} />
-              </View>
-            </IconButton>
+              icon={<ShoppingCart size={20} color="#1a1a1a" />}
+              count={cartCount}
+              accessibilityLabel="ตะกร้าสินค้า"
+            />
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -762,8 +1065,8 @@ export function HomeScreen() {
                 <View
                   className="rounded-full items-center justify-center overflow-hidden"
                   style={{
-                    width: 56,
-                    height: 56,
+                    width: 40,
+                    height: 40,
                     backgroundColor: c.color + "1a",
                     borderWidth: 0.5,
                     borderColor: c.color + "33",
@@ -772,7 +1075,7 @@ export function HomeScreen() {
                   {"image" in c ? (
                     <Image
                       source={c.image}
-                      style={{ width: 36, height: 36 }}
+                      style={{ width: 32, height: 32 }}
                       resizeMode="contain"
                     />
                   ) : (
@@ -799,37 +1102,109 @@ export function HomeScreen() {
         {/* Recommended section (paged 2-per-page) */}
         <View className="mb-4 bg-white py-4">
           <View style={{ paddingHorizontal: 16 }}>
-            <SectionHeader title="แนะนำสำหรับคุณ" />
+            <SectionHeader title="แนะนำสำหรับคุณ" onSeeAll={() => goProducts("recommended")} />
           </View>
           <PagedProductList products={RECOMMENDED} />
         </View>
 
-        {/* Flash Sale section — hero banner replaces plain SectionHeader to
-            drive urgency (Scarcity + Loss Aversion + Zeigarnik). */}
+        {/* สินค้าโปรโมชั่น — discounted products (paged 2-per-page).
+            Web order: Recommended → Promotion → Flash Sale. */}
         <View className="mb-4 bg-white py-4">
-          <FlashSaleHero />
-          <View style={{ height: 12 }} />
+          <View style={{ paddingHorizontal: 16 }}>
+            <SectionHeader title="สินค้าโปรโมชั่น" onSeeAll={() => goProducts("promo")} />
+          </View>
+          <PagedProductList products={PROMO} />
+        </View>
+
+        {/* Flash Sale section — header is "Flash Sale" + live countdown +
+            ดูทั้งหมด (matches the web home; not a separate gradient hero). */}
+        <View className="mb-4 bg-white py-4">
+          <View style={{ paddingHorizontal: 16 }}>
+            <SectionHeader
+              title="Flash Sale"
+              rightSlot={<FlashSaleCountdown />}
+              onSeeAll={() => goProducts("flash")}
+            />
+          </View>
           <PagedProductList products={FLASH_SALE} />
         </View>
 
-        {/* More Recommended (full-bleed) */}
+        {/* ตลาดสมุนไพร — B2B herbal materials teaser (paged 2-per-page) */}
+        <View className="mb-4 bg-white py-4">
+          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-[20px] text-black font-medium">ตลาดสมุนไพร</Text>
+                <Text style={{ fontSize: 11, color: "#737373" }}>วัตถุดิบสมุนไพรคุณภาพสำหรับผู้ผลิต</Text>
+              </View>
+              <Pressable onPress={() => nav.navigate("HerbalMarket")} className="flex-row items-center" style={{ gap: 6 }}>
+                <Text className="text-[12px] text-gray-500">ดูทั้งหมด</Text>
+                <ChevronRight size={16} color="#6b7280" />
+              </Pressable>
+            </View>
+          </View>
+          <PagedPairs
+            data={MATERIALS.slice(0, 6)}
+            keyOf={(m) => m.id}
+            renderCard={(m, w) => (
+              <MarketCard m={m} width={w} onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id })} />
+            )}
+          />
+        </View>
+
+        {/* ผลิตภัณฑ์ทดสอบ — free trial products teaser (paged 2-per-page) */}
+        <View className="mb-4 bg-white py-4">
+          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center" style={{ gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                  <FlaskConical size={20} color="#319754" />
+                </View>
+                <View>
+                  <Text className="text-[20px] text-black font-medium">ผลิตภัณฑ์ทดสอบ</Text>
+                  <Text style={{ fontSize: 11, color: "#737373" }}>ทดลองสินค้าฟรี — แลกรีวิวสะสมแต้ม</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => nav.navigate("TrialProducts")} className="flex-row items-center" style={{ gap: 6 }}>
+                <Text className="text-[12px] text-gray-500">ดูทั้งหมด</Text>
+                <ChevronRight size={16} color="#6b7280" />
+              </Pressable>
+            </View>
+          </View>
+          <PagedPairs
+            data={TRIAL_PRODUCTS}
+            keyOf={(p) => p.id}
+            renderCard={(p, w) => (
+              <TrialMiniCard p={p} width={w} onPress={() => (nav.navigate as (r: string, params?: object) => void)("TrialDetail", { id: p.id })} />
+            )}
+          />
+        </View>
+
+        {/* บทความแนะนำ — recommended blog articles (paged carousel, 1 per page,
+            swipeable like the Flash Sale rail) */}
         <View className="mb-4 bg-white py-4">
           <View style={{ paddingHorizontal: 16 }}>
-            <SectionHeader title="สินค้ามาใหม่" />
+            <SectionHeader title="บทความแนะนำ" onSeeAll={() => goKnowledge("articles")} />
           </View>
-          <View
-            className="flex-row flex-wrap"
-            style={{ paddingHorizontal: 16, gap: 12 }}
-          >
-            {RECOMMENDED.slice(4).map((p) => (
-              <ProductCard key={p.id} product={p} width={cardWidth} />
-            ))}
+          <PagedArticles
+            articles={ARTICLES.slice(0, 5)}
+            onOpen={(a) => nav.navigate("ArticleDetail", { article: a })}
+          />
+        </View>
+
+        {/* วีดีโอแนะนำ — recommended videos (paged 2-per-page, like the web) */}
+        <View className="mb-4 bg-white py-4">
+          <View style={{ paddingHorizontal: 16 }}>
+            <SectionHeader title="วีดีโอแนะนำ" onSeeAll={() => goKnowledge("videos")} />
           </View>
+          <PagedVideoList videos={VIDEOS} onOpen={() => goKnowledge("videos")} />
         </View>
 
         {/* Footer spacer — clears the floating Liquid Glass tab bar */}
         <View style={{ height: 104 }} />
       </Animated.ScrollView>
+        {/* Black scroll-edge shade at the very bottom of the screen. */}
+        <BottomFade />
       </View>
 
     </View>
