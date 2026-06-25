@@ -17,6 +17,15 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { CartProvider } from "./src/context/CartContext";
 import { ProductFilterProvider } from "./src/context/ProductFilterContext";
 import { PaymentProvider } from "./src/context/PaymentContext";
+import { OrderProvider } from "./src/context/OrderContext";
+import { RefundProvider } from "./src/context/RefundContext";
+import { WishlistProvider } from "./src/context/WishlistContext";
+import { TrialProvider } from "./src/context/TrialContext";
+import { LanguageProvider } from "./src/context/LanguageContext";
+import { ChatProvider } from "./src/context/ChatContext";
+import { AIAssistantProvider } from "./src/context/AIAssistantContext";
+import { SecurityProvider } from "./src/context/SecurityContext";
+import { SellerProvider } from "./src/context/SellerContext";
 
 // Keep the branded splash up at least this long so a fast font load doesn't
 // flash it for a single frame.
@@ -93,13 +102,31 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer>
           <ErrorBoundary>
+            <LanguageProvider>
+            <ChatProvider>
             <CartProvider>
               <ProductFilterProvider>
                 <PaymentProvider>
-                  <RootStack />
+                  <OrderProvider>
+                    <AIAssistantProvider>
+                      <RefundProvider>
+                        <WishlistProvider>
+                          <TrialProvider>
+                            <SecurityProvider>
+                              <SellerProvider>
+                                <RootStack />
+                              </SellerProvider>
+                            </SecurityProvider>
+                          </TrialProvider>
+                        </WishlistProvider>
+                      </RefundProvider>
+                    </AIAssistantProvider>
+                  </OrderProvider>
                 </PaymentProvider>
               </ProductFilterProvider>
             </CartProvider>
+            </ChatProvider>
+            </LanguageProvider>
           </ErrorBoundary>
         </NavigationContainer>
       </SafeAreaProvider>

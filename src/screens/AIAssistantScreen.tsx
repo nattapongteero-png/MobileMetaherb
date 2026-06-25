@@ -1,605 +1,800 @@
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  type TextInputProps,
+  View, Text, ScrollView, TextInput, Pressable, Image, Dimensions,
+  KeyboardAvoidingView, Platform, Keyboard, Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Send, Sparkles } from "lucide-react-native";
-import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { StatusBar } from "expo-status-bar";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
+import Animated, {
+  FadeOut, FadeInDown, ZoomIn, ZoomOut, Keyframe, useSharedValue, useAnimatedStyle, withTiming, withRepeat,
+  cancelAnimation, Easing, withSequence, withDelay,
+} from "react-native-reanimated";
+import {
+  Plus, History, Send, Sparkles, Check, Tag, ShoppingCart, ArrowRight, Camera, Mic,
+  Moon, Activity, Scale, Brain, Shield, Wallet, Gift, Package, Leaf, Receipt, X,
+  type LucideIcon,
+} from "lucide-react-native";
+import { GlassIconButton } from "../components/GlassIconButton";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { PressableScale } from "../components/PressableScale";
+import { ProductCard } from "../components/ProductCard";
+import { useAIAssistant, type AIMessage } from "../context/AIAssistantContext";
+import { getRealProductImage } from "../data/realProducts";
+import { getSpeech } from "../utils/speech";
+import { getTts } from "../utils/tts";
+import { elevenSpeak, stopEleven } from "../utils/elevenlabs";
+import { STATUS_LABEL } from "../data/orders";
+import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
+import type { RootStackParamList } from "../navigation/RootStack";
 
-/**
- * AI assistant ("เมต้า") chat screen — mobile port of the web AIAssistant.
- *
- * Faithfully reproduces the web reply logic: keyword → intent detection,
- * health-goal extraction, and the keyword-matched canned Thai answers about
- * herbs / products / orders. The web app rendered rich product/comparison
- * cards via a live ProductsContext; on mobile we keep it text-only (this is a
- * pushed mockup screen) but preserve the assistant's voice, suggested prompts,
- * and every Thai copy string verbatim from the web source.
- */
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const AI_GRAD = ["#0088ff", "#6366f1", "#9747ff"] as const;
+const AI_PURPLE = "#6366f1";
+const META_AI = require("../../assets/meta-ai.png");
+const TAU = Math.PI * 2;
+const GLOW_R = 5; // how far the glow drifts off-center as it circles
 
-// ===== Greeting (verbatim from AIAssistantContext GREETING) =====
-const GREETING_TEXT =
-  "สวัสดีค่ะ เมต้าเป็นผู้ช่วยช้อปสมุนไพรของคุณ 🌿 มีอะไรให้เมต้าช่วยไหมคะ — ลองถามได้เลยว่า “หาสินค้าอะไรอยู่” หรือ “แนะนำสินค้าหน่อย”";
-
-// ===== Suggested prompt pool (verbatim — web EMPTY_STATE_CHIPS_POOL) =====
-const SUGGESTION_POOL = [
-  "แนะนำสมุนไพรช่วยนอนหลับ",
-  "ลดน้ำหนัก เริ่มจากตัวไหนดี",
-  "บำรุงผิวจากธรรมชาติ",
-  "เปรียบเทียบสินค้าขายดี",
-  "มีโปรอะไรบ้างวันนี้",
-  "สมุนไพรลดความเครียด",
-  "ขมิ้นชันกับฟ้าทะลายโจรต่างกันยังไง",
-  "บำรุงสายตาด้วยอะไรดี",
-  "ตัวไหนช่วยระบบขับถ่าย",
-  "งบ 300 ซื้ออะไรได้บ้าง",
-  "ของขวัญเพื่อสุขภาพให้คุณแม่",
-  "สมุนไพรสำหรับวัยทำงาน",
-  "ช่วยเสริมภูมิคุ้มกัน",
-  "บำรุงตับ ตัวไหนดี",
-  "ลดอาการปวดข้อ",
-  "ของกินช่วยไมเกรน",
-  "สมุนไพรช่วยลดน้ำตาล",
-  "บำรุงผมสำหรับคนผมร่วง",
-  "ของขายดีที่สุดอาทิตย์นี้",
-  "มีสินค้ามาใหม่อะไรบ้าง",
-] as const;
-
-// ===== Reply engine — ported from aiEngine.ts + AIAssistantContext.handle =====
-
-type Intent =
-  | "greet"
-  | "help"
-  | "search"
-  | "recommend"
-  | "compare"
-  | "bundle"
-  | "promo"
-  | "value"
-  | "cart_add"
-  | "cart_view"
-  | "cart_remove"
-  | "checkout"
-  | "order_status"
-  | "order_recent"
-  | "qa"
-  | "unknown";
-
-type HealthGoal =
-  | "sleep"
-  | "weight_loss"
-  | "weight_gain"
-  | "skin"
-  | "hair"
-  | "brain"
-  | "energy"
-  | "immune"
-  | "digestion"
-  | "joint"
-  | "pressure"
-  | "diabetes"
-  | "senior"
-  | "kids"
-  | "stress";
-
-// Keyword → canonical goal (verbatim Thai keyword sets from aiEngine GOAL_KEYWORDS).
-const GOAL_KEYWORDS: Record<HealthGoal, string[]> = {
-  sleep: ["นอน", "หลับ", "อินซอม", "พักผ่อน", "sleep", "insomnia"],
-  weight_loss: ["ลดน้ำหนัก", "ลดความอ้วน", "ผอม", "ดีท็อกซ์", "diet", "burn"],
-  weight_gain: ["เพิ่มน้ำหนัก", "อ้วน", "บำรุงร่างกาย"],
-  skin: ["ผิว", "หน้าใส", "สิว", "ฝ้า", "skin", "คอลลาเจน", "ขาว"],
-  hair: ["ผม", "หัวล้าน", "ผมร่วง", "hair"],
-  brain: ["สมอง", "ความจำ", "บำรุงสมอง", "memory", "focus", "เด็ก"],
-  energy: ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "energy", "บำรุงกำลัง"],
-  immune: ["ภูมิคุ้มกัน", "ป้องกัน", "หวัด", "ไข้หวัด", "immune"],
-  digestion: ["ย่อย", "ท้อง", "ขับถ่าย", "ลำไส้", "stomach"],
-  joint: ["ข้อ", "เข่า", "ปวดข้อ", "joint", "กระดูก"],
-  pressure: ["ความดัน", "blood pressure"],
-  diabetes: ["เบาหวาน", "น้ำตาล", "diabetes"],
-  senior: ["ผู้สูงอายุ", "คนแก่", "ปู่ย่า", "ตายาย", "senior"],
-  kids: ["เด็ก", "ลูก", "kids"],
-  stress: ["เครียด", "วิตก", "stress", "anxiety"],
-};
-
-// Canonical goal labels (verbatim from aiEngine GOAL_LABEL).
-const GOAL_LABEL: Record<HealthGoal, string> = {
-  sleep: "ช่วยนอนหลับ",
-  weight_loss: "ลดน้ำหนัก",
-  weight_gain: "เพิ่มน้ำหนัก",
-  skin: "บำรุงผิว",
-  hair: "บำรุงผม",
-  brain: "บำรุงสมอง",
-  energy: "เพิ่มพลังงาน",
-  immune: "เสริมภูมิคุ้มกัน",
-  digestion: "ช่วยย่อย-ขับถ่าย",
-  joint: "บำรุงข้อ-เข่า",
-  pressure: "ดูแลความดัน",
-  diabetes: "ดูแลเบาหวาน",
-  senior: "ผู้สูงอายุ",
-  kids: "สำหรับเด็ก",
-  stress: "ลดความเครียด",
-};
-
-// Curated product hints per goal — lets the text-only mobile assistant name
-// real products without a live catalog (drawn from aiEngine GOAL_PRODUCT_HINTS).
-const GOAL_PICKS: Record<HealthGoal, string[]> = {
-  sleep: ["ชาคาโมมายล์", "ดอกคำฝอยอบแห้ง", "น้ำมันลาเวนเดอร์"],
-  weight_loss: ["ชาดีท็อกซ์สมุนไพร", "ขมิ้นชันแคปซูล", "ชาเขียวมัทฉะ"],
-  weight_gain: ["โสมเกาหลีสกัด", "ถั่งเช่าแคปซูล"],
-  skin: ["คอลลาเจนเปปไทด์", "วิตามินซีสกัดจากธรรมชาติ", "สบู่สมุนไพร"],
-  hair: ["อาหารเสริมไบโอติน", "สารสกัดใบบัวบก"],
-  brain: ["สารสกัดใบบัวบก", "แปะก๊วยแคปซูล"],
-  energy: ["โสมเกาหลีสกัด", "ถั่งเช่าแคปซูล", "วิตามินบีรวม"],
-  immune: ["ฟ้าทะลายโจรแคปซูล", "ขมิ้นชันแคปซูล", "เห็ดหลินจือสกัด"],
-  digestion: ["ขิงผงชงดื่ม", "มะรุมแคปซูล", "ฟ้าทะลายโจรแคปซูล"],
-  joint: ["ขมิ้นชันแคปซูล", "ไพลสกัด", "คอลลาเจนบำรุงข้อ"],
-  pressure: ["รางจืดแคปซูล", "สารสกัดใบบัวบก", "กระเทียมสกัด"],
-  diabetes: ["มะระขี้นกแคปซูล", "ฟ้าทะลายโจรแคปซูล", "สารสกัดใบบัวบก"],
-  senior: ["แคลเซียมสมุนไพร", "เห็ดหลินจือสกัด", "คอลลาเจนเปปไทด์"],
-  kids: ["วิตามินซีสำหรับเด็ก", "เอลเดอร์เบอร์รี่ไซรัป"],
-  stress: ["ชาคาโมมายล์", "น้ำมันลาเวนเดอร์", "อโรม่าสมุนไพร"],
-};
-
-// Intent parser — verbatim regex order from aiEngine detectIntent.
-function detectIntent(text: string): Intent {
-  const t = text.toLowerCase().trim();
-  if (!t) return "unknown";
-  if (/^(สวัสดี|hello|hi|หวัดดี|ดีครับ|ดีค่ะ)/i.test(t)) return "greet";
-  if (/(ช่วยอะไร|ทำอะไรได้|ใช้งานยังไง|วิธีใช้|how to use|what can you)/i.test(t)) return "help";
-
-  if (/(เปรียบเทียบ|compare|ต่างกัน|แบบไหนดีกว่า)/.test(t)) return "compare";
-  if (/(จัดเซต|bundle|ชุด|แพ็ค|รวม|set)/.test(t)) return "bundle";
-  if (/(โปร|promo|ส่วนลด|คูปอง|coupon|deal)/.test(t)) return "promo";
-  if (/(คุ้ม|ความคุ้ม|value|ราคาต่อ|คุ้มกว่า)/.test(t)) return "value";
-
-  if (/(เพิ่มใส่|ใส่ตะกร้า|add to cart|หยิบ.*ตะกร้า)/.test(t)) return "cart_add";
-  if (/(ตะกร้า|cart|รถเข็น)/.test(t) && /(ดู|แสดง|เปิด|view)/.test(t)) return "cart_view";
-  if (/(เอาออก|ลบ.*ตะกร้า|remove)/.test(t)) return "cart_remove";
-  if (/(ชำระ|checkout|สั่งซื้อ|สั่ง.*เลย|order now)/.test(t)) return "checkout";
-
-  if (/(ออเดอร์.*ถึงไหน|order.*status|ติดตาม|เลข.*track|tracking)/.test(t)) return "order_status";
-  if (/(ออเดอร์.*ล่าสุด|ประวัติ.*สั่ง|orders|my orders)/.test(t)) return "order_recent";
-
-  if (/(แนะนำ|recommend|มีอะไร|มีตัว|แบบไหน|suggest)/.test(t)) return "recommend";
-  if (/(หา|search|มี.*ไหม|มี|อยาก.*หา|มอง)/.test(t)) return "search";
-
-  if (/(วิธีรับประทาน|กิน.*ยังไง|วิธี.*ใช้|ส่วนประกอบ|ข้อควรระวัง|กลุ่ม.*เหมาะ)/.test(t)) return "qa";
-
-  return "unknown";
+const CHIP_POOL = [
+  "แนะนำสมุนไพรช่วยนอนหลับ", "ลดน้ำหนัก เริ่มจากตัวไหนดี", "บำรุงผิวจากธรรมชาติ",
+  "เปรียบเทียบสินค้าขายดี", "มีโปรอะไรบ้างวันนี้", "สมุนไพรลดความเครียด",
+  "ช่วยเสริมภูมิคุ้มกัน", "งบ 300 ซื้ออะไรได้บ้าง", "ของขวัญเพื่อสุขภาพให้คุณแม่",
+  "จัดเซตแนะนำให้หน่อย", "ช่วยย่อย-ขับถ่ายตัวไหนดี", "ออเดอร์ล่าสุดของฉัน",
+];
+function pickChips(): string[] {
+  const a = [...CHIP_POOL];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.slice(0, 5);
 }
 
-// Goal extraction — verbatim logic from aiEngine extractGoals.
-function extractGoals(text: string): HealthGoal[] {
-  const t = text.toLowerCase();
-  const hits: HealthGoal[] = [];
-  (Object.keys(GOAL_KEYWORDS) as HealthGoal[]).forEach((g) => {
-    if (GOAL_KEYWORDS[g].some((kw) => t.includes(kw.toLowerCase()))) hits.push(g);
+/** Pick a topic icon for a suggestion / quick-reply chip from its text. */
+function iconFor(label: string): LucideIcon {
+  const t = label.toLowerCase();
+  if (/(นอน|หลับ)/.test(t)) return Moon;
+  if (/(ลดน้ำหนัก|ผอม|อ้วน)/.test(t)) return Activity;
+  if (/(ผิว|หน้าใส|คอลลาเจน)/.test(t)) return Sparkles;
+  if (/(เปรียบเทียบ|ต่างกัน|คุ้ม|ถูก)/.test(t)) return Scale;
+  if (/(โปร|ส่วนลด|คูปอง|ของแถม)/.test(t)) return Tag;
+  if (/(เครียด|สมอง|วิตก)/.test(t)) return Brain;
+  if (/(ภูมิ|ป้องกัน|หวัด)/.test(t)) return Shield;
+  if (/(งบ|฿|\d)/.test(t)) return Wallet;
+  if (/(ของขวัญ|ของฝาก)/.test(t)) return Gift;
+  if (/(เซต|ชุด|แพ็ค)/.test(t)) return Package;
+  if (/(ย่อย|ขับถ่าย|ลำไส้)/.test(t)) return Leaf;
+  if (/(ออเดอร์|คำสั่งซื้อ|สถานะ)/.test(t)) return Receipt;
+  if (/(ตะกร้า|ชำระ)/.test(t)) return ShoppingCart;
+  return Sparkles;
+}
+
+// Web-parity chip transitions: scale + fade + slide, staggered on enter.
+const chipEnter = (i: number) =>
+  new Keyframe({
+    0: { opacity: 0, transform: [{ scale: 0.85 }, { translateY: 6 }] },
+    100: { opacity: 1, transform: [{ scale: 1 }, { translateY: 0 }] },
+  }).duration(300).delay(i * 55);
+const chipExit = new Keyframe({
+  0: { opacity: 1, transform: [{ scale: 1 }, { translateY: 0 }] },
+  100: { opacity: 0, transform: [{ scale: 0.9 }, { translateY: -6 }] },
+}).duration(190);
+
+export function AIAssistantScreen() {
+  const nav = useNavigation<Nav>();
+  const { messages, typing, send, quickReplyChips, markRead, newChat } = useAIAssistant();
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voicePhase, setVoicePhase] = useState<"listening" | "thinking" | "speaking">("listening");
+  const [interim, setInterim] = useState("");
+  const subsRef = useRef<{ remove: () => void }[]>([]);
+  const finalRef = useRef("");
+  const voiceModeRef = useRef(false);
+  const spokenRef = useRef<string | null>(null);
+  const lastTranscriptRef = useRef("");
+  const voiceIdRef = useRef<string | undefined>(undefined);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Composer focus glow — a soft blue + purple halo that slowly circles the
+  // floating bar while focused (two colored shadow layers, opposite phase).
+  const rot = useSharedValue(0); // 0→1 continuous, drives the orbit angle
+  const on = useSharedValue(0);  // 0/1, fades the colored glow in on focus
+  useEffect(() => {
+    rot.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false);
+    return () => cancelAnimation(rot);
+  }, [rot]);
+  useEffect(() => { on.value = withTiming(focused ? 1 : 0, { duration: 260 }); }, [focused, on]);
+  const glowA = useAnimatedStyle(() => {
+    const a = rot.value * TAU;
+    return {
+      shadowColor: "#0088ff",
+      shadowOffset: { width: Math.cos(a) * GLOW_R, height: Math.sin(a) * GLOW_R },
+      shadowRadius: 11,
+      shadowOpacity: on.value * 0.38,
+    };
   });
-  return hits;
-}
+  const glowB = useAnimatedStyle(() => {
+    const a = rot.value * TAU + Math.PI;
+    return {
+      shadowColor: "#9747ff",
+      shadowOffset: { width: Math.cos(a) * GLOW_R, height: Math.sin(a) * GLOW_R },
+      shadowRadius: 11,
+      shadowOpacity: on.value * 0.38,
+    };
+  });
+  // Bar widens on focus — side margins shrink 24 → 16.
+  const composerPad = useAnimatedStyle(() => ({ paddingHorizontal: 16 }));
 
-// Budget extraction — verbatim from aiEngine extractBudget.
-function extractBudget(text: string): number | undefined {
-  const m = text.match(/(\d{2,5})\s*(บาท|baht|฿|thb)?/i);
-  if (m) {
-    const n = parseInt(m[1], 10);
-    if (n >= 50 && n <= 100000) return n;
-  }
-  return undefined;
-}
+  const onCamera = () => Alert.alert("กำลังพัฒนา", "ส่งรูปให้เมต้าช่วยวิเคราะห์ — กำลังพัฒนาเร็วๆ นี้ค่ะ");
 
-// Quick-reply chips keyed on the last detected intent (verbatim from aiEngine quickReplies).
-function quickReplies(intent: Intent, lastGoal?: HealthGoal): string[] {
-  switch (intent) {
-    case "greet":
-    case "unknown":
-      return ["มีสมุนไพรช่วยนอนหลับไหม", "อยากลดน้ำหนัก แนะนำหน่อย", "เปรียบเทียบสินค้าขายดี", "ออเดอร์ล่าสุด"];
-    case "search":
-    case "recommend":
-      return ["จัดเซตแนะนำให้หน่อย", "ตัวที่ถูกที่สุด", "เปรียบเทียบ 2 ตัวบนสุด", "ดูโปรโมชั่น"];
-    case "compare":
-      return ["ตัวไหนคุ้มกว่า", "เพิ่มตัวคุ้มสุดเข้าตะกร้า", "มีโปรไหม"];
-    case "cart_view":
-    case "promo":
-      return ["ชำระเงิน", "แนะนำของแถม", "ลบสินค้าออก"];
-    case "checkout":
-      return ["ใช้ที่อยู่เดิม", "เลือกที่อยู่อื่น", "ยกเลิก"];
-    default:
-      return ["หาสินค้าใหม่", "ตะกร้า", "ออเดอร์ของฉัน", lastGoal ? `${GOAL_LABEL[lastGoal]} อะไรดี` : "จัดเซตแนะนำ"];
-  }
-}
+  const cleanupSubs = () => { subsRef.current.forEach((s) => s.remove()); subsRef.current = []; };
 
-// Build the assistant's reply text. Ports the branch-by-intent copy from
-// AIAssistantContext.handle, keeping every Thai string verbatim. Where the web
-// rendered a rich card from live data, mobile substitutes an equivalent text
-// answer drawn from the curated goal picks above.
-function buildReply(text: string, lastGoal?: HealthGoal): { reply: string; intent: Intent; goal?: HealthGoal } {
-  const intent = detectIntent(text);
-  const newGoals = extractGoals(text);
-  const budget = extractBudget(text);
-  const activeGoal = newGoals[0] ?? lastGoal;
-
-  switch (intent) {
-    case "greet":
-      return {
-        reply:
-          "สวัสดีค่ะ! ลองบอก goal สุขภาพ เช่น “นอนไม่หลับ” หรือ “บำรุงผิว” ฉันจะแนะนำสินค้าที่เหมาะกับคุณ",
-        intent,
-        goal: activeGoal,
-      };
-    case "help":
-      return {
-        reply:
-          "ฉันช่วยอะไรได้บ้าง:\n• ค้นหา/แนะนำสมุนไพรตามอาการ\n• เปรียบเทียบ + วิเคราะห์ความคุ้มค่า\n• จัดเซตประหยัด + แนะนำโปรโมชั่น\n• เพิ่ม/ลบสินค้าในตะกร้า + ชำระเงิน\n• ดูสถานะออเดอร์",
-        intent,
-        goal: activeGoal,
-      };
-    case "search":
-    case "recommend": {
-      if (activeGoal) {
-        const picks = GOAL_PICKS[activeGoal];
-        const head = `จาก goal “${GOAL_LABEL[activeGoal]}”${budget ? ` ภายในงบ ฿${budget}` : ""} แนะนำ:`;
-        return { reply: `${head}\n${picks.map((p) => `• ${p}`).join("\n")}`, intent, goal: activeGoal };
-      }
-      return {
-        reply:
-          "ขอโทษค่ะ ยังไม่พบสินค้าที่ตรงเลย ลองใช้คำที่กว้างขึ้น หรือบอก goal เช่น “นอนหลับ”, “บำรุงผิว”",
-        intent,
-        goal: activeGoal,
-      };
-    }
-    case "compare":
-      return {
-        reply:
-          "บอกชื่อสินค้า 2 ตัวที่อยากเทียบได้เลยค่ะ เมต้าจะเทียบให้ทั้งราคา ส่วนลด คะแนนรีวิว และความคุ้มค่า แล้วสรุปว่าตัวไหนเหมาะกับคุณที่สุด",
-        intent,
-        goal: activeGoal,
-      };
-    case "bundle": {
-      const picks = activeGoal ? GOAL_PICKS[activeGoal] : GOAL_PICKS.immune;
-      const name = activeGoal ? `ชุด${GOAL_LABEL[activeGoal]}` : "ชุดแนะนำ";
-      return {
-        reply: `ฉันจัดชุดให้แล้วค่ะ — ${name} ราคารวมพิเศษ:\n${picks.map((p) => `• ${p}`).join("\n")}\nรับส่วนลดเพิ่ม 10% เมื่อซื้อทั้งชุด`,
-        intent,
-        goal: activeGoal,
-      };
-    }
-    case "promo":
-      return {
-        reply: "เพิ่มสินค้าเข้าตะกร้าก่อนนะคะ ฉันจะช่วยหาโปรที่ใช่ให้",
-        intent,
-        goal: activeGoal,
-      };
-    case "value":
-      return {
-        reply: "ลองค้นหาสินค้าก่อน แล้วค่อยถามความคุ้มค่าได้นะคะ",
-        intent,
-        goal: activeGoal,
-      };
-    case "cart_add":
-      return {
-        reply:
-          "ยังไม่แน่ใจว่าจะหยิบตัวไหน — ลองพิมพ์ชื่อสินค้าให้ชัดขึ้น หรือกดปุ่ม “เพิ่มเข้าตะกร้า” ใต้การ์ดสินค้าได้เลย",
-        intent,
-        goal: activeGoal,
-      };
-    case "cart_remove":
-      return { reply: "ตะกร้ายังว่างอยู่ค่ะ", intent, goal: activeGoal };
-    case "cart_view":
-      return {
-        reply: "ตะกร้ายังว่างอยู่ค่ะ ลองหาสินค้าก่อนนะคะ",
-        intent,
-        goal: activeGoal,
-      };
-    case "checkout":
-      return { reply: "กรุณาเข้าสู่ระบบก่อนสั่งซื้อนะคะ", intent, goal: activeGoal };
-    case "order_status":
-    case "order_recent":
-      return { reply: "ยังไม่มีออเดอร์ในระบบค่ะ", intent, goal: activeGoal };
-    case "qa":
-      return { reply: "บอกชื่อสินค้าให้แม่นยำขึ้นได้ไหมคะ ฉันจะดึงข้อมูลให้", intent, goal: activeGoal };
-    default: {
-      if (activeGoal) {
-        const picks = GOAL_PICKS[activeGoal];
-        return { reply: `ลองดูตัวเลือกเหล่านี้ดูนะคะ:\n${picks.map((p) => `• ${p}`).join("\n")}`, intent, goal: activeGoal };
-      }
-      return {
-        reply: "ฉันยังไม่เข้าใจคำขอ — ลองเลือกจากคำถามแนะนำด้านล่างก็ได้ค่ะ",
-        intent,
-        goal: activeGoal,
-      };
-    }
-  }
-}
-
-// ===== Message model =====
-
-type Role = "user" | "ai";
-interface Msg {
-  id: string;
-  role: Role;
-  text: string;
-  ts: number;
-}
-
-let _seq = 0;
-const uid = () => `m_${Date.now()}_${_seq++}`;
-
-const timeLabel = (ts: number) =>
-  new Date(ts).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-
-// ===== Module-scope TextInput helper (chat composer field) =====
-function ChatInput(props: TextInputProps) {
-  return (
-    <TextInput
-      {...props}
-      multiline
-      style={{
-        flex: 1,
-        backgroundColor: "#f5f5f5",
-        minHeight: 44,
-        maxHeight: 120,
-        borderRadius: 22,
-        paddingHorizontal: 16,
-        paddingTop: 11,
-        paddingBottom: 11,
-        fontSize: 15,
-        color: "#0a0a0a",
-      }}
-      placeholderTextColor={TEXT_MUTED}
-    />
-  );
-}
-
-// ===== Avatar — Sparkles in a brand-tinted circle (no external assets) =====
-function AssistantAvatar() {
-  return (
-    <View
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: "rgba(49,151,84,0.12)",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Sparkles size={16} color={BRAND_GREEN} strokeWidth={2.2} />
-    </View>
-  );
-}
-
-// ===== Typing indicator — three pulsing dots in an incoming bubble =====
-function TypingBubble() {
-  return (
-    <View style={{ alignSelf: "flex-start", maxWidth: "78%" }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
-        <AssistantAvatar />
-        <View
-          style={{
-            backgroundColor: "#ffffff",
-            borderWidth: 1,
-            borderColor: "#ececed",
-            borderRadius: 18,
-            borderBottomLeftRadius: 6,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            flexDirection: "row",
-            gap: 5,
-          }}
-        >
-          {[0, 1, 2].map((i) => (
-            <View
-              key={i}
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: 4,
-                backgroundColor: i === 1 ? BRAND_GREEN : "#c4c4c6",
-              }}
-            />
-          ))}
-        </View>
-      </View>
-      <Text style={{ fontSize: 11, color: TEXT_MUTED, marginLeft: 40, marginTop: 3 }}>
-        เมต้ากำลังคิด...
-      </Text>
-    </View>
-  );
-}
-
-// ===== One message bubble =====
-function Bubble({ msg }: { msg: Msg }) {
-  const isUser = msg.role === "user";
-  if (isUser) {
-    return (
-      <View style={{ alignSelf: "flex-end", maxWidth: "78%", alignItems: "flex-end" }}>
-        <View
-          style={{
-            backgroundColor: BRAND_GREEN,
-            borderRadius: 18,
-            borderBottomRightRadius: 6,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-          }}
-        >
-          <Text style={{ color: "#ffffff", fontSize: 15, lineHeight: 21 }}>{msg.text}</Text>
-        </View>
-        <Text style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 3 }}>{timeLabel(msg.ts)}</Text>
-      </View>
+  // Open the mic and listen for one utterance; 'end' routes the transcript to เมต้า.
+  const beginListen = () => {
+    const S = getSpeech();
+    if (!S) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = S.ExpoSpeechRecognitionModule as any;
+    finalRef.current = "";
+    lastTranscriptRef.current = "";
+    setInterim("");
+    setVoicePhase("listening");
+    cleanupSubs();
+    subsRef.current.push(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mod.addListener("result", (e: any) => {
+        const t = e?.results?.[0]?.transcript ?? "";
+        if (t) lastTranscriptRef.current = t; // keep every partial — isFinal may not fire
+        setInterim(t);
+        if (e?.isFinal) finalRef.current = t;
+      }),
+      mod.addListener("end", () => {
+        cleanupSubs();
+        if (!voiceModeRef.current) return;
+        const t = (finalRef.current || lastTranscriptRef.current || "").trim();
+        setInterim("");
+        if (t) { setVoicePhase("thinking"); send(t); } // → shows as a user bubble in the thread
+        else { setTimeout(() => { if (voiceModeRef.current) beginListen(); }, 300); } // silence → keep mic open
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mod.addListener("error", (e: any) => {
+        cleanupSubs();
+        if (!voiceModeRef.current) return;
+        setInterim("");
+        if (e?.error !== "aborted") setTimeout(() => { if (voiceModeRef.current) beginListen(); }, 400); // no-speech / transient → keep listening
+      }),
     );
-  }
+    try { mod.start({ lang: "th-TH", interimResults: true, continuous: false }); }
+    catch { /* ignore */ }
+  };
+
+  const enterVoice = async () => {
+    const S = getSpeech();
+    if (!S) { Alert.alert("ยังไม่พร้อม", "โหมดสนทนาด้วยเสียงต้องอัปเดต/รีบิลด์แอปก่อนนะคะ"); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = S.ExpoSpeechRecognitionModule as any;
+    try {
+      const perm = await mod.requestPermissionsAsync();
+      if (!perm?.granted) { Alert.alert("ต้องอนุญาต", "กรุณาอนุญาตไมโครโฟนและการรู้จำเสียงพูด"); return; }
+    } catch { Alert.alert("ผิดพลาด", "ขอสิทธิ์ไม่สำเร็จ"); return; }
+    Keyboard.dismiss();
+    setFocused(false);
+    spokenRef.current = null;
+    voiceModeRef.current = true;
+    setVoiceMode(true);
+    beginListen();
+  };
+
+  const exitVoice = () => {
+    voiceModeRef.current = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    try { (getSpeech()?.ExpoSpeechRecognitionModule as any)?.abort?.(); } catch { /* noop */ }
+    try { getTts()?.stop(); } catch { /* noop */ }
+    try { stopEleven(); } catch { /* noop */ }
+    cleanupSubs();
+    setVoiceMode(false);
+    setInterim("");
+    setVoicePhase("listening");
+  };
+
+  const onMic = () => { if (voiceMode) exitVoice(); else enterVoice(); };
+
+  // Speak เมต้า's replies aloud in voice mode, then re-open the mic (the turn
+  // still appears in the chat thread via send()).
+  useEffect(() => {
+    if (!voiceMode) return;
+    if (typing) { setVoicePhase("thinking"); return; }
+    const last = messages[messages.length - 1];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const txt = last && last.role === "ai" ? (last as any).text : "";
+    if (!txt || last.id === spokenRef.current) return;
+    spokenRef.current = last.id;
+    setVoicePhase("speaking");
+    const resume = () => { if (voiceModeRef.current) setTimeout(() => { if (voiceModeRef.current) beginListen(); }, 350); };
+    // Human-like voice via ElevenLabs; fall back to the system voice if it's unavailable.
+    elevenSpeak(txt, resume).then((ok) => {
+      if (ok) return;
+      const T = getTts();
+      if (!T) { resume(); return; }
+      T.speak(txt, { language: "th-TH", voice: voiceIdRef.current, pitch: 1.05, rate: 0.94, onDone: resume, onError: resume });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, typing, voiceMode]);
+
+  useEffect(() => () => {
+    voiceModeRef.current = false;
+    cleanupSubs();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    try { (getSpeech()?.ExpoSpeechRecognitionModule as any)?.abort?.(); } catch { /* noop */ }
+    try { getTts()?.stop(); } catch { /* noop */ }
+    try { stopEleven(); } catch { /* noop */ }
+  }, []);
+
+  // Pick the most natural Thai voice the OS has (Premium > Enhanced > compact).
+  useEffect(() => {
+    const T = getTts();
+    if (!T) return;
+    T.getAvailableVoicesAsync()
+      .then((voices) => {
+        const rank = (q?: string) => (q === "Premium" ? 3 : q === "Enhanced" ? 2 : 1);
+        const th = voices
+          .filter((v) => (v.language ?? "").toLowerCase().startsWith("th"))
+          .sort((a, b) => rank(b.quality as unknown as string) - rank(a.quality as unknown as string));
+        voiceIdRef.current = th[0]?.identifier;
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { markRead(); }, [markRead]);
+  useEffect(() => {
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(t);
+  }, [messages, typing]);
+
+  const isEmpty = messages.length <= 1;
+  const submit = async () => {
+    const v = text.trim();
+    if (!v) return;
+    setText("");
+    await send(v);
+  };
+  const onChip = (c: string) => send(c);
+
   return (
-    <View style={{ alignSelf: "flex-start", maxWidth: "78%" }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
-        <AssistantAvatar />
-        <View
-          style={{
-            backgroundColor: "#ffffff",
-            borderWidth: 1,
-            borderColor: "#ececed",
-            borderRadius: 18,
-            borderBottomLeftRadius: 6,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            flexShrink: 1,
-          }}
-        >
-          <Text style={{ color: "#1a1a1a", fontSize: 15, lineHeight: 22 }}>{msg.text}</Text>
+    <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
+      <StatusBar style="dark" />
+
+      <SubPageHeader
+        title="เมต้า"
+        subtitle="AI Shopping Assistant"
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+        rightSlot={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <GlassIconButton onPress={() => nav.navigate("AIHistory")} accessibilityLabel="ประวัติแชท">
+              <History size={19} color="#1a1a1a" strokeWidth={2.2} />
+            </GlassIconButton>
+            <GlassIconButton onPress={() => { newChat(); setText(""); }} accessibilityLabel="แชทใหม่">
+              <Plus size={20} color="#1a1a1a" strokeWidth={2.4} />
+            </GlassIconButton>
+          </View>
+        }
+      />
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={0}>
+        <View style={{ flex: 1 }}>
+        {isEmpty ? (
+          <EmptyState onChip={onChip} />
+        ) : (
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 150 }}
+          >
+            {messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                m={m}
+                onSend={onChip}
+                onNav={(r) => nav.navigate(r as any)}
+                onProduct={(p) => nav.navigate("ProductDetail", { product: p })}
+              />
+            ))}
+            {typing ? <ThinkingIndicator /> : null}
+          </ScrollView>
+        )}
+
+        {/* Top fade — messages dissolve as they scroll up under the header */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#fafafa", "rgba(250,250,250,0)"]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 32 }}
+        />
+
+        {/* Bottom fade — messages dissolve as they pass behind the bar */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(250,250,250,0)", "#fafafa"]}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 150 }}
+        />
+
+        {/* Floating overlay — quick replies + composer (content scrolls behind) */}
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingBottom: 18 }}>
+          {!voiceMode && !isEmpty && !typing && !focused && quickReplyChips.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 24, paddingBottom: 8 }}>
+              {quickReplyChips.map((c, i) => {
+                const Icon = iconFor(c);
+                return (
+                  <Animated.View key={c} entering={chipEnter(i)}>
+                    <PressableScale onPress={() => onChip(c)}>
+                      <View style={{ height: 34, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 13, borderRadius: 999, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb" }}>
+                        <Icon size={14} color={AI_PURPLE} strokeWidth={2.2} />
+                        <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>{c}</Text>
+                      </View>
+                    </PressableScale>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
+          {/* Two independent floating bars — typing & voice — toggled by voiceMode */}
+          {voiceMode ? (
+            <Animated.View key="voicebar" entering={ZoomIn.springify().damping(15).duration(320)} exiting={ZoomOut.duration(180)} style={{ paddingHorizontal: 16 }}>
+              <VoiceBar phase={voicePhase} interim={interim} onExit={exitVoice} />
+            </Animated.View>
+          ) : (
+            <Animated.View key="composer" entering={FadeInDown.springify().damping(18).duration(320)} exiting={FadeOut.duration(140)} style={composerPad}>
+              <View>
+                {/* Blue + purple halo that slowly circles the bar while focused */}
+                <Animated.View pointerEvents="none" style={[glowRect, glowA]} />
+                <Animated.View pointerEvents="none" style={[glowRect, glowB]} />
+                <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+                  <GlassView
+                    glassEffectStyle="regular"
+                    colorScheme="light"
+                    style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "flex-end", gap: 6 }}
+                  >
+                    {/* Gray field — wraps the camera button + text input */}
+                    <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "#f5f5f5", borderRadius: 22, minHeight: 44, paddingLeft: 2 }}>
+                      <Pressable onPress={onCamera} hitSlop={6} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }} accessibilityLabel="ส่งรูปภาพ">
+                        <Camera size={22} color={AI_PURPLE} strokeWidth={2.2} />
+                      </Pressable>
+                      <TextInput
+                        value={text}
+                        onChangeText={setText}
+                        onFocus={() => setFocused(true)}
+                        onBlur={() => setFocused(false)}
+                        placeholder="พิมพ์คำถามหรือสิ่งที่คุณต้องการ…"
+                        placeholderTextColor="#a3a3a3"
+                        returnKeyType="send"
+                        onSubmitEditing={submit}
+                        style={{ flex: 1, fontSize: 14, color: "#1a1a1a", paddingVertical: 0, paddingRight: 8, minHeight: 44 }}
+                      />
+                    </View>
+                    <Pressable onPress={onMic} hitSlop={6} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }} accessibilityLabel="คุยกับเมต้าด้วยเสียง">
+                      <View>
+                        <Mic size={21} color={AI_PURPLE} strokeWidth={2.2} />
+                        <AiSparkle />
+                      </View>
+                    </Pressable>
+                    <Pressable onPress={submit} disabled={!text.trim()} hitSlop={8} accessibilityLabel="ส่ง">
+                      {text.trim() ? (
+                        <LinearGradient colors={AI_GRAD} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" }}>
+                          <Send size={20} color="#fff" strokeWidth={2.2} />
+                        </LinearGradient>
+                      ) : (
+                        <View style={{ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#cfd4d1", opacity: 0.7 }}>
+                          <Send size={20} color="#fff" strokeWidth={2.2} />
+                        </View>
+                      )}
+                    </Pressable>
+                  </GlassView>
+                </View>
+              </View>
+            </Animated.View>
+          )}
         </View>
-      </View>
-      <Text style={{ fontSize: 11, color: TEXT_MUTED, marginLeft: 40, marginTop: 3 }}>
-        เมต้า · {timeLabel(msg.ts)}
-      </Text>
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
-// ===== Quick-reply / suggestion chip =====
-function Chip({ label, onPress }: { label: string; onPress: () => void }) {
+/** Twinkling AI sparkle badge on the mic — irregular timing so it feels random. */
+function AiSparkle() {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    // Sit idle for a (varied) few seconds, then a quick twinkle — not continuous.
+    const twinkle = () => withSequence(
+      withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 480, easing: Easing.in(Easing.quad) }),
+    );
+    t.value = withRepeat(
+      withSequence(
+        withDelay(3200, twinkle()),
+        withDelay(5000, twinkle()),
+        withDelay(2600, twinkle()),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(t);
+  }, [t]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.45 + t.value * 0.55,
+    transform: [{ scale: 1 + t.value * 0.3 }, { rotate: `${t.value * 30}deg` }],
+  }));
   return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? "rgba(49,151,84,0.12)" : "#ffffff",
-        borderWidth: 1,
-        borderColor: pressed ? BRAND_GREEN : "#e5e7eb",
-        borderRadius: 100,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-      })}
-    >
-      <Text style={{ fontSize: 13, color: TEXT_SECONDARY }}>{label}</Text>
+    <Animated.View pointerEvents="none" style={[{ position: "absolute", top: -5, right: -6 }, style]}>
+      <Sparkles size={11} color={AI_PURPLE} fill={AI_PURPLE} strokeWidth={2} />
+    </Animated.View>
+  );
+}
+
+/* ===== Voice-conversation composer ===== */
+type VoicePhase = "listening" | "thinking" | "speaking";
+
+function WaveBar({ index, color, active }: { index: number; color: string; active: boolean }) {
+  const h = useSharedValue(0.25 + ((index % 4) * 0.18));
+  useEffect(() => {
+    if (!active) { cancelAnimation(h); h.value = withTiming(0.18, { duration: 200 }); return; }
+    const dur = 360 + ((index * 53) % 360);
+    h.value = withRepeat(withTiming(1, { duration: dur, easing: Easing.inOut(Easing.ease) }), -1, true);
+    return () => cancelAnimation(h);
+  }, [h, index, active]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scaleY: h.value }] }));
+  return <Animated.View style={[{ width: 3, height: 20, borderRadius: 2, backgroundColor: color }, style]} />;
+}
+
+function VoiceWaveform({ color, active }: { color: string; active: boolean }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 22, gap: 3 }}>
+      {Array.from({ length: 22 }).map((_, i) => <WaveBar key={i} index={i} color={color} active={active} />)}
+    </View>
+  );
+}
+
+/** Three pulsing dots — shown while เมต้า is thinking. */
+function Dots() {
+  const Dot = ({ i }: { i: number }) => {
+    const o = useSharedValue(0.3);
+    useEffect(() => { o.value = withRepeat(withTiming(1, { duration: 500 }), -1, true); }, [o]);
+    const st = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ scale: 0.7 + o.value * 0.3 }] }));
+    return <Animated.View style={[{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#cbd5e1", marginHorizontal: 3 }, st]} />;
+  };
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 26 }}>
+      {[0, 1, 2].map((i) => <Dot key={i} i={i} />)}
+    </View>
+  );
+}
+
+/** Dark voice-conversation bar — listening / เมต้ากำลังคิด / เมต้ากำลังพูด. */
+function VoiceBar({ phase, interim, onExit }: { phase: VoicePhase; interim: string; onExit: () => void }) {
+  const speaking = phase === "speaking";
+  const thinking = phase === "thinking";
+  const label = thinking ? "เมต้ากำลังคิด…" : speaking ? "เมต้ากำลังพูด…" : (interim || "กำลังฟัง… พูดได้เลยค่ะ");
+  // Grand voice bar: an emerald↔teal aura orbits behind, a jewel-tone gradient
+  // base, a breathing sheen on top, and the whole bar gently pulses in scale.
+  const orbit = useSharedValue(0);
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    orbit.value = withRepeat(withTiming(1, { duration: 3800, easing: Easing.linear }), -1, false);
+    pulse.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }), -1, true);
+    return () => { cancelAnimation(orbit); cancelAnimation(pulse); };
+  }, [orbit, pulse]);
+  const glowG = useAnimatedStyle(() => {
+    const a = orbit.value * TAU;
+    return { shadowColor: "#10b981", shadowOffset: { width: Math.cos(a) * 9, height: Math.sin(a) * 9 }, shadowRadius: 18, shadowOpacity: 0.6 };
+  });
+  const glowT = useAnimatedStyle(() => {
+    const a = orbit.value * TAU + Math.PI;
+    return { shadowColor: "#2dd4bf", shadowOffset: { width: Math.cos(a) * 9, height: Math.sin(a) * 9 }, shadowRadius: 18, shadowOpacity: 0.55 };
+  });
+  const sheenStyle = useAnimatedStyle(() => ({ opacity: 0.12 + pulse.value * 0.5 }));
+  const fill = { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 };
+  const glowFill = { position: "absolute" as const, top: 5, left: 8, right: 8, bottom: 5, borderRadius: 30, backgroundColor: "#0b7a52" };
+  return (
+    <View>
+      {/* Orbiting emerald + teal aura behind the bar */}
+      <Animated.View pointerEvents="none" style={[glowFill, glowG]} />
+      <Animated.View pointerEvents="none" style={[glowFill, glowT]} />
+      <View>
+        <View style={{ borderRadius: 34, overflow: "hidden", paddingVertical: 9, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 10, minHeight: 62 }}>
+          <LinearGradient colors={["#059669", "#0d9488", "#10b981"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={fill} />
+          <Animated.View pointerEvents="none" style={[fill, sheenStyle]}>
+            <LinearGradient colors={["#a7f3d0", "rgba(255,255,255,0)", "#99f6e4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={fill} />
+          </Animated.View>
+          <Pressable onPress={onExit} hitSlop={6} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }} accessibilityLabel="ออกจากโหมดเสียง">
+            <X size={22} color="rgba(255,255,255,0.92)" strokeWidth={2.2} />
+          </Pressable>
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            {thinking ? <Dots /> : <VoiceWaveform color="#ffffff" active={speaking || phase === "listening"} />}
+            <Text numberOfLines={1} style={{ color: phase === "listening" && !interim ? "rgba(255,255,255,0.85)" : "#fff", fontSize: 12.5, fontWeight: "600", marginTop: 4, textAlign: "center" }}>
+              {label}
+            </Text>
+          </View>
+          {/* right spacer to keep the waveform centered opposite the X */}
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ===== Empty state ===== */
+function EmptyState({ onChip, topPad = 0 }: { onChip: (s: string) => void; topPad?: number }) {
+  const [chips, setChips] = useState<string[]>(() => pickChips());
+  useEffect(() => {
+    const t = setInterval(() => setChips(pickChips()), 6000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Idle animation — META AI gently floats and sways so it feels alive.
+  const bob = useSharedValue(0);
+  const sway = useSharedValue(0);
+  useEffect(() => {
+    bob.value = withRepeat(withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.quad) }), -1, true);
+    sway.value = withRepeat(withTiming(1, { duration: 2300, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => { cancelAnimation(bob); cancelAnimation(sway); };
+  }, [bob, sway]);
+  const orbFloat = useAnimatedStyle(() => ({ transform: [{ translateY: -6 * bob.value }] }));
+  const charSway = useAnimatedStyle(() => ({ transform: [{ rotate: `${sway.value * 8 - 4}deg` }, { scale: 0.97 + 0.05 * bob.value }] }));
+
+  return (
+    <Pressable onPress={() => Keyboard.dismiss()} style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, paddingTop: topPad, paddingBottom: 40 }}>
+      {/* Glass orb with the META AI character — matches the web empty state */}
+      <Animated.View style={[{ marginBottom: 18, borderRadius: 44, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 }, orbFloat]}>
+        <GlassView
+          glassEffectStyle="regular"
+          colorScheme="light"
+          tintColor="rgba(255,255,255,0.6)"
+          style={{ width: 88, height: 88, borderRadius: 44, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}
+        >
+          <Animated.Image source={META_AI} style={[{ width: 76, height: 76 }, charSway]} resizeMode="contain" />
+        </GlassView>
+      </Animated.View>
+      <Text style={{ fontSize: 18, fontWeight: "600", color: "#1a1a1a", textAlign: "center", marginBottom: 22 }}>สวัสดีค่ะ มีอะไรให้เมต้าช่วยไหมคะ</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, minHeight: 100 }}>
+        {chips.map((c, i) => {
+          const Icon = iconFor(c);
+          return (
+            <Animated.View key={c} entering={chipEnter(i)} exiting={chipExit}>
+              <PressableScale onPress={() => onChip(c)}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 100, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb" }}>
+                  <Icon size={15} color={AI_PURPLE} strokeWidth={2.2} />
+                  <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500" }}>{c}</Text>
+                </View>
+              </PressableScale>
+            </Animated.View>
+          );
+        })}
+      </View>
     </Pressable>
   );
 }
 
-export function AIAssistantScreen() {
-  const [messages, setMessages] = useState<Msg[]>([
-    { id: "greet", role: "ai", text: GREETING_TEXT, ts: Date.now() },
-  ]);
-  const [text, setText] = useState("");
-  const [typing, setTyping] = useState(false);
-  const [chips, setChips] = useState<string[]>(() => SUGGESTION_POOL.slice(0, 5));
-  const lastGoalRef = useRef<HealthGoal | undefined>(undefined);
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Whether the conversation is still on just the greeting (mirrors web isEmpty).
-  const isEmpty = messages.length <= 1;
-
-  const scrollToEnd = useCallback(() => {
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
-  }, []);
-
-  const send = useCallback(
-    (raw: string) => {
-      const trimmed = raw.trim();
-      if (!trimmed || typing) return;
-
-      const userMsg: Msg = { id: uid(), role: "user", text: trimmed, ts: Date.now() };
-      setMessages((prev) => [...prev, userMsg]);
-      setText("");
-      setTyping(true);
-      scrollToEnd();
-
-      // Simulate the AI "thinking" delay (web used a ~550ms mock), then append the reply.
-      setTimeout(() => {
-        const { reply, intent, goal } = buildReply(trimmed, lastGoalRef.current);
-        lastGoalRef.current = goal ?? lastGoalRef.current;
-        const aiMsg: Msg = { id: uid(), role: "ai", text: reply, ts: Date.now() };
-        setMessages((prev) => [...prev, aiMsg]);
-        setChips(quickReplies(intent, lastGoalRef.current));
-        setTyping(false);
-        scrollToEnd();
-      }, 650);
-    },
-    [typing, scrollToEnd],
-  );
-
-  const canSend = text.trim().length > 0 && !typing;
-
+/* ===== Thinking indicator ===== */
+function ThinkingIndicator() {
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={96}
-      style={{ flex: 1, backgroundColor: "#fafafa" }}
-    >
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 16 }}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={scrollToEnd}
-      >
-        {messages.map((m) => (
-          <Bubble key={m.id} msg={m} />
-        ))}
-        {typing && <TypingBubble />}
-      </ScrollView>
-
-      {/* Suggestions row — on the empty greeting, show the prompt pool;
-          afterwards, show intent-aware quick replies. Tap fills + sends. */}
-      {(isEmpty || (!typing && chips.length > 0)) && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}
-        >
-          {(isEmpty ? [...SUGGESTION_POOL.slice(0, 5)] : chips).map((c) => (
-            <Chip key={c} label={c} onPress={() => send(c)} />
-          ))}
-        </ScrollView>
-      )}
-
-      <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#fafafa" }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-end",
-            gap: 8,
-            paddingHorizontal: 12,
-            paddingTop: 8,
-            paddingBottom: 8,
-            borderTopWidth: 1,
-            borderTopColor: "#ececed",
-          }}
-        >
-          <ChatInput
-            value={text}
-            onChangeText={setText}
-            placeholder="พิมพ์คำถามหรือสิ่งที่คุณต้องการ…"
-            onSubmitEditing={() => send(text)}
-            returnKeyType="send"
-            blurOnSubmit={false}
-          />
-          <Pressable
-            onPress={() => send(text)}
-            disabled={!canSend}
-            hitSlop={8}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: canSend ? BRAND_GREEN : "#e5e7eb",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: canSend ? 1 : 0.7,
-            }}
-            android_ripple={{ color: BRAND_GREEN_DARK, borderless: true }}
-            accessibilityLabel="ส่ง"
-          >
-            <Send size={20} color={canSend ? "#ffffff" : TEXT_MUTED} strokeWidth={2.2} />
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 }}>
+      <Sparkles size={18} color={AI_PURPLE} strokeWidth={2.2} />
+      <Text style={{ fontSize: 14, color: "#6b7280", fontWeight: "500" }}>เมต้ากำลังคิด…</Text>
+    </View>
   );
 }
+
+/* ===== Message bubble ===== */
+function MessageBubble({ m, onSend, onNav, onProduct }: {
+  m: AIMessage;
+  onSend: (s: string) => void;
+  onNav: (r: keyof RootStackParamList) => void;
+  onProduct: (p: any) => void;
+}) {
+  // User text — gray bubble right
+  if (m.role === "user" && m.kind === "text") {
+    return (
+      <View style={{ alignItems: "flex-end", marginBottom: 16 }}>
+        <View style={{ maxWidth: "82%", backgroundColor: "#eceef1", borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10 }}>
+          <Text style={{ fontSize: 15, color: "#1a1a1a", lineHeight: 22 }}>{m.text}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ marginBottom: 22 }}>
+      {m.kind === "text" && (
+        <Text style={{ fontSize: 15, color: "#333", lineHeight: 23 }}>{m.text}</Text>
+      )}
+
+      {m.kind === "products" && (
+        <View>
+          <Text style={{ fontSize: 15, color: "#333", lineHeight: 23, marginBottom: 10 }}>{m.text}</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {m.products.map((p) => (
+              <ProductCard key={p.id} product={p} width={(SCREEN_WIDTH - 16 * 2 - 12) / 2} />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {m.kind === "comparison" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", fontWeight: "500", marginBottom: 8 }}>{m.text}</Text>
+          <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#f0f0f0", paddingBottom: 6 }}>
+            <Text style={{ width: 78, fontSize: 11, color: "#a3a3a3", fontWeight: "500" }}>รายการ</Text>
+            {m.products.map((p) => (
+              <Text key={p.id} numberOfLines={1} style={{ flex: 1, fontSize: 11, color: BRAND_GREEN_DARK, fontWeight: "700", paddingHorizontal: 2 }}>{p.name}</Text>
+            ))}
+          </View>
+          {m.rows.map((row, i) => (
+            <View key={i} style={{ flexDirection: "row", borderBottomWidth: i < m.rows.length - 1 ? 1 : 0, borderBottomColor: "#f6f6f6", paddingVertical: 6 }}>
+              <Text style={{ width: 78, fontSize: 11.5, color: "#737373" }}>{row.label}</Text>
+              {row.values.map((v, j) => (
+                <View key={j} style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 2 }}>
+                  <Text style={{ fontSize: 11.5, color: row.highlight === j ? BRAND_GREEN : "#444", fontWeight: row.highlight === j ? "700" : "500" }}>
+                    {typeof v === "number" ? v.toLocaleString() : v}
+                  </Text>
+                  {row.highlight === j ? <Check size={11} color={BRAND_GREEN} strokeWidth={3} style={{ marginLeft: 2 }} /> : null}
+                </View>
+              ))}
+            </View>
+          ))}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "rgba(49,151,84,0.1)", paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, marginTop: 8 }}>
+            <Sparkles size={13} color={BRAND_GREEN} strokeWidth={2.2} style={{ marginTop: 1 }} />
+            <Text style={{ flex: 1, fontSize: 12, color: "#444", lineHeight: 17 }}>{m.summary}</Text>
+          </View>
+        </View>
+      )}
+
+      {m.kind === "bundle" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 10 }}>{m.text}</Text>
+          <LinearGradient colors={["#46c474", BRAND_GREEN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 14, padding: 12, marginBottom: 12 }}>
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>📦 {m.name}</Text>
+            {m.items.map((p) => (
+              <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 6 }}>
+                <Image source={getRealProductImage(p.id)} style={{ width: 28, height: 28, borderRadius: 6 }} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: "#fff" }}>{p.name}</Text>
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.9)" }}>฿{p.price.toLocaleString()}</Text>
+              </View>
+            ))}
+            <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.3)", paddingTop: 8, marginTop: 4 }}>
+              <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", textDecorationLine: "line-through" }}>฿{m.total.toLocaleString()}</Text>
+              <Text style={{ fontSize: 18, color: "#fff", fontWeight: "700" }}>฿{m.finalPrice.toLocaleString()}</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.9)", textAlign: "right" }}>ประหยัด ฿{m.discount.toLocaleString()} (10%)</Text>
+          </LinearGradient>
+          <PressableScale onPress={() => m.items.forEach((p) => onSend(`เพิ่ม ${p.name} ใส่ตะกร้า`))}>
+            <View style={{ height: 44, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <ShoppingCart size={16} color="#fff" strokeWidth={2.4} />
+              <Text style={{ fontSize: 14, color: "#fff", fontWeight: "600" }}>เพิ่มทั้งชุดเข้าตะกร้า</Text>
+            </View>
+          </PressableScale>
+        </View>
+      )}
+
+      {m.kind === "value" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 8 }}>{m.text}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Image source={getRealProductImage(m.product.id)} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f3f4f6" }} />
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={{ fontSize: 13, color: "#1a1a1a", fontWeight: "600" }}>{m.product.name}</Text>
+              <Text style={{ fontSize: 12, color: "#737373", marginTop: 2 }}>฿{m.product.price.toLocaleString()}{m.product.originalPrice ? `  (เดิม ฿${m.product.originalPrice.toLocaleString()})` : ""}</Text>
+              {m.savings ? <Text style={{ fontSize: 11.5, color: "#dc2626", fontWeight: "600", marginTop: 1 }}>{m.savings}</Text> : null}
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", backgroundColor: "rgba(49,151,84,0.1)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, marginTop: 10 }}>
+            <Tag size={12} color={BRAND_GREEN_DARK} strokeWidth={2.4} />
+            <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK, fontWeight: "600" }}>{m.verdict}</Text>
+          </View>
+        </View>
+      )}
+
+      {m.kind === "cart" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: m.items.length ? 8 : 0 }}>{m.text}</Text>
+          {m.items.length > 0 && (
+            <View style={{ gap: 4 }}>
+              {m.items.map((it) => (
+                <View key={it.id} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                  <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: "#555" }}>×{it.quantity} {it.name}</Text>
+                  <Text style={{ fontSize: 12.5, color: BRAND_GREEN, fontWeight: "600" }}>฿{(it.price * it.quantity).toLocaleString()}</Text>
+                </View>
+              ))}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#f0f0f0", paddingTop: 6, marginTop: 2 }}>
+                <Text style={{ fontSize: 13, color: "#444", fontWeight: "600" }}>ยอดรวม</Text>
+                <Text style={{ fontSize: 15, color: BRAND_GREEN_DARK, fontWeight: "700" }}>฿{m.total.toLocaleString()}</Text>
+              </View>
+            </View>
+          )}
+          {m.promos.length > 0 && (
+            <View style={{ gap: 4, marginTop: 8 }}>
+              {m.promos.map((p, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fde68a", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 }}>
+                  <Sparkles size={12} color="#f59e0b" strokeWidth={2.4} style={{ marginTop: 1 }} />
+                  <Text style={{ flex: 1, fontSize: 11.5, color: "#92400e", lineHeight: 16 }}><Text style={{ fontWeight: "700" }}>{p.title}</Text> — {p.body}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {m.items.length > 0 && (
+            <PressableScale onPress={() => onNav("Cart")}>
+              <View style={{ height: 40, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                <Text style={{ fontSize: 13, color: "#fff", fontWeight: "600" }}>ดำเนินการชำระเงิน</Text>
+                <ArrowRight size={16} color="#fff" strokeWidth={2.4} />
+              </View>
+            </PressableScale>
+          )}
+        </View>
+      )}
+
+      {m.kind === "orders" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 8 }}>{m.text}</Text>
+          <View style={{ gap: 6 }}>
+            {m.orders.map((o) => (
+              <View key={o.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fafafa", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 12, color: "#1a1a1a", fontWeight: "600" }}>{o.id}</Text>
+                  <Text style={{ fontSize: 10.5, color: "#a3a3a3", marginTop: 1 }}>{o.date}</Text>
+                </View>
+                <View style={{ backgroundColor: "rgba(49,151,84,0.1)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                  <Text style={{ fontSize: 11, color: BRAND_GREEN_DARK, fontWeight: "600" }}>{STATUS_LABEL[o.status as keyof typeof STATUS_LABEL] ?? o.status}</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: BRAND_GREEN, fontWeight: "700" }}>฿{o.total.toLocaleString()}</Text>
+              </View>
+            ))}
+          </View>
+          <PressableScale onPress={() => onNav("Orders")}>
+            <View style={{ height: 36, borderRadius: 999, backgroundColor: "rgba(49,151,84,0.1)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }}>
+              <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK, fontWeight: "600" }}>ดูทั้งหมด</Text>
+              <ArrowRight size={14} color={BRAND_GREEN_DARK} strokeWidth={2.4} />
+            </View>
+          </PressableScale>
+        </View>
+      )}
+
+      {m.kind === "actions" && (
+        <View style={card}>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 8 }}>{m.text}</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {m.actions.map((a, i) => (
+              <PressableScale key={i} onPress={() => { if (a.intent.startsWith("nav:")) onNav(a.intent.slice(4) as keyof RootStackParamList); else onSend(a.intent); }}>
+                <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: BRAND_GREEN }}>
+                  <Text style={{ fontSize: 12.5, color: "#fff", fontWeight: "600" }}>{a.label}</Text>
+                </View>
+              </PressableScale>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const card = {
+  backgroundColor: "#fff",
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: "#f0f0f0",
+  padding: 14,
+} as const;
+
+// White rounded layer behind the bar, used only to cast the circling colored glow.
+const glowRect = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  borderRadius: 34,
+  backgroundColor: "#fff",
+} as const;

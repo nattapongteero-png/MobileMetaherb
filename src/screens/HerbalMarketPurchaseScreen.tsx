@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SubPageHeader } from "../components/SubPageHeader";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   AlertCircle,
@@ -228,6 +229,12 @@ export function HerbalMarketPurchaseScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <SubPageHeader
+        title="สั่งซื้อสมุนไพร"
+        subtitle="ยืนยันคำสั่งซื้อวัตถุดิบ"
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"

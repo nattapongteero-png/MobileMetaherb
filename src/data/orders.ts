@@ -1,4 +1,9 @@
 // Ported from the MetaHerb website (src/app/store/OrderContext.tsx).
+// Order line items reference the real store catalog (RAW_PRODUCT_BY_ID) so names,
+// prices and photos match what the buyer actually sees in the shop.
+
+import type { ImageSourcePropType } from "react-native";
+import { RAW_PRODUCT_BY_ID, getRealProductImage } from "./realProducts";
 
 export type OrderStatus =
   | "pending_payment"
@@ -11,10 +16,17 @@ export type OrderStatus =
 
 export type OrderItem = {
   name: string;
-  image: string;
+  image: ImageSourcePropType;
   option: string;
   quantity: number;
   price: number;
+};
+
+export type Recipient = {
+  name: string;
+  phone: string;
+  /** Full delivery address on one line. */
+  address: string;
 };
 
 export type Order = {
@@ -25,15 +37,30 @@ export type Order = {
   total: number;
   trackingNumber?: string;
   items: OrderItem[];
-  review?: { rating: number; comment: string };
+  review?: {
+    /** Overall rating (average of per-product ratings) — keeps list/detail display simple. */
+    rating: number;
+    /** Summary comment (first non-empty product comment). */
+    comment: string;
+    /** Stars given to the shop itself (rating only, no text). */
+    shopRating?: number;
+    /** When true, the reviewer's name is hidden on the public review. */
+    anonymous?: boolean;
+    /** Per-product reviews captured at review time. */
+    products?: { name: string; rating: number; comment: string; photos: string[] }[];
+  };
+  // Shipping + payment detail — shown on the order detail screen.
+  recipient?: Recipient;
+  shippingMethod?: string;
+  paymentMethod?: string;
 };
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
   pending_payment: "รอชำระเงิน",
-  pending_verify: "รอตรวจสอบการชำระเงิน",
-  preparing: "กำลังเตรียมสินค้า",
+  pending_verify: "รอตรวจสอบ",
+  preparing: "กำลังจัดเตรียม",
   shipped: "จัดส่งแล้ว",
-  delivered: "ส่งถึงปลายทาง",
+  delivered: "รับสินค้าแล้ว",
   completed: "สำเร็จ",
   cancelled: "ยกเลิก",
 };
@@ -49,87 +76,105 @@ export const STATUS_COLOR: Record<OrderStatus, string> = {
   cancelled: "#9ca3af",
 };
 
-const img = (id: string) => `https://images.unsplash.com/${id}?w=200&q=80`;
+// Default delivery target — mirrors the user's saved default address.
+const DEFAULT_RECIPIENT: Recipient = {
+  name: "ณัฐพงษ์ ธีโรภาส",
+  phone: "061-421-3111",
+  address: "เลขที่ 2 ชั้น 2 ซอยสุขสวัสดิ์ 33 แขวงราษฎร์บูรณะ เขตราษฎร์บูรณะ กรุงเทพมหานคร 10140",
+};
 
-export const MOCK_ORDERS: Order[] = [
+// Build an order line from a real catalog product id ("1"–"43").
+const line = (id: string, quantity: number, option: string): OrderItem => {
+  const p = RAW_PRODUCT_BY_ID[id];
+  return { name: p.name, image: getRealProductImage(id), option, quantity, price: p.price };
+};
+
+type RawOrder = Omit<Order, "total"> & { items: OrderItem[] };
+
+const RAW_ORDERS: RawOrder[] = [
+  // ── รอชำระเงิน ───────────────────────────────────────────────
   {
-    id: "ORD-20260218-03571",
-    shopName: "METAHERB Store",
-    status: "pending_payment",
-    date: "18 ก.พ. 2569 · 15:00 น.",
-    total: 856,
-    items: [
-      { name: "ชาสมุนไพรดีท็อกซ์", image: img("photo-1576092759770-14d9e692eb45"), option: "แพ็ค 30 ซอง", quantity: 2, price: 259 },
-      { name: "น้ำมันมะพร้าวสกัดเย็น", image: img("photo-1662058595162-10e024b1a907"), option: "ขนาด 500ml", quantity: 1, price: 189 },
-      { name: "ขมิ้นชันแคปซูล", image: img("photo-1740592754365-2117f5977528"), option: "60 แคปซูล", quantity: 1, price: 149 },
-    ],
+    id: "ORD-20260219-04012", shopName: "METAHERB Store", status: "pending_payment", date: "19 ก.พ. 2569 · 16:40 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "PromptPay",
+    items: [line("1", 2, "ขวด 250 ml"), line("3", 1, "แพ็ค 9 ซอง"), line("12", 2, "กล่อง 4 ชิ้น")],
   },
   {
-    id: "ORD-20260218-03572",
-    shopName: "METAHERB Store",
-    status: "pending_verify",
-    date: "18 ก.พ. 2569 · 13:30 น.",
-    total: 820,
-    items: [
-      { name: "กาแฟดริปสมุนไพร", image: img("photo-1631149206144-4549c0468787"), option: "แพ็ค 10 ซอง", quantity: 2, price: 250 },
-      { name: "ชาเขียวมัทฉะ", image: img("photo-1708573106044-2bbefb3d9fc3"), option: "กระป๋อง 200g", quantity: 1, price: 320 },
-    ],
+    id: "ORD-20260218-03571", shopName: "บ้านสมุนไพรไทย", status: "pending_payment", date: "18 ก.พ. 2569 · 15:00 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "โอนผ่านธนาคาร",
+    items: [line("37", 1, "ขนาด 150 g"), line("7", 2, "แท่ง 100 g")],
+  },
+  // ── รอตรวจสอบ ────────────────────────────────────────────────
+  {
+    id: "ORD-20260218-03572", shopName: "METAHERB Store", status: "pending_verify", date: "18 ก.พ. 2569 · 13:30 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "PromptPay",
+    items: [line("10", 1, "เซ็ต Aromatic คละกลิ่น"), line("5", 1, "ขวด พิมเสนน้ำ")],
   },
   {
-    id: "ORD-20260217-04821",
-    shopName: "ร้านป่าหมอก",
-    status: "preparing",
-    date: "17 ก.พ. 2569 · 09:15 น.",
-    total: 857,
-    items: [
-      { name: "น้ำผึ้งป่าแท้ 100%", image: img("photo-1691480208637-6ed63aac6694"), option: "ขวด 750ml", quantity: 1, price: 459 },
-      { name: "ผงโกโก้ออร์แกนิก", image: img("photo-1676870799186-7d55b7bfa84e"), option: "ถุง 250g", quantity: 2, price: 199 },
-    ],
+    id: "ORD-20260217-04880", shopName: "กรีนลีฟ ออร์แกนิก", status: "pending_verify", date: "17 ก.พ. 2569 · 18:05 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "โอนผ่านธนาคาร",
+    items: [line("8", 2, "กล่อง 50 g"), line("31", 1, "เซต 2 กล่อง")],
+  },
+  // ── กำลังจัดเตรียม ───────────────────────────────────────────
+  {
+    id: "ORD-20260217-04821", shopName: "ร้านป่าหมอก", status: "preparing", date: "17 ก.พ. 2569 · 09:15 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "PromptPay",
+    items: [line("18", 1, "โถ 550 ml"), line("14", 2, "ชิ้น")],
   },
   {
-    id: "ORD-20260216-05133",
-    shopName: "Organic Thai Farm",
-    status: "shipped",
-    date: "16 ก.พ. 2569 · 10:00 น.",
-    total: 289,
-    trackingNumber: "TH123456789",
-    items: [
-      { name: "น้ำมันงาดำสกัดเย็น", image: img("photo-1474979266404-7d1296e76fa2"), option: "ขวด 250ml", quantity: 1, price: 289 },
-    ],
+    id: "ORD-20260216-05290", shopName: "METAHERB Store", status: "preparing", date: "16 ก.พ. 2569 · 11:20 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "บัตรเครดิต / เดบิต",
+    items: [line("4", 3, "แพ็ค 9 ซอง")],
+  },
+  // ── จัดส่งแล้ว ───────────────────────────────────────────────
+  {
+    id: "ORD-20260216-05133", shopName: "Organic Thai Farm", status: "shipped", date: "16 ก.พ. 2569 · 10:00 น.",
+    trackingNumber: "TH123456789", recipient: DEFAULT_RECIPIENT, shippingMethod: "ส่งด่วนภายในวัน", paymentMethod: "บัตรเครดิต / เดบิต",
+    items: [line("9", 1, "ขวด 2 รสคู่")],
   },
   {
-    id: "ORD-20260215-06244",
-    shopName: "ธรรมชาติพรีเมียม",
-    status: "delivered",
-    date: "15 ก.พ. 2569 · 14:20 น.",
-    total: 446,
-    trackingNumber: "TH987654321",
-    items: [
-      { name: "แชมพูสมุนไพรอัญชัน", image: img("photo-1721680378230-78104b762f36"), option: "ขวด 300ml", quantity: 1, price: 179 },
-      { name: "สบู่สมุนไพรขมิ้น", image: img("photo-1604565750665-3501b2c00194"), option: "ก้อน 100g", quantity: 3, price: 89 },
-    ],
+    id: "ORD-20260215-05511", shopName: "METAHERB Store", status: "shipped", date: "15 ก.พ. 2569 · 19:30 น.",
+    trackingNumber: "TH445566778", recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "PromptPay",
+    items: [line("27", 2, "แก้ว 16 oz"), line("13", 1, "กล่อง 6 ชิ้น")],
+  },
+  // ── รับสินค้าแล้ว ────────────────────────────────────────────
+  {
+    id: "ORD-20260215-06244", shopName: "ธรรมชาติพรีเมียม", status: "delivered", date: "15 ก.พ. 2569 · 14:20 น.",
+    trackingNumber: "TH987654321", recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "เก็บเงินปลายทาง",
+    items: [line("29", 1, "ขวด 30 ml"), line("33", 1, "ขวด 30 ml")],
   },
   {
-    id: "ORD-20260210-07355",
-    shopName: "METAHERB Store",
-    status: "completed",
-    date: "10 ก.พ. 2569 · 11:45 น.",
-    total: 460,
-    trackingNumber: "TH555666777",
-    review: { rating: 5, comment: "สินค้าดี ส่งเร็ว แพ็คเกจสวย" },
-    items: [
-      { name: "ชาดอกไม้รวม", image: img("photo-1720082301739-5d250b4a5551"), option: "กล่อง 20 ซอง", quantity: 1, price: 220 },
-      { name: "น้ำตาลมะพร้าว", image: img("photo-1772064901439-15c233a18665"), option: "ถุง 500g", quantity: 2, price: 120 },
-    ],
+    id: "ORD-20260214-06701", shopName: "METAHERB Store", status: "delivered", date: "14 ก.พ. 2569 · 09:00 น.",
+    trackingNumber: "TH998877665", recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "บัตรเครดิต / เดบิต",
+    items: [line("17", 2, "ชิ้น"), line("16", 3, "ถ้วย")],
+  },
+  // ── สำเร็จ (รีวิวแล้ว) ───────────────────────────────────────
+  {
+    id: "ORD-20260210-07355", shopName: "METAHERB Store", status: "completed", date: "10 ก.พ. 2569 · 11:45 น.",
+    trackingNumber: "TH555666777", recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "PromptPay",
+    review: { rating: 5, comment: "สินค้าดี ส่งเร็ว แพ็คเกจสวย", shopRating: 5 },
+    items: [line("1", 1, "ขวด 250 ml"), line("19", 1, "เซ็ตของขวัญ")],
   },
   {
-    id: "ORD-20260208-08466",
-    shopName: "สมุนไพรบ้านสวน",
-    status: "cancelled",
-    date: "8 ก.พ. 2569 · 16:30 น.",
-    total: 350,
-    items: [
-      { name: "วิตามินซีจากธรรมชาติ", image: img("photo-1648139347040-857f024f8da4"), option: "60 เม็ด", quantity: 1, price: 350 },
-    ],
+    id: "ORD-20260208-07720", shopName: "บ้านสมุนไพรไทย", status: "completed", date: "8 ก.พ. 2569 · 13:10 น.",
+    trackingNumber: "TH112233445", recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "โอนผ่านธนาคาร",
+    review: { rating: 4, comment: "ของแท้ กลิ่นหอม คุ้มราคา", shopRating: 4 },
+    items: [line("37", 2, "ขนาด 150 g")],
+  },
+  {
+    id: "ORD-20260205-08010", shopName: "METAHERB Store", status: "completed", date: "5 ก.พ. 2569 · 10:25 น.",
+    trackingNumber: "TH224466880", recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "PromptPay",
+    review: { rating: 5, comment: "ชอบมาก ซื้อซ้ำแน่นอน", shopRating: 5 },
+    items: [line("24", 1, "เซ็ตของขวัญ")],
+  },
+  // ── ยกเลิก ───────────────────────────────────────────────────
+  {
+    id: "ORD-20260208-08466", shopName: "สมุนไพรบ้านสวน", status: "cancelled", date: "8 ก.พ. 2569 · 16:30 น.",
+    recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "PromptPay",
+    items: [line("35", 1, "เม็ดแห้ง 100 g")],
   },
 ];
+
+export const MOCK_ORDERS: Order[] = RAW_ORDERS.map((o) => ({
+  ...o,
+  total: o.items.reduce((sum, it) => sum + it.price * it.quantity, 0),
+}));

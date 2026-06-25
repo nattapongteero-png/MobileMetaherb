@@ -1,5 +1,6 @@
 import type { Product } from "../types/Product";
 import type { CategoryKey, TypeKey, CatalogProduct } from "./catalog";
+import { GROUP_BY_ID, MERGED_AWAY_IDS, IMAGE_OVERRIDE } from "./productVariants";
 
 /**
  * Real product samples ported 1:1 from the METAHERB web app
@@ -116,7 +117,7 @@ const ROWS: Row[] = [
   { id: "26", name: "ชุดของขวัญ Happy New Year (Premium 3 ชิ้น)", price: 125, originalPrice: 180, discountPercent: 31, rating: 4.6, sold: "ขายได้ 200+", category: "gift", type: "gift", hasCoupon: true, isFreeShipping: true },
   { id: "27", name: "Americano Coconut อเมริกาโน่มะพร้าว", price: 79, rating: 4.2, sold: "ขายได้ 250+", category: "food", type: "beverage", isRecommended: true },
   { id: "28", name: "Banana Chocolate Donut", price: 159, originalPrice: 230, discountPercent: 31, rating: 4.7, sold: "ขายได้ 95+", category: "food", type: "food", isFlashSale: true, hasCoupon: true, isFreeShipping: true, flashSaleEndsIn: 14400 },
-  { id: "29", name: "น้ำหอมพิมเสนน้ำ Meta Herb Essence", price: 350, rating: 4.9, sold: "ขายได้ 35+", category: "aroma", type: "aroma", isRecommended: true, hasCoupon: true },
+  { id: "29", name: "น้ำหอมพิมเสนน้ำ Meta Herb Essence", price: 175, originalPrice: 260, discountPercent: 33, rating: 4.9, sold: "ขายได้ 35+", category: "aroma", type: "aroma", isRecommended: true, hasCoupon: true },
   { id: "31", name: "ผงอบเชย Cinnamon Powder (เซต 2 กล่อง)", price: 139, originalPrice: 199, discountPercent: 30, rating: 4.4, sold: "ขายได้ 85+", category: "herbal", type: "powder", hasCoupon: true, isFreeShipping: true },
   { id: "33", name: "Meta Herb Essence Rose Plumeria Bergamot", price: 175, originalPrice: 260, discountPercent: 33, rating: 4.6, sold: "ขายได้ 70+", category: "aroma", type: "aroma", isFlashSale: true, hasCoupon: true, isFreeShipping: true, flashSaleEndsIn: 32400 },
   { id: "34", name: "ดอกกานพลู Clove", price: 69, rating: 4.5, sold: "ขายได้ 340+", category: "raw", type: "powder" },
@@ -129,15 +130,43 @@ const ROWS: Row[] = [
   { id: "41", name: "เซตของขวัญ Butter Cookies คู่", price: 79, originalPrice: 110, discountPercent: 28, rating: 4.5, sold: "ขายได้ 150+", category: "gift", type: "gift", hasCoupon: true },
   { id: "42", name: "Reed Diffuser ก้านไม้กระจายกลิ่น", price: 359, originalPrice: 520, discountPercent: 31, rating: 4.9, sold: "ขายได้ 40+", category: "aroma", type: "aroma", isFlashSale: true, hasCoupon: true, isFreeShipping: true, flashSaleEndsIn: 16200 },
   { id: "43", name: "Meta Herb Essence Duo Set", price: 499, rating: 4.8, sold: "จอง 30+", category: "aroma", type: "aroma", isRecommended: true, hasCoupon: true },
+  { id: "44", name: "ชาอู๋หลงผสมดอกหอมหมื่นลี้", price: 200, rating: 4.7, sold: "ขายได้ 45+", category: "food", type: "beverage", isRecommended: true, hasCoupon: true },
+  { id: "45", name: "กาแฟดริป Signature อเมริกาโนเย็น", price: 149, originalPrice: 169, discountPercent: 12, rating: 4.6, sold: "ขายได้ 60+", category: "food", type: "beverage", isRecommended: true, hasCoupon: true },
 ];
 
-export const REAL_PRODUCTS: CatalogProduct[] = ROWS.map((r) => ({
-  ...r,
-  image: getRealProductImage(r.id),
-  // Deterministic goal-gradient fill for flash-sale cards (no Math.random so
-  // the value is stable across re-renders).
-  soldPercent: r.isFlashSale ? 30 + ((parseInt(r.id, 10) * 7) % 60) : undefined,
-}));
+// Every product, keyed by id (image + soldPercent resolved). Used to build the
+// variant lists on the detail page — includes SKUs merged out of the card list.
+export const RAW_PRODUCT_BY_ID: Record<string, CatalogProduct> = {};
+ROWS.forEach((r) => {
+  RAW_PRODUCT_BY_ID[r.id] = {
+    ...r,
+    image: IMAGE_OVERRIDE[r.id] ?? getRealProductImage(r.id),
+    // Deterministic goal-gradient fill for flash-sale cards (no Math.random so
+    // the value is stable across re-renders).
+    soldPercent: r.isFlashSale ? 30 + ((parseInt(r.id, 10) * 7) % 60) : undefined,
+  };
+});
+
+// "Same product" SKUs collapse into one card per group (cover/first photo +
+// generic name); the rest are hidden and only appear as detail-page options.
+export const REAL_PRODUCTS: CatalogProduct[] = ROWS.filter((r) => !MERGED_AWAY_IDS.has(r.id)).map(
+  (r) => {
+    const raw = RAW_PRODUCT_BY_ID[r.id];
+    const group = GROUP_BY_ID[r.id];
+    if (!group) return raw;
+    // Keep the merged card in the Flash Sale rail if ANY variant is on flash
+    // (else a merged-away SKU could drop the product out of that section).
+    const flash = group.items.map((it) => RAW_PRODUCT_BY_ID[it.id]).find((p) => p?.isFlashSale);
+    return {
+      ...raw,
+      name: group.name,
+      image: group.cover ?? raw.image,
+      ...(flash
+        ? { isFlashSale: true, flashSaleEndsIn: flash.flashSaleEndsIn, soldPercent: flash.soldPercent }
+        : {}),
+    };
+  },
+);
 
 /** Products carrying the web's isFlashSale flag, in id order. */
 export const REAL_FLASH_SALE: Product[] = REAL_PRODUCTS.filter((p) => p.isFlashSale);

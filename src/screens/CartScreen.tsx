@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
   Animated,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -542,9 +543,24 @@ export function CartScreen() {
             grandTotal={grandTotal}
             payDisabled={selectedCount === 0}
             onPay={() => nav.navigate("Payment")}
-            // TODO: wire to the real PR / RFQ flows once their destinations exist.
-            onPR={() => {}}
-            onRFQ={() => {}}
+            onPR={() => {
+              if (selectedItems.length === 0) {
+                Alert.alert("เลือกสินค้าก่อน", "กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนออกใบ PR");
+                return;
+              }
+              // Bulk PR — seed the requisition from the ticked cart lines (web parity:
+              // /cart/pr?ids=...). One flat id list across suppliers, like the web.
+              nav.navigate("HerbalMarketPR", { ids: selectedItems.map((i) => i.id) });
+            }}
+            onRFQ={() => {
+              if (selectedItems.length === 0) {
+                Alert.alert("เลือกสินค้าก่อน", "กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนขอใบเสนอราคา");
+                return;
+              }
+              // Bulk RFQ — seed a quote request from the ticked cart lines, grouped
+              // by supplier in the preview (web parity: /cart/quote?ids=...).
+              nav.navigate("HerbalMarketQuote", { ids: selectedItems.map((i) => i.id) });
+            }}
             supplierCount={supplierCount}
           />
         </>

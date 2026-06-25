@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import {
   Bell,
   ChevronRight,
-  Leaf,
+  Coffee,
   Search,
   ShoppingCart,
   Star,
@@ -55,11 +55,14 @@ const SCREEN_WIDTH =
 
 type Category =
   | { label: string; image: number; color: string }
-  | { label: string; icon: string; color: string };
+  | { label: string; Icon: ComponentType<{ size?: number; color?: string }>; color: string };
 
 // Categories taken from the web menu — 6 entries that match the real catalog.
 // `\n` placed manually so labels break at word boundaries, not mid-word.
 const CATEGORIES: Category[] = [
+  // Cafe service — first item per request; coffee icon distinguishes it from the
+  // product categories that follow.
+  { label: "บริการคาเฟ่\nMETAHERB", Icon: Coffee, color: "#8b5e3c" },
   { label: "ผลิตภัณฑ์\nสุขภาพ", image: require("../../assets/IMG_4022.png"), color: "#319754" },
   { label: "อาหาร\n& เครื่องดื่ม", image: require("../../assets/IMG_4021.png"), color: "#16a34a" },
   { label: "เครื่องหอม\n& อโรม่า", image: require("../../assets/IMG_4020.png"), color: "#52b788" },
@@ -648,38 +651,32 @@ export function HomeScreen() {
 
   // Collapsible header: logo + wordmark row shrinks to 0 as user scrolls past ~60px.
   const HEADER_TOP_ROW_HEIGHT = 60;
-  const topRowHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
-    outputRange: [HEADER_TOP_ROW_HEIGHT, 0],
-    extrapolate: "clamp",
-  });
-  const topRowOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_TOP_ROW_HEIGHT * 0.6, HEADER_TOP_ROW_HEIGHT],
-    outputRange: [1, 0.2, 0],
-    extrapolate: "clamp",
-  });
-  // Crossfade icons between top row (scrollY=0) and search row (scrollY=60)
-  // at the SAME screen pixel — translateY counter-acts the layout shift so
-  // rendered y stays constant. Search bar's marginRight grows in step, so it's
-  // full-width when icons are invisible and shrinks as icons appear.
-  const searchIconsOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_TOP_ROW_HEIGHT * 0.4, HEADER_TOP_ROW_HEIGHT],
-    outputRange: [0, 0.4, 1],
-    extrapolate: "clamp",
-  });
-  const iconsTranslateY = scrollY.interpolate({
-    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
-    outputRange: [-HEADER_TOP_ROW_HEIGHT, 0],
-    extrapolate: "clamp",
-  });
-  // 106 = bell 38 + gap 12 + cart 38 + leading gap 12 + 6 margin for badge
-  const searchBarMarginRight = scrollY.interpolate({
-    inputRange: [0, HEADER_TOP_ROW_HEIGHT],
-    // Reserves room for the two 44px glass icons (2×44 + 12 gap) at right:18,
-    // keeping a ~12px gap from the search bar.
-    outputRange: [0, 118],
-    extrapolate: "clamp",
-  });
+  // The top row (logo + wordmark + bell/cart) is now persistent — only the
+  // search bar below it hides/shows with scroll direction.
+
+  // Direction-aware search row: collapse it when scrolling down (reading), bring
+  // it back when scrolling up — and always show it near the top.
+  const SEARCH_ROW_HEIGHT = 70; // paddingTop 14 + bar 44 + paddingBottom 12
+  const searchVisible = useRef(new Animated.Value(1)).current;
+  const lastScrollY = useRef(0);
+  const searchTarget = useRef(1);
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => {
+      const y = value;
+      const prev = lastScrollY.current;
+      lastScrollY.current = y;
+      let target = searchTarget.current;
+      if (y < 90) target = 1; // near the top → always visible
+      else if (y - prev > 6) target = 0; // scrolling down → hide
+      else if (prev - y > 6) target = 1; // scrolling up → show
+      if (target !== searchTarget.current) {
+        searchTarget.current = target;
+        Animated.timing(searchVisible, { toValue: target, duration: 200, useNativeDriver: false }).start();
+      }
+    });
+    return () => scrollY.removeListener(id);
+  }, [scrollY, searchVisible]);
+  const searchRowHeight = searchVisible.interpolate({ inputRange: [0, 1], outputRange: [0, SEARCH_ROW_HEIGHT] });
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#319754" }}>
@@ -766,14 +763,8 @@ export function HomeScreen() {
           />
         </View>
 
-        {/* Collapsible top row — logo + wordmark fades + shrinks on scroll */}
-        <Animated.View
-          style={{
-            height: topRowHeight,
-            opacity: topRowOpacity,
-            overflow: "hidden",
-          }}
-        >
+        {/* Persistent top row — logo + wordmark + actions always visible */}
+        <View>
           <View
             className="flex-row items-center"
             style={{
@@ -829,13 +820,11 @@ export function HomeScreen() {
               accessibilityLabel="ตะกร้าสินค้า"
             />
           </View>
-        </Animated.View>
+        </View>
 
-        {/* Sticky search row. Search bar is full-width when icons are invisible
-            (scrollY=0) thanks to animated marginRight. Icons are absolutely
-            positioned at the same screen pixel as the top-row icons (right:18),
-            and translate from -60 to 0 so they appear stationary during the
-            crossfade. */}
+        {/* Search row — full-width search bar that hides on scroll-down and
+            returns on scroll-up. */}
+        <Animated.View style={{ height: searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
         <View
           style={{
             paddingLeft: 12,
@@ -844,65 +833,29 @@ export function HomeScreen() {
             paddingTop: 14,
           }}
         >
-          {/* Search bar — full-width pill with animated right margin */}
-          <Animated.View style={{ marginRight: searchBarMarginRight }}>
-            <View
-              className="flex-row items-center rounded-full px-4"
-              style={{
-                height: 44,
-                backgroundColor: "#ffffff",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-              }}
-            >
-              <Search size={18} color="#319754" />
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="ค้นหาสินค้า, สมุนไพร, ร้านค้า..."
-                placeholderTextColor="#a3a3a3"
-                style={{
-                  flex: 1,
-                  marginLeft: 8,
-                  fontSize: 13,
-                  color: "#374151",
-                }}
-              />
-            </View>
-          </Animated.View>
-
-          {/* Absolutely-positioned icons — overlap top-row icons exactly at
-              scrollY=0 (right:18 + translateY:-60), reveal as scroll progresses */}
-          <Animated.View
-            pointerEvents="box-none"
+          {/* Search bar — full-width pill */}
+          <View
+            className="flex-row items-center rounded-full px-4"
             style={{
-              position: "absolute",
-              top: 4,
-              right: 18,
               height: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 12,
-              opacity: searchIconsOpacity,
-              transform: [{ translateY: iconsTranslateY }],
+              backgroundColor: "#ffffff",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08,
+              shadowRadius: 4,
             }}
           >
-            <HeaderGlassButton
-              onPress={() => nav.navigate("Notification")}
-              icon={<Bell size={20} color="#1a1a1a" />}
-              count={3}
-              accessibilityLabel="การแจ้งเตือน"
+            <Search size={18} color="#319754" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="ค้นหาสินค้า, สมุนไพร, ร้านค้า..."
+              placeholderTextColor="#a3a3a3"
+              style={{ flex: 1, marginLeft: 8, fontSize: 13, color: "#374151" }}
             />
-            <HeaderGlassButton
-              onPress={() => nav.navigate("Cart")}
-              icon={<ShoppingCart size={20} color="#1a1a1a" />}
-              count={cartCount}
-              accessibilityLabel="ตะกร้าสินค้า"
-            />
-          </Animated.View>
+          </View>
         </View>
+        </Animated.View>
       </SafeAreaView>
 
       {/* White surface — rounded top corners reveal green underneath */}
@@ -1079,7 +1032,7 @@ export function HomeScreen() {
                       resizeMode="contain"
                     />
                   ) : (
-                    <Leaf size={26} color={c.color} />
+                    <c.Icon size={26} color={c.color} />
                   )}
                 </View>
                 <Text
@@ -1206,7 +1159,6 @@ export function HomeScreen() {
         {/* Black scroll-edge shade at the very bottom of the screen. */}
         <BottomFade />
       </View>
-
     </View>
   );
 }

@@ -30,6 +30,10 @@
     },
     "experiments": {
       "baseUrl": "/MobileMetaherb"
-    }
+    },
+    "plugins": [
+      "expo-speech-recognition",
+      "expo-audio"
+    ]
   }
 }

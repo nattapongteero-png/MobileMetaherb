@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, TextInput, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SubPageHeader } from "../components/SubPageHeader";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   User,
@@ -229,6 +230,12 @@ export function HerbalMarketSampleScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <SubPageHeader
+        title="ขอตัวอย่างสินค้า"
+        subtitle="ขอตัวอย่างก่อนสั่งซื้อจริง"
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"

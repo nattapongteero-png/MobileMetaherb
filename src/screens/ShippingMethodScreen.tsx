@@ -2,7 +2,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet, Image } from "react-nati
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { X, Zap } from "lucide-react-native";
+import { X, Zap, Store } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { usePayment } from "../context/PaymentContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
@@ -70,6 +70,8 @@ export function ShippingMethodScreen() {
                     <Image source={s.image} style={{ width: 28, height: 28 }} resizeMode="contain" />
                   ) : s.express ? (
                     <Zap size={20} color={EXPRESS_AMBER} fill={EXPRESS_AMBER} />
+                  ) : s.pickup ? (
+                    <Store size={20} color={BRAND_GREEN} />
                   ) : (
                     <Text style={{ fontSize: 10, fontWeight: "700", color: "#0a0a0a" }}>{s.code}</Text>
                   )}

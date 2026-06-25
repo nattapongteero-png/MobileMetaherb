@@ -1,12 +1,22 @@
 import { useState, type ReactNode } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, Switch } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, Switch, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { X, Info } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { useRefund } from "../context/RefundContext";
+import type { CardBrand } from "../data/bankAccounts";
 import { BRAND_GREEN } from "../theme/tokens";
 
 const LABEL = "#6b7280";
+
+/** Detect the card brand from the number (same prefixes the networks use). */
+function detectBrand(digits: string): CardBrand {
+  if (/^3[47]/.test(digits)) return "amex";
+  if (/^35/.test(digits)) return "jcb";
+  if (/^(5[1-5]|2[2-7])/.test(digits)) return "mastercard";
+  return "visa";
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -31,12 +41,28 @@ const inputStyle = {
 export function AddCardScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
+  const { addCard } = useRefund();
   const [number, setNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [primary, setPrimary] = useState(true);
+
+  const save = () => {
+    const digits = number.replace(/\D/g, "");
+    const [mm, yy] = expiry.split(/[/\s]+/);
+    if (digits.length < 13) { Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกหมายเลขบัตรให้ถูกต้อง"); return; }
+    if (!mm || !yy) { Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกวันหมดอายุ (ดด/ปป)"); return; }
+    addCard({
+      brand: detectBrand(digits),
+      last4: digits.slice(-4),
+      expMonth: parseInt(mm, 10) || 1,
+      expYear: parseInt(yy, 10) || 0,
+      isDefault: primary,
+    });
+    nav.goBack();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -139,7 +165,7 @@ export function AddCardScreen() {
 
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 12 }}>
         <Pressable
-          onPress={() => nav.goBack()}
+          onPress={save}
           className="active:opacity-80 items-center justify-center"
           style={{ height: 52, borderRadius: 999, backgroundColor: BRAND_GREEN }}
         >

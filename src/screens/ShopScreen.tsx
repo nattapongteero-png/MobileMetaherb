@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,31 +12,35 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Check,
-  ChevronDown,
   ChevronLeft,
   Clock,
   Heart,
+  Leaf,
   MapPin,
   MessageCircle,
   Package,
   Search,
   Share2,
   ShieldCheck,
+  SlidersHorizontal,
   Star,
   ThumbsUp,
   X,
 } from "lucide-react-native";
-import { BottomSheet } from "../components/BottomSheet";
+import { GlassView } from "expo-glass-effect";
 import { ProductCard } from "../components/ProductCard";
 import { EmptyState } from "../components/EmptyState";
-import { IconButton } from "../components/IconButton";
+import { GlassIconButton } from "../components/GlassIconButton";
 import { STAR_YELLOW, RATING_BAR_FILL, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
 import type { Product } from "../types/Product";
+import { type SortKey } from "../data/shopSort";
+import { type HerbalSortKey } from "../data/herbalSort";
+import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -121,16 +125,7 @@ const CATEGORY_ORDER = [
   "ชุดของชำร่วย/ของขวัญ",
 ];
 
-type SortKey = "popular" | "price-asc" | "price-desc" | "rating";
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "popular", label: "ยอดนิยม" },
-  { key: "price-asc", label: "ราคา: ต่ำไปสูง" },
-  { key: "price-desc", label: "ราคา: สูงไปต่ำ" },
-  { key: "rating", label: "คะแนนสูงสุด" },
-];
-
-type TabKey = "products" | "reviews";
+type TabKey = "products" | "herbal" | "reviews";
 
 export function ShopScreen() {
   const nav = useNavigation<Nav>();
@@ -140,9 +135,30 @@ export function ShopScreen() {
   const [tab, setTab] = useState<TabKey>("products");
   const [category, setCategory] = useState<string>("ทั้งหมด");
   const [sort, setSort] = useState<SortKey>("popular");
-  const [showSort, setShowSort] = useState(false);
-  const [showCategory, setShowCategory] = useState(false);
   const [search, setSearch] = useState("");
+  // Herbal Market tab filters.
+  const [herbalQuery, setHerbalQuery] = useState("");
+  const [herbalCategory, setHerbalCategory] = useState<string>("ทั้งหมด");
+  const [herbalSort, setHerbalSort] = useState<HerbalSortKey>("popular");
+
+  // The native filter sheets hand their choices back via route params.
+  const route = useRoute<RouteProp<RootStackParamList, "Shop">>();
+  const routeSort = route.params?.sort;
+  const routeCategory = route.params?.category;
+  const routeHerbalSort = route.params?.herbalSort;
+  const routeHerbalCategory = route.params?.herbalCategory;
+  useEffect(() => {
+    if (routeSort) setSort(routeSort);
+  }, [routeSort]);
+  useEffect(() => {
+    if (routeCategory) setCategory(routeCategory);
+  }, [routeCategory]);
+  useEffect(() => {
+    if (routeHerbalSort) setHerbalSort(routeHerbalSort);
+  }, [routeHerbalSort]);
+  useEffect(() => {
+    if (routeHerbalCategory) setHerbalCategory(routeHerbalCategory);
+  }, [routeHerbalCategory]);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // Heart "pop" feedback — pulses on toggle so the state change is felt, not
@@ -202,10 +218,16 @@ export function ShopScreen() {
   const bannerHeight =
     insets.top + HEADER_ROW_HEIGHT + HEADER_TO_CARD_GAP + CARD_OVERLAP;
 
-  // Sticky header bar — fade in only after the banner has scrolled past.
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [bannerHeight - 80, bannerHeight - 30],
-    outputRange: [0, 1],
+  // Stretchy cover — pulling down (negative scrollY) scales the banner up,
+  // anchored at its bottom so it expands to fill the overscroll gap.
+  const bannerScale = scrollY.interpolate({
+    inputRange: [-bannerHeight, 0],
+    outputRange: [2, 1],
+    extrapolate: "clamp",
+  });
+  const bannerTranslateY = scrollY.interpolate({
+    inputRange: [-bannerHeight, 0],
+    outputRange: [-bannerHeight / 2, 0],
     extrapolate: "clamp",
   });
 
@@ -213,9 +235,37 @@ export function ShopScreen() {
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
     SHOP_PRODUCTS.forEach((p) => counts.set(p.category, (counts.get(p.category) || 0) + 1));
-    const ordered = CATEGORY_ORDER.map((name) => ({ name, count: counts.get(name) || 0 }));
+    // Only categories this shop actually stocks (drop empty ones).
+    const ordered = CATEGORY_ORDER.map((name) => ({ name, count: counts.get(name) || 0 })).filter(
+      (c) => c.count > 0,
+    );
     return [{ name: "ทั้งหมด", count: SHOP_PRODUCTS.length }, ...ordered];
   }, []);
+
+  // Herbal Market materials this shop supplies — only show the tab if it has any.
+  const herbalMaterials = useMemo(() => MATERIALS.filter((m) => m.supplier === SHOP.name), []);
+  const hasHerbal = herbalMaterials.length > 0;
+
+  // Distinct material categories this shop stocks (for the herbal filter/chips).
+  const herbalCategories = useMemo(
+    () => ["ทั้งหมด", ...Array.from(new Set(herbalMaterials.map((m) => m.category)))],
+    [herbalMaterials],
+  );
+
+  // Apply search + category + sort to the herbal materials (mirrors HerbalMarket).
+  const filteredHerbal = useMemo(() => {
+    const q = herbalQuery.trim().toLowerCase();
+    let list = herbalMaterials.filter(
+      (m) =>
+        (herbalCategory === "ทั้งหมด" || m.category === herbalCategory) &&
+        (q.length === 0 || m.name.toLowerCase().includes(q) || m.scientificName.toLowerCase().includes(q)),
+    );
+    if (herbalSort === "price_asc") list = [...list].sort((a, b) => a.pricePerKg - b.pricePerKg);
+    else if (herbalSort === "price_desc") list = [...list].sort((a, b) => b.pricePerKg - a.pricePerKg);
+    else if (herbalSort === "moq_asc") list = [...list].sort((a, b) => a.moq - b.moq);
+    else list = [...list].sort((a, b) => b.rating - a.rating); // popular
+    return list;
+  }, [herbalMaterials, herbalQuery, herbalCategory, herbalSort]);
 
   // Apply category + search filter, then sort.
   const filteredProducts = useMemo(() => {
@@ -257,51 +307,17 @@ export function ShopScreen() {
         }}
       >
         <SafeAreaView edges={["top"]} pointerEvents="box-none">
-          {/* Animated green bg — fades in when banner scrolls past. Keeps the
-              brand color flowing under the header instead of breaking to
-              white, so the screen feels like one continuous green region. */}
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "#319754",
-              opacity: headerOpacity,
-            }}
-          />
+          {/* Transparent app bar — only the floating glass buttons (no fill) */}
           <View
-            className="flex-row items-center"
-            style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}
+            className="flex-row items-center justify-between"
+            style={{ paddingHorizontal: 12, paddingVertical: 10 }}
           >
-            {/* Back — both states use white icon (green bg in both phases) */}
-            <IconButton
-              onPress={() => nav.canGoBack() && nav.goBack()}
-              variant="translucentDarkLight"
-            >
-              <ChevronLeft size={22} color="white" />
-            </IconButton>
-
-            {/* Title — fades in when scrolled, white text on green */}
-            <Animated.Text
-              numberOfLines={1}
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: "white",
-                flex: 1,
-                opacity: headerOpacity,
-              }}
-            >
-              {SHOP.name}
-            </Animated.Text>
-
-            {/* Share */}
-            <IconButton variant="translucentDarkLight">
-              <Share2 size={18} color="white" />
-            </IconButton>
+            <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel="ย้อนกลับ">
+              <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
+            </GlassIconButton>
+            <GlassIconButton accessibilityLabel="แชร์ร้านค้า">
+              <Share2 size={18} color="#1a1a1a" strokeWidth={2.2} />
+            </GlassIconButton>
           </View>
         </SafeAreaView>
       </View>
@@ -316,7 +332,13 @@ export function ShopScreen() {
       >
         {/* Banner — solid brand green; height is computed to end at the
             avatar's vertical center (see layout maths above). */}
-        <View style={{ height: bannerHeight, backgroundColor: "#319754" }} />
+        {/* Shop cover image (natural herb banner) — stretches on pull-down */}
+        <View style={{ height: bannerHeight, backgroundColor: "#319754" }}>
+          <Animated.View style={{ width: "100%", height: "100%", transform: [{ translateY: bannerTranslateY }, { scale: bannerScale }] }}>
+            <Image source={SHOP.banner} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(13,49,29,0.28)" }} />
+          </Animated.View>
+        </View>
 
         {/* Shop info card — overlaps banner */}
         <View
@@ -324,7 +346,7 @@ export function ShopScreen() {
             marginTop: -CARD_OVERLAP,
             marginHorizontal: 12,
             backgroundColor: "white",
-            borderRadius: 16,
+            borderRadius: 24,
             padding: 16,
             shadowColor: "#000",
             shadowOpacity: 0.08,
@@ -474,10 +496,12 @@ export function ShopScreen() {
 
         </View>
 
-        {/* Tabs row — Products / Reviews (Jakob's Law: same as web shop) */}
-        <View
-          className="flex-row items-center"
-          style={{ marginTop: 16, paddingHorizontal: 12, gap: 8 }}
+        {/* Tabs row — Products / [Herbal Market] / Reviews (Jakob's Law: same as web shop) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 16 }}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
         >
           <TabPill
             active={tab === "products"}
@@ -486,6 +510,15 @@ export function ShopScreen() {
             Icon={Package}
             onPress={() => setTab("products")}
           />
+          {hasHerbal ? (
+            <TabPill
+              active={tab === "herbal"}
+              label="Herbal Market"
+              count={herbalMaterials.length}
+              Icon={Leaf}
+              onPress={() => setTab("herbal")}
+            />
+          ) : null}
           <TabPill
             active={tab === "reviews"}
             label="รีวิวร้านค้า"
@@ -494,106 +527,176 @@ export function ShopScreen() {
             badgeRed
             onPress={() => setTab("reviews")}
           />
-        </View>
+        </ScrollView>
 
         {tab === "products" ? (
           <>
-            {/* Search bar */}
+            {/* Search bar — white pill matching the other pages' header search */}
             <View
-              className="flex-row items-center"
+              className="flex-row items-center rounded-full px-4"
               style={{
                 marginTop: 10,
                 marginHorizontal: 12,
-                backgroundColor: "white",
-                borderRadius: 999,
-                paddingLeft: 16,
-                paddingRight: 4,
-                height: 40,
-                gap: 8,
-                borderWidth: 1,
-                borderColor: "#e5e7eb",
+                height: 46,
+                backgroundColor: "#ffffff",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 4,
+                elevation: 2,
               }}
             >
+              <Search size={18} color="#319754" />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder="ค้นหาสินค้าในร้านนี้"
                 placeholderTextColor="#a3a3a3"
-                style={{ flex: 1, fontSize: 13, color: "#0a0a0a", padding: 0 }}
+                returnKeyType="search"
+                style={{ flex: 1, marginLeft: 10, fontSize: 13.5, color: "#374151" }}
               />
               {search ? (
-                <Pressable
-                  onPress={() => setSearch("")}
-                  hitSlop={8}
-                  className="active:opacity-70"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: "#e5e7eb",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <X size={14} color="#525252" />
+                <Pressable onPress={() => setSearch("")} hitSlop={8} className="active:opacity-60">
+                  <X size={16} color="#a3a3a3" />
                 </Pressable>
-              ) : (
-                <Pressable
-                  hitSlop={8}
-                  className="active:opacity-70"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: "#319754",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Search size={16} color="white" />
-                </Pressable>
-              )}
+              ) : null}
             </View>
 
-            {/* Count + dropdowns row — Law of Proximity: status text on the
-                left, controls that change that count on the right. */}
-            <View
-              className="flex-row items-center"
-              style={{
-                marginTop: 12,
-                paddingHorizontal: 12,
-                gap: 8,
-              }}
-            >
-              <View className="flex-row items-center" style={{ flex: 1, gap: 5 }}>
-                <Package size={14} color="#319754" />
-                <Text style={{ fontSize: 12, color: "#737373" }}>
-                  สินค้าทั้งหมด{" "}
-                  <Text style={{ color: "#0a0a0a", fontWeight: "700" }}>
-                    {filteredProducts.length}
-                  </Text>{" "}
-                  รายการ
-                </Text>
-              </View>
+            {/* Filter button (sort) + category chips — same language as the Products page */}
+            <View className="flex-row items-center" style={{ marginTop: 14, gap: 10, paddingLeft: 12 }}>
+              <Pressable
+                onPress={() => nav.navigate("ShopSort", { current: sort, category, categories: categories.map((c) => c.name) })}
+                hitSlop={6}
+                accessibilityLabel="ตัวกรอง"
+              >
+                <GlassView
+                  glassEffectStyle="regular"
+                  colorScheme="light"
+                  tintColor="rgba(255,255,255,0.45)"
+                  isInteractive
+                  style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" }}
+                >
+                  <SlidersHorizontal size={18} color="#374151" strokeWidth={2.2} />
+                </GlassView>
+              </Pressable>
 
-              <DropdownButton
-                label={
-                  category === "ทั้งหมด"
-                    ? `ทุกหมวดหมู่ (${SHOP_PRODUCTS.length})`
-                    : `${category} (${categories.find((c) => c.name === category)?.count ?? 0})`
-                }
-                onPress={() => setShowCategory(true)}
-              />
-              <DropdownButton
-                label={SORT_OPTIONS.find((o) => o.key === sort)?.label ?? ""}
-                onPress={() => setShowSort(true)}
-              />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 12 }}>
+                {categories.map((c) => {
+                  const active = category === c.name;
+                  return (
+                    <Pressable key={c.name} onPress={() => setCategory(c.name)} hitSlop={4}>
+                      <GlassView
+                        glassEffectStyle="regular"
+                        colorScheme="light"
+                        tintColor={active ? "rgba(49,151,84,0.22)" : "rgba(255,255,255,0.45)"}
+                        isInteractive
+                        style={{ height: 34, paddingHorizontal: 16, borderRadius: 999, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: active ? "rgba(49,151,84,0.45)" : "rgba(0,0,0,0.06)" }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? BRAND_GREEN_DARK : "#374151" }}>{c.name}</Text>
+                      </GlassView>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
 
             {/* Products grid */}
             <View style={{ marginTop: 12 }}>
               <ProductsGrid products={filteredProducts} />
             </View>
+          </>
+        ) : tab === "herbal" ? (
+          <>
+            {/* Search bar — white pill matching the products tab */}
+            <View
+              className="flex-row items-center rounded-full px-4"
+              style={{
+                marginTop: 10,
+                marginHorizontal: 12,
+                height: 46,
+                backgroundColor: "#ffffff",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 4,
+                elevation: 2,
+              }}
+            >
+              <Search size={18} color="#319754" />
+              <TextInput
+                value={herbalQuery}
+                onChangeText={setHerbalQuery}
+                placeholder="ค้นหาวัตถุดิบในร้านนี้"
+                placeholderTextColor="#a3a3a3"
+                returnKeyType="search"
+                style={{ flex: 1, marginLeft: 10, fontSize: 13.5, color: "#374151" }}
+              />
+              {herbalQuery ? (
+                <Pressable onPress={() => setHerbalQuery("")} hitSlop={8} className="active:opacity-60">
+                  <X size={16} color="#a3a3a3" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Filter button + material-category chips */}
+            <View className="flex-row items-center" style={{ marginTop: 14, gap: 10, paddingLeft: 12 }}>
+              <Pressable
+                onPress={() =>
+                  nav.navigate("ShopHerbalFilter", { sort: herbalSort, category: herbalCategory, categories: herbalCategories })
+                }
+                hitSlop={6}
+                accessibilityLabel="ตัวกรอง"
+              >
+                <GlassView
+                  glassEffectStyle="regular"
+                  colorScheme="light"
+                  tintColor="rgba(255,255,255,0.45)"
+                  isInteractive
+                  style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" }}
+                >
+                  <SlidersHorizontal size={18} color="#374151" strokeWidth={2.2} />
+                </GlassView>
+              </Pressable>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 12 }}>
+                {herbalCategories.map((name) => {
+                  const active = herbalCategory === name;
+                  return (
+                    <Pressable key={name} onPress={() => setHerbalCategory(name)} hitSlop={4}>
+                      <GlassView
+                        glassEffectStyle="regular"
+                        colorScheme="light"
+                        tintColor={active ? "rgba(49,151,84,0.22)" : "rgba(255,255,255,0.45)"}
+                        isInteractive
+                        style={{ height: 34, paddingHorizontal: 16, borderRadius: 999, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: active ? "rgba(49,151,84,0.45)" : "rgba(0,0,0,0.06)" }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? BRAND_GREEN_DARK : "#374151" }}>{name}</Text>
+                      </GlassView>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Materials grid */}
+            {filteredHerbal.length === 0 ? (
+              <EmptyState
+                icon={<Leaf size={36} color="#d4d4d4" />}
+                title="ไม่พบวัตถุดิบ"
+                subtitle="ลองเปลี่ยนหมวดหมู่หรือคำค้นหาดู"
+              />
+            ) : (
+              <View className="flex-row flex-wrap" style={{ marginTop: 12, paddingHorizontal: 16, gap: 14 }}>
+                {filteredHerbal.map((m) => (
+                  <MaterialCard
+                    key={m.id}
+                    m={m}
+                    width={(SCREEN_WIDTH - 16 * 2 - 14) / 2}
+                    onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id })}
+                  />
+                ))}
+              </View>
+            )}
           </>
         ) : (
           <View style={{ marginTop: 12 }}>
@@ -606,29 +709,6 @@ export function ShopScreen() {
           </View>
         )}
       </Animated.ScrollView>
-
-      {/* Sort modal */}
-      <SortModal
-        visible={showSort}
-        current={sort}
-        onClose={() => setShowSort(false)}
-        onSelect={(k) => {
-          setSort(k);
-          setShowSort(false);
-        }}
-      />
-
-      {/* Category modal */}
-      <CategoryModal
-        visible={showCategory}
-        current={category}
-        categories={categories}
-        onClose={() => setShowCategory(false)}
-        onSelect={(name) => {
-          setCategory(name);
-          setShowCategory(false);
-        }}
-      />
 
       {/* Floating toast — appears briefly under the header to confirm the
           follow action took effect (Peak-End Rule + Visibility of Status). */}
@@ -753,120 +833,6 @@ function TabPill({
   );
 }
 
-function DropdownButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:opacity-70"
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
-        backgroundColor: "white",
-        gap: 6,
-        maxWidth: 160,
-      }}
-    >
-      <Text
-        numberOfLines={1}
-        style={{
-          fontSize: 12,
-          color: "#0a0a0a",
-          fontWeight: "500",
-          maxWidth: 110,
-        }}
-      >
-        {label}
-      </Text>
-      <ChevronDown size={13} color="#737373" />
-    </Pressable>
-  );
-}
-
-function CategoryModal({
-  visible,
-  current,
-  categories,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  current: string;
-  categories: { name: string; count: number }[];
-  onClose: () => void;
-  onSelect: (name: string) => void;
-}) {
-  return (
-    <BottomSheet visible={visible} onClose={onClose} title="เลือกหมวดหมู่">
-      <ScrollView>
-        {categories.map((c) => {
-          const label = c.name === "ทั้งหมด" ? "ทุกหมวดหมู่" : c.name;
-          return (
-            <OptionRow
-              key={c.name}
-              label={label}
-              count={c.count}
-              active={current === c.name}
-              onPress={() => onSelect(c.name)}
-            />
-          );
-        })}
-      </ScrollView>
-    </BottomSheet>
-  );
-}
-
-/** Shared row used inside every BottomSheet that's a single-select list. */
-function OptionRow({
-  label,
-  active,
-  count,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  count?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:bg-gray-50"
-      style={{ paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}
-    >
-      <Text
-        style={{
-          flex: 1,
-          fontSize: 14,
-          color: active ? "#319754" : "#0a0a0a",
-          fontWeight: active ? "600" : "400",
-        }}
-      >
-        {label}
-        {typeof count === "number" ? (
-          <Text style={{ color: TEXT_MUTED, fontWeight: "400" }}> ({count})</Text>
-        ) : null}
-      </Text>
-      {active ? (
-        <View
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: "#319754",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Check size={12} color="white" strokeWidth={3} />
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
 function Stat({
   value,
   label,
@@ -926,37 +892,6 @@ function ProductsGrid({ products }: { products: Product[] }) {
         <ProductCard key={p.id} product={p} width={cardWidth} />
       ))}
     </View>
-  );
-}
-
-function SortModal({
-  visible,
-  current,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  current: SortKey;
-  onClose: () => void;
-  onSelect: (k: SortKey) => void;
-}) {
-  return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      title="เรียงตาม"
-      minHeightRatio={0.4}
-      maxHeightRatio={0.6}
-    >
-      {SORT_OPTIONS.map((opt) => (
-        <OptionRow
-          key={opt.key}
-          label={opt.label}
-          active={current === opt.key}
-          onPress={() => onSelect(opt.key)}
-        />
-      ))}
-    </BottomSheet>
   );
 }
 

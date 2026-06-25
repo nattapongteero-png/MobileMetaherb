@@ -54,11 +54,8 @@ export function PaymentSuccessScreen() {
           {/* Order details */}
           <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#ececed", padding: 18, marginTop: 24, gap: 14 }}>
             <DetailRow label="หมายเลขคำสั่งซื้อ" value={orderId} />
-            <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
             <DetailRow label="ช่องทางชำระเงิน" value={methodLabel} sub={methodDesc} />
-            <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
             <DetailRow label="การจัดส่ง" value={carrier.name} sub={carrier.desc} />
-            <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
             <DetailRow label="จัดส่งถึง" value={address.name} sub={`${address.detail}\n${address.area}`} />
           </View>
         </ScrollView>

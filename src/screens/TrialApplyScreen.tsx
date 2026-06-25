@@ -8,7 +8,13 @@ import {
   TextInput,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { BottomFade } from "../components/BottomFade";
+import { usePayment } from "../context/PaymentContext";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   MapPin,
@@ -20,10 +26,9 @@ import {
   Check,
   Sparkles,
   User,
-  Ellipsis,
   Plus,
 } from "lucide-react-native";
-import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 
 /* ----------------------------------------------------------------------------
  * Data — ported verbatim from web src/app/data/trialProducts.ts + TrialApplyPage.
@@ -40,43 +45,6 @@ import { TRIAL_PRODUCTS } from "./TrialProductsScreen";
 function imgSource(src: number | string | undefined): any {
   return typeof src === "number" ? src : { uri: src };
 }
-
-type Address = {
-  id: string;
-  label: string;
-  recipient: string;
-  phone: string;
-  fullAddress: string;
-  isDefault?: boolean;
-};
-
-/** Mock saved addresses — would come from AddressContext in a real app. */
-const SAVED_ADDRESSES: Address[] = [
-  {
-    id: "addr-1",
-    label: "บ้าน",
-    recipient: "username01",
-    phone: "090-000-0001",
-    fullAddress:
-      "เลขที่ 2 ชั้น 2 ซอยสุขสวัสดิ์ 33 แขวงราษฎร์บูรณะ เขตราษฎร์บูรณะ กรุงเทพมหานคร 10140",
-    isDefault: true,
-  },
-  {
-    id: "addr-2",
-    label: "ที่ทำงาน",
-    recipient: "username01",
-    phone: "090-000-0001",
-    fullAddress:
-      "ชั้น 15 อาคาร B ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
-  },
-  {
-    id: "addr-3",
-    label: "บ้านต่างจังหวัด",
-    recipient: "username01",
-    phone: "090-000-0002",
-    fullAddress: "55/12 หมู่ 5 ตำบลในเมือง อำเภอเมือง จังหวัดเชียงใหม่ 50000",
-  },
-];
 
 /** Tester profile — mirrors loadTesterProfile() from the web mock. */
 const TESTER_PROFILE = {
@@ -103,12 +71,13 @@ type Params = { id?: string };
  * Shared style constants
  * -------------------------------------------------------------------------- */
 
+// Full-bleed white section (edge-to-edge, separated by a thin gray gap) — matches
+// the order detail / account pages.
 const CARD_STYLE = {
   backgroundColor: "#fff",
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: "#ececed",
-  padding: 16,
+  marginTop: 8,
+  paddingHorizontal: 16,
+  paddingVertical: 16,
 } as const;
 
 const BLUE = "#08f"; // "ที่อยู่หลัก" default-address badge (matches web)
@@ -186,9 +155,8 @@ function ReasonInput({
       textAlignVertical="top"
       style={{
         minHeight: 110,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
+        backgroundColor: "#f5f5f5",
+        borderRadius: 14,
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 14,
@@ -206,6 +174,7 @@ function ReasonInput({
 export function TrialApplyScreen() {
   const nav = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
   const { id } = (route.params as Params) ?? {};
 
   const product = useMemo(
@@ -213,23 +182,27 @@ export function TrialApplyScreen() {
     [id]
   );
 
-  const [selectedAddressId, setSelectedAddressId] = useState(
-    SAVED_ADDRESSES.find((a) => a.isDefault)?.id ?? SAVED_ADDRESSES[0].id
-  );
-  const [showAddressList, setShowAddressList] = useState(false);
+  // Shared shipping address — same source as the checkout page (PaymentContext),
+  // tapping the card opens the same AddressSelect picker.
+  const { addresses, selectedAddressId } = usePayment();
+  const selectedAddress =
+    addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
+
   const [reason, setReason] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
-
-  const selectedAddress =
-    SAVED_ADDRESSES.find((a) => a.id === selectedAddressId) ??
-    SAVED_ADDRESSES[0];
 
   const spotsLeft = product.spotsTotal - product.spotsTaken;
   const isClosed = spotsLeft <= 0 || product.endsInDays <= 0;
   const canSubmit =
     reason.trim().length >= 10 && acceptTerms && !isClosed;
 
+  // Always tappable — each unmet condition explains itself via an alert so the
+  // user is never left with a silent, unresponsive button.
   const handleSubmit = () => {
+    if (isClosed) {
+      Alert.alert("ปิดรับสมัครแล้ว", "ขออภัย — การทดสอบนี้ปิดรับสมัครแล้ว");
+      return;
+    }
     if (reason.trim().length < 10) {
       Alert.alert(
         "กรุณากรอกเหตุผล",
@@ -244,25 +217,26 @@ export function TrialApplyScreen() {
       );
       return;
     }
-    if (!canSubmit) return;
-    Alert.alert(
-      "ส่งใบสมัครเรียบร้อย",
-      `METAHERB จะตรวจสอบและติดต่อกลับทาง ${selectedAddress.phone} ภายใน 2 วันทำการ`
-    );
+    (nav as any).navigate("TrialSuccess", {
+      productName: product.name,
+      rewardPoints: product.rewardPoints,
+    });
   };
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}
-      >
-        {/* Page heading */}
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#1a1a1a" }}>
-          ขอเข้าร่วมทดสอบผลิตภัณฑ์
-        </Text>
-
+      <StatusBar style="dark" />
+      <SubPageHeader
+        title="สมัครทดลองใช้สินค้า"
+        subtitle={product.name}
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+      />
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+        >
         {/* ===== Trial summary — product + stats + studio ===== */}
         <View style={[CARD_STYLE, { gap: 14 }]}>
           <Text style={{ fontSize: 18, fontWeight: "600", color: "#1a1a1a" }}>
@@ -364,7 +338,7 @@ export function TrialApplyScreen() {
           </View>
         </View>
 
-        {/* ===== Address — mirrors PaymentPage layout ===== */}
+        {/* ===== Address — same card + AddressSelect picker as the checkout page ===== */}
         <View style={CARD_STYLE}>
           <View
             style={{
@@ -377,193 +351,63 @@ export function TrialApplyScreen() {
             <SectionTitle
               icon={<MapPin size={18} color={BRAND_GREEN} strokeWidth={2.2} />}
             >
-              ที่อยู่ในการจัดส่ง
+              ที่อยู่จัดส่ง
             </SectionTitle>
-            <Pressable
-              onPress={() => setShowAddressList((v) => !v)}
-              hitSlop={10}
-            >
+            <Pressable onPress={() => nav.navigate("AddressSelect" as never)} hitSlop={10}>
               <Text style={{ fontSize: 13, color: BRAND_GREEN, fontWeight: "500" }}>
-                {showAddressList ? "ปิด" : "เปลี่ยน"}
+                เปลี่ยน
               </Text>
             </Pressable>
           </View>
 
-          {/* Selected address card */}
-          <View
-            style={{
-              backgroundColor: "rgba(242,242,247,0.7)",
-              borderRadius: 16,
-              padding: 14,
-              gap: 10,
-            }}
-          >
-            <View
+          {selectedAddress ? (
+            <Pressable
+              onPress={() => nav.navigate("AddressSelect" as never)}
+              className="active:opacity-90"
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
+                backgroundColor: "rgba(242,242,247,0.6)",
+                borderRadius: 24,
+                padding: 14,
+                gap: 10,
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  flex: 1,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "500", color: "#000" }}>
-                  {selectedAddress.recipient}
+              <View className="flex-row items-center" style={{ gap: 8 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 15, fontWeight: "600", color: "#0a0a0a", lineHeight: 20, flexShrink: 1 }}
+                >
+                  {selectedAddress.name}
                 </Text>
-                {selectedAddress.isDefault && (
-                  <View
-                    style={{
-                      backgroundColor: BLUE,
-                      paddingHorizontal: 12,
-                      paddingVertical: 2,
-                      borderRadius: 999,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: "#fff", fontWeight: "500" }}>
-                      ที่อยู่หลัก
+                {selectedAddress.isDefault ? (
+                  <View style={{ backgroundColor: BLUE, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                    <Text style={{ color: "white", fontSize: 10, fontWeight: "700", lineHeight: 13 }}>
+                      ค่าเริ่มต้น
                     </Text>
                   </View>
-                )}
-                <View
-                  style={{
-                    backgroundColor: "#e5e7eb",
-                    paddingHorizontal: 10,
-                    paddingVertical: 2,
-                    borderRadius: 999,
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: "#374151", fontWeight: "500" }}>
-                    {selectedAddress.label}
-                  </Text>
-                </View>
+                ) : null}
               </View>
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: "rgba(120,120,128,0.12)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ellipsis size={16} color="#999" />
+              <View style={{ height: 1, backgroundColor: "#d4d4d8" }} />
+              <View>
+                <Text style={{ fontSize: 14, color: "#0a0a0a", lineHeight: 19 }}>
+                  {selectedAddress.phone}
+                </Text>
+                <Text style={{ fontSize: 13, color: "#525252", lineHeight: 19, marginTop: 4 }}>
+                  {selectedAddress.detail}
+                  {"\n"}
+                  {selectedAddress.area}
+                </Text>
               </View>
-            </View>
-            <View style={{ height: 1, backgroundColor: "#D4D4D8" }} />
-            <View style={{ gap: 4 }}>
-              <Text style={{ fontSize: 15, color: "#000" }}>
-                {selectedAddress.phone}
-              </Text>
-              <Text style={{ fontSize: 13.5, color: "#000", lineHeight: 19 }}>
-                {selectedAddress.fullAddress}
-              </Text>
-            </View>
-          </View>
-
-          {/* Address picker — expands when "เปลี่ยน" pressed */}
-          {showAddressList && (
-            <View
-              style={{
-                marginTop: 12,
-                paddingTop: 12,
-                borderTopWidth: 1,
-                borderTopColor: "#f0f0f0",
-                gap: 8,
-              }}
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => nav.navigate("AddAddress" as never)}
+              hitSlop={8}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >
-              {SAVED_ADDRESSES.filter((a) => a.id !== selectedAddressId).map(
-                (addr) => (
-                  <Pressable
-                    key={addr.id}
-                    onPress={() => {
-                      setSelectedAddressId(addr.id);
-                      setShowAddressList(false);
-                    }}
-                    style={{
-                      padding: 12,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: "#e5e7eb",
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 4,
-                      }}
-                    >
-                      <Text
-                        style={{ fontSize: 14, fontWeight: "600", color: "#1a1a1a" }}
-                      >
-                        {addr.recipient}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: TEXT_MUTED }}>
-                        · {addr.phone}
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: "#e5e7eb",
-                          paddingHorizontal: 8,
-                          paddingVertical: 1,
-                          borderRadius: 999,
-                        }}
-                      >
-                        <Text
-                          style={{ fontSize: 10, color: "#374151", fontWeight: "500" }}
-                        >
-                          {addr.label}
-                        </Text>
-                      </View>
-                      {addr.isDefault && (
-                        <View
-                          style={{
-                            backgroundColor: BLUE,
-                            paddingHorizontal: 8,
-                            paddingVertical: 1,
-                            borderRadius: 999,
-                          }}
-                        >
-                          <Text
-                            style={{ fontSize: 10, color: "#fff", fontWeight: "500" }}
-                          >
-                            ที่อยู่หลัก
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={{ fontSize: 12.5, color: TEXT_SECONDARY, lineHeight: 18 }}>
-                      {addr.fullAddress}
-                    </Text>
-                  </Pressable>
-                )
-              )}
-            </View>
+              <Plus size={14} color={BRAND_GREEN} strokeWidth={2.4} />
+              <Text style={{ fontSize: 13, color: BRAND_GREEN }}>เพิ่มที่อยู่ใหม่</Text>
+            </Pressable>
           )}
-
-          <Pressable
-            onPress={() => nav.navigate("Address" as never)}
-            hitSlop={8}
-            style={{
-              marginTop: 10,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <Plus size={14} color={BRAND_GREEN} strokeWidth={2.4} />
-            <Text style={{ fontSize: 13, color: BRAND_GREEN }}>เพิ่มที่อยู่ใหม่</Text>
-          </Pressable>
         </View>
 
         {/* ===== Tester profile ===== */}
@@ -680,6 +524,8 @@ export function TrialApplyScreen() {
         {isClosed && (
           <View
             style={{
+              marginTop: 8,
+              marginHorizontal: 16,
               borderRadius: 12,
               padding: 12,
               backgroundColor: AMBER_BG,
@@ -699,55 +545,59 @@ export function TrialApplyScreen() {
             color: "#9ca3af",
             textAlign: "center",
             lineHeight: 17,
-            marginTop: 2,
+            marginTop: 14,
+            paddingHorizontal: 16,
           }}
         >
           เมื่อกดส่งคำขอ ทีมงานจะตรวจสอบและติดต่อกลับภายใน 2 วันทำการ
         </Text>
-      </ScrollView>
+        </ScrollView>
+        <LinearGradient pointerEvents="none" colors={["#fafafa", "rgba(250,250,250,0)"]} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }} />
+        <BottomFade />
+      </View>
 
-      {/* ===== Fixed bottom submit ===== */}
-      <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#fafafa" }}>
+      {/* ===== Floating Liquid Glass submit bar (hovers above the bottom, same
+          language as the cart / payment / order detail screens) ===== */}
+      <View
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}
+      >
         <View
           style={{
-            paddingHorizontal: 16,
-            paddingTop: 10,
-            paddingBottom: 6,
-            borderTopWidth: 1,
-            borderTopColor: "#ececed",
-            backgroundColor: "#fff",
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
           }}
         >
-          <Pressable
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            style={{
-              height: 48,
-              borderRadius: 999,
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "row",
-              gap: 8,
-              backgroundColor: canSubmit ? BRAND_GREEN : "#e5e7eb",
-            }}
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}
           >
-            <Check
-              size={16}
-              color={canSubmit ? "#fff" : "#9ca3af"}
-              strokeWidth={2.6}
-            />
-            <Text
+            <Pressable
+              onPress={handleSubmit}
+              className="active:opacity-90"
               style={{
-                fontSize: 14,
-                fontWeight: "700",
-                color: canSubmit ? "#fff" : "#9ca3af",
+                height: 50,
+                borderRadius: 999,
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
+                backgroundColor: canSubmit ? BRAND_GREEN : "#9ca3af",
               }}
             >
-              ส่งคำขอเข้าร่วมทดสอบ
-            </Text>
-          </Pressable>
+              <Check size={17} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+                ส่งคำขอเข้าร่วมทดสอบ
+              </Text>
+            </Pressable>
+          </GlassView>
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }

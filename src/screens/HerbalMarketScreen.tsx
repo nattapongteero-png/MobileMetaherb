@@ -7,7 +7,6 @@ import {
   Image,
   Pressable,
   Dimensions,
-  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
@@ -18,7 +17,6 @@ import {
   BadgeCheck,
   MapPin,
   Beaker,
-  ChevronRight,
 } from "lucide-react-native";
 import {
   BRAND_GREEN,
@@ -357,15 +355,11 @@ export function HerbalMarketScreen() {
     (nav.navigate as (route: string, params?: object) => void)("HerbalMarketDetail", { id });
   };
 
-  const becomeSupplier = () => {
-    Alert.alert("กำลังพัฒนา", "การสมัคร Supplier กำลังพัฒนา");
-  };
-
   return (
     <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
       <StatusBar style="light" />
       <BrandHeader
-        title="เฮอร์บัลมาร์เก็ต"
+        title="Herbal Market"
         subtitle="ตลาดวัตถุดิบสมุนไพรขายส่ง"
         titleSize={20}
         showLogo={false}

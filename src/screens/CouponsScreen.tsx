@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, Alert } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronRight, Clock, Ticket, ShoppingCart } from "lucide-react-native";
-import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { SubPageHeader } from "../components/SubPageHeader";
+import { PressableScale } from "../components/PressableScale";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import { COUPONS, type Coupon } from "../data/coupons";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
 type FilterKey = "all" | "discount" | "free_shipping" | "used" | "expired";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -30,17 +34,46 @@ const matches = (c: Coupon, f: FilterKey) =>
           ? c.status === "used"
           : c.status === "expired";
 
+// Glass filter chips — same language as the order status tabs / notification filters.
+function FilterChips({ filter, setFilter }: { filter: FilterKey; setFilter: (f: FilterKey) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}>
+      {FILTERS.map((f) => {
+        const active = filter === f.key;
+        const count = COUPONS.filter((c) => matches(c, f.key)).length;
+        return (
+          <PressableScale key={f.key} onPress={() => setFilter(f.key)} scaleTo={0.92}>
+            <GlassView
+              glassEffectStyle="regular"
+              colorScheme="light"
+              tintColor={active ? "rgba(49,151,84,0.22)" : "rgba(255,255,255,0.5)"}
+              isInteractive
+              style={{ height: 34, paddingHorizontal: 16, borderRadius: 999, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: active ? "rgba(49,151,84,0.45)" : "rgba(0,0,0,0.06)" }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? BRAND_GREEN_DARK : "#374151" }}>{f.label}</Text>
+              {count > 0 ? (
+                <View style={{ minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: active ? "rgba(38,122,67,0.16)" : "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: active ? BRAND_GREEN_DARK : "#374151", lineHeight: 13 }}>{count}</Text>
+                </View>
+              ) : null}
+            </GlassView>
+          </PressableScale>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function CouponCard({ coupon, onUse }: { coupon: Coupon; onUse: () => void }) {
   const inactive = coupon.status !== "active";
   const badgeBg = inactive ? "#b4b4b4" : coupon.bgColor;
 
   return (
-    <View style={{ flexDirection: "row", backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#ececed", overflow: "hidden" }}>
+    <View style={{ flexDirection: "row", backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececed", overflow: "hidden" }}>
       {/* Left colored badge with notch cutouts */}
       <View style={{ width: 84, backgroundColor: badgeBg, alignItems: "center", justifyContent: "center" }}>
         <Text style={{ fontSize: 20, fontWeight: "800", color: "#fff" }}>{coupon.label}</Text>
         <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.95)", marginTop: 2 }}>{coupon.sublabel}</Text>
-        {/* notch cutouts */}
         <View style={{ position: "absolute", right: -6, top: 22, width: 12, height: 12, borderRadius: 6, backgroundColor: "#fafafa" }} />
         <View style={{ position: "absolute", right: -6, bottom: 22, width: 12, height: 12, borderRadius: 6, backgroundColor: "#fafafa" }} />
       </View>
@@ -48,9 +81,7 @@ function CouponCard({ coupon, onUse }: { coupon: Coupon; onUse: () => void }) {
       {/* Content */}
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, gap: 10 }}>
         <View style={{ flex: 1, gap: 5 }}>
-          <Text style={{ fontSize: 14, fontWeight: "600", color: inactive ? "#9b9b9b" : "#222" }} numberOfLines={2}>
-            {coupon.title}
-          </Text>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: inactive ? "#9b9b9b" : "#222" }} numberOfLines={2}>{coupon.title}</Text>
           <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>{coupon.minSpend}</Text>
           {coupon.tag ? (
             <View style={{ alignSelf: "flex-start", borderWidth: 1, borderColor: inactive ? "#bdbdbd" : coupon.tagColor, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 1.5 }}>
@@ -81,40 +112,28 @@ export function CouponsScreen() {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<FilterKey>("all");
 
-  const countFor = (f: FilterKey) => COUPONS.filter((c) => matches(c, f)).length;
+  const activeCount = COUPONS.filter((c) => c.status === "active").length;
   const filtered = COUPONS.filter((c) => matches(c, filter));
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
-        {/* Filter pills */}
-        <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-            {FILTERS.map((f) => {
-              const active = filter === f.key;
-              const count = countFor(f.key);
-              return (
-                <Pressable
-                  key={f.key}
-                  onPress={() => setFilter(f.key)}
-                  className="flex-row items-center active:opacity-80"
-                  style={{ height: 32, paddingHorizontal: 13, borderRadius: 999, backgroundColor: active ? BRAND_GREEN : "#f0f0f0", gap: 5 }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "#fff" : "#404040" }}>{f.label}</Text>
-                  <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: active ? "rgba(255,255,255,0.25)" : "#d4d4d4", alignItems: "center", justifyContent: "center" }}>
-                    <Text style={{ fontSize: 9.5, fontWeight: "700", color: active ? "#fff" : "#fff", lineHeight: 13 }}>{count}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+      <StatusBar style="dark" />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
-          {/* Collect-more banner */}
+      <SubPageHeader
+        title="คูปองของฉัน"
+        subtitle={`${activeCount} คูปองพร้อมใช้`}
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+        bottomSlot={<FilterChips filter={filter} setFilter={setFilter} />}
+      />
+
+      <View style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}>
+          {/* Collect more */}
           <Pressable
             onPress={() => nav.navigate("CouponCollect")}
             className="flex-row items-center justify-between active:opacity-90"
-            style={{ backgroundColor: BRAND_GREEN, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderStyle: "dashed", paddingHorizontal: 14, paddingVertical: 14 }}
+            style={{ backgroundColor: BRAND_GREEN, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)", borderStyle: "dashed", paddingHorizontal: 14, paddingVertical: 14 }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
               <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center" }}>
@@ -127,7 +146,7 @@ export function CouponsScreen() {
 
           {filtered.length > 0 ? (
             filtered.map((c) => (
-              <CouponCard key={c.id} coupon={c} onUse={() => { Alert.alert("ใช้คูปอง", `ใช้โค้ด ${c.code} แล้ว`); }} />
+              <CouponCard key={c.id} coupon={c} onUse={() => Alert.alert("ใช้คูปอง", `ใช้โค้ด ${c.code} แล้ว`)} />
             ))
           ) : (
             <View style={{ alignItems: "center", paddingTop: 60 }}>
@@ -138,6 +157,10 @@ export function CouponsScreen() {
             </View>
           )}
         </ScrollView>
+
+        <LinearGradient pointerEvents="none" colors={["#fafafa", "rgba(250,250,250,0)"]} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }} />
+        <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 24 }} />
+      </View>
     </View>
   );
 }

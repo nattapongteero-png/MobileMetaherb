@@ -11,6 +11,7 @@ import {
   Dimensions,
   Modal,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -39,9 +40,11 @@ import { BottomFade } from "../components/BottomFade";
 import { GlassView } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
 import { ProductCard } from "../components/ProductCard";
-import { REAL_PRODUCTS } from "../data/realProducts";
+import { REAL_PRODUCTS, RAW_PRODUCT_BY_ID } from "../data/realProducts";
 import { useCart } from "../context/CartContext";
+import { useWishlist } from "../context/WishlistContext";
 import { shopForKey } from "../data/shops";
+import { GROUP_BY_ID, GALLERY_OVERRIDE } from "../data/productVariants";
 import { ShopAvatar } from "../components/ShopAvatar";
 import type { Product } from "../types/Product";
 import { STAR_YELLOW, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
@@ -210,14 +213,32 @@ export function ProductDetailScreen({ route }: Props) {
   const { product } = route.params;
   const { addToCart, count: cartCount } = useCart();
   const shop = shopForKey(product.id);
+  // Some products (coffee, honey, aromatic, …) merge several SKUs into one page.
+  const group = GROUP_BY_ID[product.id];
+  const variants = group
+    ? group.items.map((it) => ({
+        ...(RAW_PRODUCT_BY_ID[it.id] ?? product),
+        ...(it.custom ?? {}),
+        id: it.id,
+        label: it.label,
+      }))
+    : undefined;
+  // Only variant-group products show options; everything else is single-price
+  // with no option picker (no default sizes).
+  const noOptions = !variants;
 
   const [galleryIdx, setGalleryIdx] = useState(0);
   // Full-screen image viewer (tap a hero image to open; swipe between images).
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerStart, setViewerStart] = useState(0);
-  const [selectedOption, setSelectedOption] = useState(0);
+  // No option pre-selected — the user must pick one (standard e-commerce UX).
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [variantIdx, setVariantIdx] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [wishlisted, setWishlisted] = useState(false);
+  // Liked state comes from the shared wishlist so the heart reflects products
+  // already in "สินค้าที่ชอบ" and stays in sync when toggled.
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist();
+  const wishlisted = isWishlisted(product.id);
   const [showWishToast, setShowWishToast] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [flying, setFlying] = useState(false);
@@ -229,7 +250,7 @@ export function ProductDetailScreen({ route }: Props) {
 
   const onToggleWishlist = () => {
     const next = !wishlisted;
-    setWishlisted(next);
+    toggleWishlist(product.id);
 
     Animated.sequence([
       Animated.spring(heartScale, {
@@ -345,24 +366,70 @@ export function ProductDetailScreen({ route }: Props) {
   }, []);
 
   const stock = 10;
-  const priceColor = product.discountPercent ? "#bc1b06" : "#226a3b";
+  // Active view = the selected variant merged onto the product (no variants → the
+  // product itself). Image / name / price all follow the selected variant.
+  // Selected variant → its data. No variant chosen yet → cover/first photo +
+  // generic name, priced from the cheapest variant. Non-variant product → itself.
+  const cheapest = variants ? variants.reduce((a, b) => (b.price < a.price ? b : a)) : null;
+  const view =
+    variants && variantIdx !== null
+      ? { ...product, ...variants[variantIdx] }
+      : group && cheapest
+      ? {
+          ...product,
+          image: group.cover ?? cheapest.image,
+          name: group.name,
+          price: cheapest.price,
+          originalPrice: cheapest.originalPrice,
+          discountPercent: cheapest.discountPercent,
+        }
+      : product;
+  const priceColor = view.discountPercent ? "#bc1b06" : "#226a3b";
+  // The headline price reflects the chosen quantity (× unit price).
+  const qty = Math.max(1, quantity);
   // "สินค้าเหมาะกับคุณ" — other catalog products, excluding the current one.
   const recommended = REAL_PRODUCTS.filter((p) => p.id !== product.id).slice(0, 8);
 
   // Each product ships one real photo; repeat it so the hero stays swipeable
   // (the dots + counter signal "you can slide"). Same shot per slide on purpose.
-  const galleryImages = [product.image, product.image, product.image];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const galleryRef = useRef<any>(null);
+  // Variant products show every related photo (cover, if any, + each variant);
+  // plain products repeat their single shot so the hero still reads as swipeable.
+  const coverCount = group?.cover ? 1 : 0;
+  const galleryImages = group
+    ? group.cover
+      ? [group.cover, ...variants!.map((v) => v.image)]
+      : variants!.map((v) => v.image)
+    : GALLERY_OVERRIDE[product.id] ?? [view.image, view.image, view.image];
   const hasGallery = galleryImages.length > 1;
 
+  // Picking a variant scrolls the hero to its photo; deselecting returns to the
+  // first image. Manual swiping is unaffected.
+  useEffect(() => {
+    if (!group) return;
+    const target = variantIdx === null ? 0 : variantIdx + coverCount;
+    galleryRef.current?.scrollToOffset({ offset: target * SCREEN_WIDTH, animated: true });
+    setGalleryIdx(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantIdx]);
+
   const handleAddToCart = () => {
+    // Require an option choice first (no default is pre-selected), unless the
+    // product has no options at all.
+    const noChoice = !noOptions && (variants ? variantIdx === null : selectedOption === null);
+    if (noChoice) {
+      Alert.alert("เลือกตัวเลือกสินค้า", "กรุณาเลือกตัวเลือกก่อนเพิ่มลงตะกร้า");
+      return;
+    }
     // Actually add the line to the shared cart (badge + CartScreen update).
     addToCart({
-      id: `p-${product.id}-${selectedOption}`,
-      name: product.name,
-      option: `ขนาด ${OPTIONS[selectedOption]}`,
-      price: product.price,
-      originalPrice: product.originalPrice,
-      image: product.image,
+      id: `p-${view.id}-${variants ? variantIdx : selectedOption}`,
+      name: view.name,
+      option: noOptions ? "" : variants ? variants[variantIdx!].label : `ขนาด ${OPTIONS[selectedOption!]}`,
+      price: view.price,
+      originalPrice: view.originalPrice,
+      image: view.image,
       quantity,
       shop: shop.name,
     });
@@ -405,6 +472,7 @@ export function ProductDetailScreen({ route }: Props) {
           }}
         >
           <Animated.FlatList
+            ref={galleryRef}
             data={galleryImages}
             keyExtractor={(_: unknown, i: number) => `g-${i}`}
             horizontal
@@ -528,9 +596,9 @@ export function ProductDetailScreen({ route }: Props) {
               }}
             >
               <Text style={{ fontSize: 24, fontWeight: "700", color: "#bc1b06", lineHeight: 28 }}>
-                ฿{product.price.toFixed(0)}
+                ฿{(view.price * qty).toFixed(0)}
               </Text>
-              {product.originalPrice ? (
+              {view.originalPrice ? (
                 <Text
                   style={{
                     fontSize: 14,
@@ -538,10 +606,10 @@ export function ProductDetailScreen({ route }: Props) {
                     textDecorationLine: "line-through",
                   }}
                 >
-                  ฿{product.originalPrice.toFixed(0)}
+                  ฿{(view.originalPrice * qty).toFixed(0)}
                 </Text>
               ) : null}
-              {product.discountPercent ? (
+              {view.discountPercent ? (
                 <View
                   style={{
                     backgroundColor: "#e62e05",
@@ -551,7 +619,7 @@ export function ProductDetailScreen({ route }: Props) {
                   }}
                 >
                   <Text style={{ color: "white", fontSize: 11, fontWeight: "600", lineHeight: 14 }}>
-                    -{product.discountPercent}%
+                    -{view.discountPercent}%
                   </Text>
                 </View>
               ) : null}
@@ -571,9 +639,9 @@ export function ProductDetailScreen({ route }: Props) {
           {!product.isFlashSale ? (
             <View className="flex-row items-center" style={{ gap: 10, marginBottom: 10 }}>
               <Text style={{ fontSize: 26, fontWeight: "700", color: priceColor, lineHeight: 30 }}>
-                ฿{product.price.toFixed(0)}
+                ฿{(view.price * qty).toFixed(0)}
               </Text>
-              {product.originalPrice ? (
+              {view.originalPrice ? (
                 <Text
                   style={{
                     fontSize: 14,
@@ -581,10 +649,10 @@ export function ProductDetailScreen({ route }: Props) {
                     textDecorationLine: "line-through",
                   }}
                 >
-                  ฿{product.originalPrice.toFixed(0)}
+                  ฿{(view.originalPrice * qty).toFixed(0)}
                 </Text>
               ) : null}
-              {product.discountPercent ? (
+              {view.discountPercent ? (
                 <View
                   style={{
                     backgroundColor: "#e62e05",
@@ -594,7 +662,7 @@ export function ProductDetailScreen({ route }: Props) {
                   }}
                 >
                   <Text style={{ color: "white", fontSize: 11, fontWeight: "600", lineHeight: 14 }}>
-                    -{product.discountPercent}%
+                    -{view.discountPercent}%
                   </Text>
                 </View>
               ) : null}
@@ -611,7 +679,7 @@ export function ProductDetailScreen({ route }: Props) {
               marginBottom: 10,
             }}
           >
-            {product.name}
+            {view.name}
           </Text>
 
           {/* Rating + sold row */}
@@ -652,19 +720,32 @@ export function ProductDetailScreen({ route }: Props) {
           className="bg-white"
           style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}
         >
-          <Text style={{ fontSize: 14, color: "#525252", marginBottom: 10, lineHeight: 18 }}>
-            ตัวเลือกสินค้า
-          </Text>
-          <View className="flex-row flex-wrap" style={{ gap: 8, marginBottom: 16 }}>
-            {OPTIONS.map((opt, i) => (
-              <OptionPill
-                key={opt}
-                label={opt}
-                active={selectedOption === i}
-                onPress={() => setSelectedOption(i)}
-              />
-            ))}
-          </View>
+          {!noOptions ? (
+            <>
+              <Text style={{ fontSize: 14, color: "#525252", marginBottom: 10, lineHeight: 18 }}>
+                ตัวเลือกสินค้า
+              </Text>
+              <View className="flex-row flex-wrap" style={{ gap: 8, marginBottom: 16 }}>
+                {variants
+                  ? variants.map((v, i) => (
+                      <OptionPill
+                        key={v.id}
+                        label={v.label}
+                        active={variantIdx === i}
+                        onPress={() => setVariantIdx((cur) => (cur === i ? null : i))}
+                      />
+                    ))
+                  : OPTIONS.map((opt, i) => (
+                      <OptionPill
+                        key={opt}
+                        label={opt}
+                        active={selectedOption === i}
+                        onPress={() => setSelectedOption((cur) => (cur === i ? null : i))}
+                      />
+                    ))}
+              </View>
+            </>
+          ) : null}
 
           <Text style={{ fontSize: 14, color: "#525252", marginBottom: 10, lineHeight: 18 }}>
             จำนวนสินค้า
@@ -738,7 +819,7 @@ export function ProductDetailScreen({ route }: Props) {
           {[
             ["น้ำหนักสุทธิ:", "150 กรัม"],
             ["ประเภท:", "สมุนไพรอบแห้ง"],
-            ["รหัสสินค้า:", `MH-${product.id.toUpperCase()}-2569`],
+            ["รหัสสินค้า:", `MH-${view.id.toUpperCase()}-2569`],
             ["รูปแบบ:", "แบ่งบรรจุ"],
           ].map(([k, v]) => (
             <View
@@ -1150,7 +1231,7 @@ export function ProductDetailScreen({ route }: Props) {
           }}
         >
           <Image
-            source={product.image}
+            source={view.image}
             style={{ width: "100%", height: "100%" }}
             resizeMode="cover"
           />

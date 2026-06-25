@@ -12,12 +12,20 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
-import { X, Search, MapPin } from "lucide-react-native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import { X, Search, MapPin, Check } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { usePayment } from "../context/PaymentContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import { POSTAL_CODES, type PostalEntry } from "../data/thaiPostalCodes";
+import type { RootStackParamList } from "../navigation/RootStack";
+
+const formatPhone = (raw: string) => {
+  const d = raw.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+};
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
@@ -49,17 +57,21 @@ const hintStyle = { fontSize: 12, color: "#9ca3af", marginTop: 2, marginLeft: 6 
 export function AddAddressScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
-  const { addAddress } = usePayment();
+  const { addAddress, updateAddress, addresses } = usePayment();
 
-  const [firstName, setFirstName] = useState("");
+  // Edit mode when an id is passed (from "ที่อยู่ของฉัน"); otherwise add.
+  const editId = useRoute<RouteProp<RootStackParamList, "AddAddress">>().params?.id;
+  const editing = editId ? addresses.find((a) => a.id === editId) : undefined;
+
+  const [firstName, setFirstName] = useState(editing?.name ?? "");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [line, setLine] = useState("");
+  const [phone, setPhone] = useState(editing?.phone ?? "");
+  const [line, setLine] = useState(editing?.detail ?? "");
   const [zip, setZip] = useState("");
   const [subdistrict, setSubdistrict] = useState("");
   const [district, setDistrict] = useState("");
   const [province, setProvince] = useState("");
-  const [isDefault, setIsDefault] = useState(false);
+  const [isDefault, setIsDefault] = useState(editing?.isDefault ?? false);
   const [postalOpen, setPostalOpen] = useState(false);
   const [postalQuery, setPostalQuery] = useState("");
 
@@ -85,14 +97,18 @@ export function AddAddressScreen() {
     setPostalQuery("");
   };
 
+  // New address needs a full postal selection; editing can keep its existing area.
   const canSave =
-    firstName.trim() !== "" && phone.trim() !== "" && line.trim() !== "" && zip.trim() !== "" && province !== "";
+    firstName.trim() !== "" && phone.trim() !== "" && line.trim() !== "" &&
+    (editing ? true : zip.trim() !== "" && province !== "");
 
   const save = () => {
     if (!canSave) return;
     const name = `${firstName.trim()} ${lastName.trim()}`.trim();
-    const area = [subdistrict, district, province, zip].filter(Boolean).join(" ");
-    addAddress({ name, phone: phone.trim(), detail: line.trim(), area, isDefault });
+    const area = [subdistrict, district, province, zip].filter(Boolean).join(" ") || editing?.area || "";
+    const payload = { name, phone: phone.trim(), detail: line.trim(), area, isDefault };
+    if (editing) updateAddress(editing.id, payload);
+    else addAddress(payload);
     nav.goBack();
   };
 
@@ -108,12 +124,14 @@ export function AddAddressScreen() {
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>
-        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>เพิ่มที่อยู่ใหม่</Text>
-        <View style={{ width: 44 }} />
+        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{editing ? "แก้ไขที่อยู่" : "เพิ่มที่อยู่ใหม่"}</Text>
+        <GlassIconButton onPress={save} disabled={!canSave} size={44} accessibilityLabel="บันทึก" tintColor="rgba(49,151,84,0.22)">
+          <Check size={22} color={BRAND_GREEN_DARK} strokeWidth={3} />
+        </GlassIconButton>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -128,7 +146,7 @@ export function AddAddressScreen() {
         </View>
 
         <Field label="เบอร์โทรศัพท์" required>
-          <TextInput value={phone} onChangeText={setPhone} placeholder="เบอร์โทรศัพท์" placeholderTextColor="#9ca3af" keyboardType="phone-pad" style={inputStyle} />
+          <TextInput value={phone} onChangeText={(t) => setPhone(formatPhone(t))} placeholder="เบอร์โทรศัพท์" placeholderTextColor="#9ca3af" keyboardType="phone-pad" maxLength={12} style={inputStyle} />
         </Field>
 
         <View style={{ gap: 0 }}>
@@ -172,17 +190,6 @@ export function AddAddressScreen() {
           <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ false: "#d1d5db", true: BRAND_GREEN }} thumbColor="#fff" />
         </View>
       </ScrollView>
-
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 12 }}>
-        <Pressable
-          onPress={save}
-          disabled={!canSave}
-          className="active:opacity-80 items-center justify-center"
-          style={{ height: 52, borderRadius: 999, backgroundColor: canSave ? BRAND_GREEN : "#cbd5cb" }}
-        >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>บันทึกที่อยู่</Text>
-        </Pressable>
-      </View>
 
       {/* Postal-code search — page-sheet modal (same style as เพิ่มที่อยู่ใหม่) */}
       <Modal

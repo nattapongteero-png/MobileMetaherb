@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { RAW_PRODUCT_BY_ID, getRealProductImage } from "../data/realProducts";
+import { shopForKey } from "../data/shops";
 
 export type CartItem = {
   id: string;
@@ -28,42 +30,36 @@ type CartValue = {
   removeMany: (ids: string[]) => void;
 };
 
-// Seed the cart with the previous mock contents so existing screens look the
-// same on first open; new additions append to this single source of truth.
+// Build a cart line straight from a real catalog product (the same source the
+// shop / product-detail pages read) so name, price, discount, photo and shop
+// all match what the buyer actually sees in store — no drifting mock copies.
+// The shop is resolved via shopForKey(id), exactly like ProductDetailScreen.
+function lineFromProduct(
+  id: string,
+  opts: { option: string; quantity: number; inStock?: boolean },
+): CartItem {
+  const p = RAW_PRODUCT_BY_ID[id];
+  return {
+    id: `c-${id}`,
+    name: p.name,
+    option: opts.option,
+    price: p.price,
+    originalPrice: p.originalPrice,
+    quantity: opts.quantity,
+    inStock: opts.inStock ?? true,
+    image: getRealProductImage(id),
+    shop: shopForKey(id).name,
+  };
+}
+
+// Seed the cart with real in-store products spread across three shops — gives
+// the supplier-grouped Cart / PR / RFQ views something faithful to render, and
+// keeps one out-of-stock line so the "สินค้าหมด" path stays exercised.
 const SEED: CartItem[] = [
-  {
-    id: "c1",
-    name: "อบเชยเทศ Cinnamon Varum 150g",
-    option: "ขนาด 150g",
-    price: 199,
-    originalPrice: 330,
-    quantity: 2,
-    inStock: true,
-    image: require("../../assets/products/catalog/product-37.jpg"),
-    shop: "METAHERB Store",
-  },
-  {
-    id: "c2",
-    name: "เมต้าเฮิร์บ ยาดมสมุนไพร แดง+น้ำเงิน",
-    option: "เซต 2 ขวด",
-    price: 89,
-    originalPrice: 150,
-    quantity: 1,
-    inStock: true,
-    image: require("../../assets/products/catalog/product-10.jpg"),
-    shop: "METAHERB Store",
-  },
-  {
-    id: "c3",
-    name: "กาแฟดริป Dark Roast Arabica 9 ซอง",
-    option: "Dark Roast",
-    price: 220,
-    originalPrice: 320,
-    quantity: 1,
-    inStock: false,
-    image: require("../../assets/products/catalog/product-03.png"),
-    shop: "บ้านสมุนไพรไทย",
-  },
+  lineFromProduct("37", { option: "ขนาด 150 g", quantity: 2 }),        // อบเชยเทศ Cinnamon Varum (Alba) — บ้านสมุนไพรไทย
+  lineFromProduct("10", { option: "เซ็ต Aromatic คละกลิ่น", quantity: 1 }), // สมุนไพรหอม Aromatic Herbals — บ้านสมุนไพรไทย
+  lineFromProduct("3", { option: "Medium Roast · 9 ซอง", quantity: 1 }),  // กาแฟดริป Signature Blend — METAHERB Store
+  lineFromProduct("35", { option: "เม็ดแห้ง 100 g", quantity: 1, inStock: false }), // ลูกจันทน์เทศ Nutmeg — กรีนลีฟ ออร์แกนิก
 ];
 
 const CartContext = createContext<CartValue | null>(null);

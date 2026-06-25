@@ -13,6 +13,7 @@ import { SAVED_CARDS } from "../data/savedCards";
 import { CardBrandIcon } from "../components/CardBrandIcon";
 import { maskPhone } from "./TrueMoneyLinkScreen";
 import { usePayment } from "../context/PaymentContext";
+import { useSecurity } from "../context/SecurityContext";
 import { SHIPPING_METHODS } from "../data/shippingMethods";
 import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
 import { CHECKOUT_ITEMS as ITEMS } from "../data/checkoutItems";
@@ -55,6 +56,7 @@ const groupNum = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 export function PaymentScreen() {
   const nav = useNavigation<Nav>();
+  const { requirePin } = useSecurity();
   const insets = useSafeAreaInsets();
   // Payment selection lives in context so it survives the picker + TrueMoney
   // link modals without passing callbacks/params across the stack.
@@ -99,7 +101,14 @@ export function PaymentScreen() {
   const openShippingSheet = () => nav.navigate("ShippingMethod");
   const openCouponSheet = () => nav.navigate("CouponSelect");
 
-  const placeOrder = () => {
+  // Card / bank payments must be confirmed with the security PIN (if set).
+  const needsPin = !!selectedCard || !!BANK_APPS.find((a) => a.id === selectedPayment);
+
+  const placeOrder = async () => {
+    if (needsPin) {
+      const ok = await requirePin("ยืนยันรหัส PIN เพื่อชำระเงิน");
+      if (!ok) return;
+    }
     const orderId = `MH${Date.now().toString().slice(-9)}`;
     // PromptPay → show a QR for the amount; other methods → straight to success.
     if (selectedPayment === "promptpay") {
@@ -326,6 +335,8 @@ export function PaymentScreen() {
                   <Image source={selectedShippingMethod.image} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 ) : selectedShippingMethod.express ? (
                   <Zap size={20} color="#f59e0b" fill="#f59e0b" />
+                ) : selectedShippingMethod.pickup ? (
+                  <Store size={20} color="#319754" />
                 ) : (
                   <Text style={{ fontSize: 10, fontWeight: "700", color: "#0a0a0a", lineHeight: 13 }}>
                     {selectedShippingMethod.code}
@@ -613,7 +624,10 @@ export function PaymentScreen() {
               gap: 12,
             }}
           >
-            <View style={{ flex: 1, paddingLeft: 2 }}>
+            {/* Price inset = 28px from the glass edge (paddingHorizontal 16 + 12),
+                matching the cart's collapsed total (glassPadX 12 + block 16) so
+                the two floating bars read identically — Jakob's Law. */}
+            <View style={{ flex: 1, paddingLeft: 12 }}>
               <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ยอดชำระทั้งสิ้น</Text>
               <Text
                 numberOfLines={1}

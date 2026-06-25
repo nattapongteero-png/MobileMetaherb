@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Image, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Bell, ChevronLeft, Search, ShoppingCart } from "lucide-react-native";
@@ -113,25 +113,29 @@ export function BrandHeader({
     outputRange: [1, 0.2, 0],
     extrapolate: "clamp",
   });
-  // Icons crossfade from the top row into the search row at the same pixel.
-  const searchIconsOpacity = sy.interpolate({
-    inputRange: [0, TOP_ROW_HEIGHT * 0.4, TOP_ROW_HEIGHT],
-    outputRange: [0, 0.4, 1],
-    extrapolate: "clamp",
-  });
-  const iconsTranslateY = sy.interpolate({
-    inputRange: [0, TOP_ROW_HEIGHT],
-    outputRange: [-TOP_ROW_HEIGHT, 0],
-    extrapolate: "clamp",
-  });
-  // Room the 44px glass icons need in the search row (at right:18, gap 12),
-  // keeping a ~12px gap from the search bar: 2 icons ≈ 118, 1 icon ≈ 64.
-  const iconsRoom = showBell ? 118 : 64;
-  const searchBarMarginRight = sy.interpolate({
-    inputRange: [0, TOP_ROW_HEIGHT],
-    outputRange: [0, iconsRoom],
-    extrapolate: "clamp",
-  });
+  // Direction-aware search row: hide when scrolling down, reveal when scrolling
+  // up (always shown near the top). The top row (logo + actions) stays put.
+  const SEARCH_ROW_HEIGHT = 70; // paddingTop 14 + bar 44 + paddingBottom 12
+  const searchVisible = useRef(new Animated.Value(1)).current;
+  const lastSearchY = useRef(0);
+  const searchTarget = useRef(1);
+  useEffect(() => {
+    const id = sy.addListener(({ value }) => {
+      const y = value;
+      const prev = lastSearchY.current;
+      lastSearchY.current = y;
+      let t = searchTarget.current;
+      if (y < 90) t = 1;
+      else if (y - prev > 6) t = 0;
+      else if (prev - y > 6) t = 1;
+      if (t !== searchTarget.current) {
+        searchTarget.current = t;
+        Animated.timing(searchVisible, { toValue: t, duration: 200, useNativeDriver: false }).start();
+      }
+    });
+    return () => sy.removeListener(id);
+  }, [sy, searchVisible]);
+  const searchRowHeight = searchVisible.interpolate({ inputRange: [0, 1], outputRange: [0, SEARCH_ROW_HEIGHT] });
 
   const leaves = (
     <View
@@ -223,8 +227,8 @@ export function BrandHeader({
         <Image source={LEAF_C} style={{ position: "absolute", top: 92, right: 14, width: 78, height: 78, opacity: 0.4, transform: [{ rotate: "85deg" }] }} resizeMode="contain" />
       </View>
 
-      {/* Collapsible top row: logo + wordmark + bell + cart */}
-      <Animated.View style={{ height: topRowHeight, opacity: topRowOpacity, overflow: "hidden" }}>
+      {/* Persistent top row: logo + wordmark + bell + cart — always visible */}
+      <View>
         <View
           className="flex-row items-center"
           style={{ height: TOP_ROW_HEIGHT, paddingLeft: 16, paddingRight: 18, gap: 12 }}
@@ -259,11 +263,11 @@ export function BrandHeader({
             accessibilityLabel="ตะกร้าสินค้า"
           />
         </View>
-      </Animated.View>
+      </View>
 
-      {/* Sticky search row — bar grows to full width as the icons fade out */}
-      <View style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12, paddingTop: 14 }}>
-        <Animated.View style={{ marginRight: searchBarMarginRight }}>
+      {/* Search row — full-width bar that hides on scroll-down, returns on scroll-up */}
+      <Animated.View style={{ height: searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
+        <View style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12, paddingTop: 14 }}>
           <View
             className="flex-row items-center rounded-full px-4"
             style={{
@@ -285,39 +289,8 @@ export function BrandHeader({
               style={{ flex: 1, marginLeft: 8, fontSize: 13, color: "#374151" }}
             />
           </View>
-        </Animated.View>
-
-        {/* Icons revealed in the search row as the top row collapses */}
-        <Animated.View
-          pointerEvents="box-none"
-          style={{
-            position: "absolute",
-            top: 4,
-            right: 18,
-            height: 44,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            opacity: searchIconsOpacity,
-            transform: [{ translateY: iconsTranslateY }],
-          }}
-        >
-          {showBell ? (
-            <GlassHeaderButton
-              onPress={onBell}
-              icon={<Bell size={20} color="#1a1a1a" />}
-              count={bellCount}
-              accessibilityLabel="การแจ้งเตือน"
-            />
-          ) : null}
-          <GlassHeaderButton
-            onPress={onCart}
-            icon={<ShoppingCart size={20} color="#1a1a1a" />}
-            count={effectiveCartCount}
-            accessibilityLabel="ตะกร้าสินค้า"
-          />
-        </Animated.View>
-      </View>
+        </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }

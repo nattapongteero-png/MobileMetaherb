@@ -23,6 +23,9 @@ type PaymentValue = {
   selectedAddressId: string;
   setSelectedAddressId: (id: string) => void;
   addAddress: (a: Omit<Address, "id">) => void;
+  updateAddress: (id: string, a: Omit<Address, "id">) => void;
+  removeAddress: (id: string) => void;
+  setDefaultAddress: (id: string) => void;
 };
 
 const PaymentContext = createContext<PaymentValue | null>(null);
@@ -45,13 +48,31 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   );
 
   const addAddress = (a: Omit<Address, "id">) => {
-    const id = `addr-${addresses.length + 1}`;
+    const id = `addr-${Date.now().toString(36)}`;
     setAddresses((prev) => {
       const cleared = a.isDefault ? prev.map((p) => ({ ...p, isDefault: false })) : prev;
       return [...cleared, { ...a, id }];
     });
     setSelectedAddressId(id);
   };
+
+  const updateAddress = (id: string, a: Omit<Address, "id">) =>
+    setAddresses((prev) => {
+      let next = prev.map((p) => (p.id === id ? { ...a, id } : p));
+      if (a.isDefault) next = next.map((p) => ({ ...p, isDefault: p.id === id }));
+      return next;
+    });
+
+  const removeAddress = (id: string) => {
+    setAddresses((prev) => prev.filter((p) => p.id !== id));
+    if (selectedAddressId === id) {
+      const remaining = addresses.filter((p) => p.id !== id);
+      setSelectedAddressId(remaining.find((p) => p.isDefault)?.id ?? remaining[0]?.id ?? "");
+    }
+  };
+
+  const setDefaultAddress = (id: string) =>
+    setAddresses((prev) => prev.map((p) => ({ ...p, isDefault: p.id === id })));
 
   return (
     <PaymentContext.Provider
@@ -70,6 +91,9 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
         selectedAddressId,
         setSelectedAddressId,
         addAddress,
+        updateAddress,
+        removeAddress,
+        setDefaultAddress,
       }}
     >
       {children}
