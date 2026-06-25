@@ -232,7 +232,8 @@ export function AccountScreen() {
       | "SellerRegister"
       | "SupplierRegister"
       | "BrandRegister"
-      | "NotificationTest",
+      | "NotificationTest"
+      | "MyShop",
   ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
@@ -518,6 +519,8 @@ export function AccountScreen() {
                 { label: "โหมดทดสอบร้านค้า", Icon: Store, toggle: { value: isSeller, onValueChange: setIsSeller } },
                 { label: "โหมดทดสอบ Supplier", Icon: Beaker, toggle: { value: isSupplier, onValueChange: setIsSupplier } },
                 { label: "โหมดทดสอบแบรนด์ทดสอบ", Icon: FlaskConical, toggle: { value: isTrialBrand, onValueChange: setIsTrialBrand } },
+                { label: "Owner Console (จัดการร้าน)", Icon: Store, onPress: () => go("MyShop") },
+                { label: "ตั้งค่าบนเว็บไซต์", Icon: Settings, onPress: () => go("Settings") },
               ]}
             />
           </View>

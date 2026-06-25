@@ -82,6 +82,7 @@ import { ChatScreen } from "../screens/ChatScreen";
 import { ChatListScreen } from "../screens/ChatListScreen";
 import { AIAssistantScreen } from "../screens/AIAssistantScreen";
 import { AIHistoryScreen } from "../screens/AIHistoryScreen";
+import { MyShopScreen } from "../screens/MyShopScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { GlassBackButton } from "../components/GlassBackButton";
 import { BRAND_GREEN } from "../theme/tokens";
@@ -154,6 +155,7 @@ export type RootStackParamList = {
   ChatList: undefined;
   AIAssistant: undefined;
   AIHistory: undefined;
+  MyShop: undefined;
   Cart: undefined;
   Payment: undefined;
   PromptPayQR: { total: number; orderId: string };
@@ -332,6 +334,7 @@ export function RootStack() {
       <Stack.Screen name="Chat" component={ChatScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="AIHistory" component={AIHistoryScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen
         name="Payment"
