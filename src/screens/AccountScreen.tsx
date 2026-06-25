@@ -110,7 +110,8 @@ export function AccountScreen() {
       | "TrialProducts"
       | "MyTrials"
       | "Chat"
-      | "AIAssistant",
+      | "AIAssistant"
+      | "MyShop",
   ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
@@ -284,7 +285,7 @@ export function AccountScreen() {
                 {
                   label: "ร้านค้าของฉัน",
                   Icon: Store,
-                  onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดร้านค้ากำลังพัฒนา"),
+                  onPress: () => go("MyShop"),
                 },
                 { label: "ตั้งค่าบนเว็บไซต์", Icon: ShieldCheck, onPress: () => go("Settings") },
               ]}

@@ -47,6 +47,7 @@ import { MyTrialsScreen } from "../screens/MyTrialsScreen";
 import { TrialRegisterScreen } from "../screens/TrialRegisterScreen";
 import { ChatScreen } from "../screens/ChatScreen";
 import { AIAssistantScreen } from "../screens/AIAssistantScreen";
+import { MyShopScreen } from "../screens/MyShopScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { GlassBackButton } from "../components/GlassBackButton";
 import { BRAND_GREEN } from "../theme/tokens";
@@ -90,6 +91,7 @@ export type RootStackParamList = {
   TrialRegister: undefined;
   Chat: undefined;
   AIAssistant: undefined;
+  MyShop: undefined;
   Cart: undefined;
   Payment: undefined;
   PromptPayQR: { total: number; orderId: string };
@@ -223,6 +225,7 @@ export function RootStack() {
       <Stack.Screen name="TrialRegister" component={TrialRegisterScreen} options={{ headerShown: true, title: "ลงทะเบียนนักรีวิว", animation: "slide_from_right" }} />
       <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: true, title: "แชทกับร้านค้า", animation: "slide_from_right" }} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ headerShown: true, title: "ผู้ช่วย AI", animation: "slide_from_right" }} />
+      <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen
         name="Payment"
