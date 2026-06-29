@@ -23,13 +23,13 @@ export function SplashScreen() {
     Animated.parallel([
       Animated.timing(leafOpacity, {
         toValue: 0.55,
-        duration: 900,
+        duration: 500,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
         toValue: 1,
-        duration: 480,
+        duration: 500,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
@@ -83,8 +83,8 @@ function LoadingDots() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(i * 160),
-          Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.timing(v, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
           Animated.delay((dots.length - 1 - i) * 160),
         ]),
       ),

@@ -60,7 +60,7 @@ export function BottomSheet({
       Animated.parallel([
         Animated.timing(backdropOpacity, {
           toValue: 1,
-          duration: 220,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.spring(translateY, {
@@ -75,12 +75,12 @@ export function BottomSheet({
       Animated.parallel([
         Animated.timing(backdropOpacity, {
           toValue: 0,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(translateY, {
           toValue: SCREEN_HEIGHT,
-          duration: 240,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {

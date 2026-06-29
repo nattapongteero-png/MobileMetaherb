@@ -278,13 +278,13 @@ export function ProductDetailScreen({ route }: Props) {
       Animated.sequence([
         Animated.timing(wishToastOpacity, {
           toValue: 1,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.delay(1600),
         Animated.timing(wishToastOpacity, {
           toValue: 0,
-          duration: 250,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
@@ -329,7 +329,7 @@ export function ProductDetailScreen({ route }: Props) {
     Animated.sequence([
       Animated.timing(cartBump, {
         toValue: 1.28,
-        duration: 170,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -352,14 +352,14 @@ export function ProductDetailScreen({ route }: Props) {
   const pingCounter = () => {
     Animated.timing(counterOpacity, {
       toValue: 1,
-      duration: 180,
+      duration: 300,
       useNativeDriver: true,
     }).start();
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       Animated.timing(counterOpacity, {
         toValue: 0,
-        duration: 350,
+        duration: 300,
         useNativeDriver: true,
       }).start();
     }, 2000);
@@ -444,7 +444,7 @@ export function ProductDetailScreen({ route }: Props) {
     flyAnim.setValue(0);
     Animated.timing(flyAnim, {
       toValue: 1,
-      duration: 700,
+      duration: 500,
       useNativeDriver: true,
     }).start(() => {
       setFlying(false);

@@ -130,9 +130,9 @@ export function CouponCollectScreen() {
     setShowToast(true);
     toastOpacity.setValue(0);
     Animated.sequence([
-      Animated.timing(toastOpacity, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(toastOpacity, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.delay(1400),
-      Animated.timing(toastOpacity, { toValue: 0, duration: 220, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
     ]).start(({ finished }) => {
       if (finished) setShowToast(false);
     });

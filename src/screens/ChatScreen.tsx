@@ -233,7 +233,7 @@ export function ChatScreen() {
 
   // Input bar widens on focus — side margins shrink 24 → 16 (matches the AI bar).
   const focusOn = useSharedValue(0);
-  useEffect(() => { focusOn.value = withTiming(focused ? 1 : 0, { duration: 240 }); }, [focused, focusOn]);
+  useEffect(() => { focusOn.value = withTiming(focused ? 1 : 0, { duration: 300 }); }, [focused, focusOn]);
   const composerPad = useAnimatedStyle(() => ({ paddingHorizontal: 16 }));
 
   // Opening this conversation clears its unread badge.

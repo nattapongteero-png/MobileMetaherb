@@ -107,7 +107,7 @@ export function AIAssistantScreen() {
     rot.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false);
     return () => cancelAnimation(rot);
   }, [rot]);
-  useEffect(() => { on.value = withTiming(focused ? 1 : 0, { duration: 260 }); }, [focused, on]);
+  useEffect(() => { on.value = withTiming(focused ? 1 : 0, { duration: 300 }); }, [focused, on]);
   const glowA = useAnimatedStyle(() => {
     const a = rot.value * TAU;
     return {
@@ -419,8 +419,8 @@ function AiSparkle() {
   useEffect(() => {
     // Sit idle for a (varied) few seconds, then a quick twinkle — not continuous.
     const twinkle = () => withSequence(
-      withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) }),
-      withTiming(0, { duration: 480, easing: Easing.in(Easing.quad) }),
+      withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 500, easing: Easing.in(Easing.quad) }),
     );
     t.value = withRepeat(
       withSequence(
@@ -450,7 +450,7 @@ type VoicePhase = "listening" | "thinking" | "speaking";
 function WaveBar({ index, color, active }: { index: number; color: string; active: boolean }) {
   const h = useSharedValue(0.25 + ((index % 4) * 0.18));
   useEffect(() => {
-    if (!active) { cancelAnimation(h); h.value = withTiming(0.18, { duration: 200 }); return; }
+    if (!active) { cancelAnimation(h); h.value = withTiming(0.18, { duration: 300 }); return; }
     const dur = 360 + ((index * 53) % 360);
     h.value = withRepeat(withTiming(1, { duration: dur, easing: Easing.inOut(Easing.ease) }), -1, true);
     return () => cancelAnimation(h);

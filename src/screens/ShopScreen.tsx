@@ -220,13 +220,13 @@ export function ShopScreen() {
       Animated.sequence([
         Animated.timing(toastOpacity, {
           toValue: 1,
-          duration: 200,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.delay(1600),
         Animated.timing(toastOpacity, {
           toValue: 0,
-          duration: 250,
+          duration: 300,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {

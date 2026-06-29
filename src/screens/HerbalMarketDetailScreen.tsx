@@ -244,7 +244,7 @@ export function HerbalMarketDetailScreen() {
     Animated.sequence([
       Animated.timing(cartBump, {
         toValue: 1.28,
-        duration: 170,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -296,10 +296,10 @@ export function HerbalMarketDetailScreen() {
   const counterOpacity = useRef(new Animated.Value(0)).current;
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingCounter = () => {
-    Animated.timing(counterOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    Animated.timing(counterOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      Animated.timing(counterOpacity, { toValue: 0, duration: 350, useNativeDriver: true }).start();
+      Animated.timing(counterOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     }, 2000);
   };
   useEffect(() => () => {
@@ -320,9 +320,9 @@ export function HerbalMarketDetailScreen() {
       setShowWishToast(true);
       wishToastOpacity.setValue(0);
       Animated.sequence([
-        Animated.timing(wishToastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(wishToastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.delay(1600),
-        Animated.timing(wishToastOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(wishToastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start(({ finished }) => {
         if (finished) setShowWishToast(false);
       });
@@ -386,7 +386,7 @@ export function HerbalMarketDetailScreen() {
     // Peak-End: fly the material image to the cart icon, then flip to ✓.
     setFlying(true);
     flyAnim.setValue(0);
-    Animated.timing(flyAnim, { toValue: 1, duration: 700, useNativeDriver: true }).start(() => {
+    Animated.timing(flyAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start(() => {
       setFlying(false);
       bumpCart();
       setAddedToCart(true);

@@ -138,6 +138,26 @@ Productivity soars when system response is **< 400 ms**.
 - Use skeleton loaders if a fetch will exceed 400 ms.
 - Animate state transitions with ~150–300 ms; longer feels sluggish.
 
+### Animation Timing — กฎ 100 / 300 / 500 ms
+หลักคุม "ความเร็ว" ของ animation + micro-interaction ให้ตรงกับการรับรู้ของสมอง
+(เร็วไป = หลอกตา/ไม่ทันเห็น, ช้าไป = รู้สึกอืด/รอ). เลือกช่วงเวลาตาม **ขนาดของการเปลี่ยนแปลง**:
+
+- **~100 ms — Immediate Feedback** (การตอบสนองทันทีต่อการกระทำ)
+  - ใช้กับ: กดปุ่ม (press/active state), ติ๊ก checkbox, toggle switch, ripple/scale-on-press.
+  - ทำไม: สมองรับรู้ว่า "ทันที" + รู้สึกควบคุมระบบได้. < 100 ms มองไม่ทัน, > 100 ms เริ่มรู้สึกหน่วง (lag).
+- **~300 ms — Transitions** (การเปลี่ยนผ่าน / การเคลื่อนที่ของออบเจกต์)
+  - ใช้กับ: เปิด/ปิด modal · bottom sheet · dropdown, expand/collapse การ์ด, slide รูป/แท็บ, การ์ดเลื่อนเข้า.
+  - ทำไม: เป็นช่วงที่ตา "เห็นการเคลื่อนไหวพอดี" — ไม่กะพริบหาย และไม่ช้าจนรู้สึกรอ. นี่คือ default ของ UI ส่วนใหญ่.
+- **≥ 500 ms — Major Transitions** (การเปลี่ยนแปลงใหญ่ / งานที่ใช้เวลาจริง)
+  - ใช้กับ: เปลี่ยนหน้าเต็มจอที่ต้องดึงความสนใจ, โหลดข้อมูลก้อนใหญ่, กระบวนการที่ระบบประมวลผลจริง (พร้อม loader).
+  - ทำไม: เกินครึ่งวินาทีสมองเริ่มรู้สึกว่า "กำลังรอ" → **อย่าใช้กับปุ่ม/interaction ทั่วไป**, ใช้เฉพาะตอนต้องการสื่อว่าระบบกำลังทำงานสำคัญ.
+
+**How to apply (โค้ดในโปรเจกต์นี้):**
+- Press feedback: `active:opacity-*` / `Animated.spring(scale)` สั้น ๆ (~100 ms).
+- Expand/collapse, sheet, tab slide: ~250–350 ms (เช่น `LayoutAnimation` duration ~300, `BottomSheet` spring). ยึด 300 ms เป็นค่ากลาง.
+- หลีกเลี่ยง animation > 500 ms บน interaction ที่ผู้ใช้กดบ่อย (รู้สึกอืด).
+- spring ที่ "เด้งช้า" อาจกินเวลารวม > 400 ms — ตั้ง damping/tension ให้จบไวพอ ถ้าไม่ใช่ major transition.
+
 ### Postel's Law
 Be liberal in what you accept, conservative in what you send.
 - Trim whitespace on inputs. Accept email case-insensitively.
@@ -333,6 +353,7 @@ Button, Input, Card (Product/Order/etc.), Modal/BottomSheet, Toast, Avatar, Badg
 | Reduce options on screen | Hick's Law, Choice Overload |
 | Make tap target reliable | Fitts's Law |
 | Make app feel responsive | Doherty Threshold, Aesthetic-Usability |
+| Pick an animation duration | Animation Timing — 100 ms (feedback) / 300 ms (transition) / 500 ms+ (major) |
 | Group related content | Proximity, Common Region, Uniform Connectedness |
 | Highlight a single action | Von Restorff, Selective Attention |
 | Help user finish a multi-step task | Goal-Gradient, Flow, Zeigarnik |
