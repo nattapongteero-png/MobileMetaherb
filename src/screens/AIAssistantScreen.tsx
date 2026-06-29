@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, Keyboard, Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
@@ -26,6 +26,7 @@ import { getRealProductImage } from "../data/realProducts";
 import { getSpeech } from "../utils/speech";
 import { getTts } from "../utils/tts";
 import { elevenSpeak, stopEleven } from "../utils/elevenlabs";
+import { voxSpeak, stopVox } from "../utils/voxtts";
 import { STATUS_LABEL } from "../data/orders";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -34,7 +35,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const AI_GRAD = ["#0088ff", "#6366f1", "#9747ff"] as const;
 const AI_PURPLE = "#6366f1";
-const META_AI = require("../../assets/meta-ai.png");
+const META_AI = require("../../assets/meta-ai.gif");
 const TAU = Math.PI * 2;
 const GLOW_R = 5; // how far the glow drifts off-center as it circles
 
@@ -82,7 +83,9 @@ const chipExit = new Keyframe({
 
 export function AIAssistantScreen() {
   const nav = useNavigation<Nav>();
-  const { messages, typing, send, quickReplyChips, markRead, newChat } = useAIAssistant();
+  const route = useRoute<RouteProp<RootStackParamList, "AIAssistant">>();
+  const { messages, typing, send, setPageContext, quickReplyChips, markRead, newChat } = useAIAssistant();
+  useEffect(() => { setPageContext(route.params?.context); }, [route.params, setPageContext]);
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
@@ -126,7 +129,7 @@ export function AIAssistantScreen() {
   // Bar widens on focus — side margins shrink 24 → 16.
   const composerPad = useAnimatedStyle(() => ({ paddingHorizontal: 16 }));
 
-  const onCamera = () => Alert.alert("กำลังพัฒนา", "ส่งรูปให้เมต้าช่วยวิเคราะห์ — กำลังพัฒนาเร็วๆ นี้ค่ะ");
+  const onCamera = () => Alert.alert("กำลังพัฒนา", "ส่งรูปให้เมต้าช่วยวิเคราะห์ — กำลังพัฒนาเร็วๆ นี้ครับ");
 
   const cleanupSubs = () => { subsRef.current.forEach((s) => s.remove()); subsRef.current = []; };
 
@@ -171,7 +174,7 @@ export function AIAssistantScreen() {
 
   const enterVoice = async () => {
     const S = getSpeech();
-    if (!S) { Alert.alert("ยังไม่พร้อม", "โหมดสนทนาด้วยเสียงต้องอัปเดต/รีบิลด์แอปก่อนนะคะ"); return; }
+    if (!S) { Alert.alert("ยังไม่พร้อม", "โหมดสนทนาด้วยเสียงต้องอัปเดต/รีบิลด์แอปก่อนนะครับ"); return; }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod = S.ExpoSpeechRecognitionModule as any;
     try {
@@ -192,6 +195,7 @@ export function AIAssistantScreen() {
     try { (getSpeech()?.ExpoSpeechRecognitionModule as any)?.abort?.(); } catch { /* noop */ }
     try { getTts()?.stop(); } catch { /* noop */ }
     try { stopEleven(); } catch { /* noop */ }
+    try { stopVox(); } catch { /* noop */ }
     cleanupSubs();
     setVoiceMode(false);
     setInterim("");
@@ -212,12 +216,15 @@ export function AIAssistantScreen() {
     spokenRef.current = last.id;
     setVoicePhase("speaking");
     const resume = () => { if (voiceModeRef.current) setTimeout(() => { if (voiceModeRef.current) beginListen(); }, 350); };
-    // Human-like voice via ElevenLabs; fall back to the system voice if it's unavailable.
-    elevenSpeak(txt, resume).then((ok) => {
-      if (ok) return;
-      const T = getTts();
-      if (!T) { resume(); return; }
-      T.speak(txt, { language: "th-TH", voice: voiceIdRef.current, pitch: 1.05, rate: 0.94, onDone: resume, onError: resume });
+    // Thai voice via VoxCPM → ElevenLabs → system voice (each falls back if unavailable).
+    voxSpeak(txt, resume).then((vok) => {
+      if (vok) return;
+      elevenSpeak(txt, resume).then((ok) => {
+        if (ok) return;
+        const T = getTts();
+        if (!T) { resume(); return; }
+        T.speak(txt, { language: "th-TH", voice: voiceIdRef.current, pitch: 1.05, rate: 0.94, onDone: resume, onError: resume });
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, typing, voiceMode]);
@@ -229,6 +236,7 @@ export function AIAssistantScreen() {
     try { (getSpeech()?.ExpoSpeechRecognitionModule as any)?.abort?.(); } catch { /* noop */ }
     try { getTts()?.stop(); } catch { /* noop */ }
     try { stopEleven(); } catch { /* noop */ }
+    try { stopVox(); } catch { /* noop */ }
   }, []);
 
   // Pick the most natural Thai voice the OS has (Premium > Enhanced > compact).
@@ -478,7 +486,7 @@ function Dots() {
 function VoiceBar({ phase, interim, onExit }: { phase: VoicePhase; interim: string; onExit: () => void }) {
   const speaking = phase === "speaking";
   const thinking = phase === "thinking";
-  const label = thinking ? "เมต้ากำลังคิด…" : speaking ? "เมต้ากำลังพูด…" : (interim || "กำลังฟัง… พูดได้เลยค่ะ");
+  const label = thinking ? "เมต้ากำลังคิด…" : speaking ? "เมต้ากำลังพูด…" : (interim || "กำลังฟัง… พูดได้เลยครับ");
   // Grand voice bar: an emerald↔teal aura orbits behind, a jewel-tone gradient
   // base, a breathing sheen on top, and the whole bar gently pulses in scale.
   const orbit = useSharedValue(0);
@@ -535,16 +543,13 @@ function EmptyState({ onChip, topPad = 0 }: { onChip: (s: string) => void; topPa
     return () => clearInterval(t);
   }, []);
 
-  // Idle animation — META AI gently floats and sways so it feels alive.
+  // Idle float — the orb gently bobs; the GIF handles the character's own motion.
   const bob = useSharedValue(0);
-  const sway = useSharedValue(0);
   useEffect(() => {
     bob.value = withRepeat(withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.quad) }), -1, true);
-    sway.value = withRepeat(withTiming(1, { duration: 2300, easing: Easing.inOut(Easing.quad) }), -1, true);
-    return () => { cancelAnimation(bob); cancelAnimation(sway); };
-  }, [bob, sway]);
+    return () => { cancelAnimation(bob); };
+  }, [bob]);
   const orbFloat = useAnimatedStyle(() => ({ transform: [{ translateY: -6 * bob.value }] }));
-  const charSway = useAnimatedStyle(() => ({ transform: [{ rotate: `${sway.value * 8 - 4}deg` }, { scale: 0.97 + 0.05 * bob.value }] }));
 
   return (
     <Pressable onPress={() => Keyboard.dismiss()} style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, paddingTop: topPad, paddingBottom: 40 }}>
@@ -556,10 +561,10 @@ function EmptyState({ onChip, topPad = 0 }: { onChip: (s: string) => void; topPa
           tintColor="rgba(255,255,255,0.6)"
           style={{ width: 88, height: 88, borderRadius: 44, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}
         >
-          <Animated.Image source={META_AI} style={[{ width: 76, height: 76 }, charSway]} resizeMode="contain" />
+          <Image source={META_AI} style={{ width: 76, height: 76 }} resizeMode="contain" />
         </GlassView>
       </Animated.View>
-      <Text style={{ fontSize: 18, fontWeight: "600", color: "#1a1a1a", textAlign: "center", marginBottom: 22 }}>สวัสดีค่ะ มีอะไรให้เมต้าช่วยไหมคะ</Text>
+      <Text style={{ fontSize: 18, fontWeight: "600", color: "#1a1a1a", textAlign: "center", marginBottom: 22 }}>สวัสดีครับ มีอะไรให้เมต้าช่วยไหมครับ</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, minHeight: 100 }}>
         {chips.map((c, i) => {
           const Icon = iconFor(c);
@@ -656,25 +661,49 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
       {m.kind === "bundle" && (
         <View style={card}>
           <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 10 }}>{m.text}</Text>
-          <LinearGradient colors={["#46c474", BRAND_GREEN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 14, padding: 12, marginBottom: 12 }}>
-            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>📦 {m.name}</Text>
-            {m.items.map((p) => (
-              <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 6 }}>
-                <Image source={getRealProductImage(p.id)} style={{ width: 28, height: 28, borderRadius: 6 }} />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, color: "#fff" }}>{p.name}</Text>
-                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.9)" }}>฿{p.price.toLocaleString()}</Text>
+
+          {/* Bundle surface — light & high-contrast; green reserved for accents */}
+          <View style={{ borderRadius: 16, borderWidth: 1, borderColor: "#e7efe9", backgroundColor: "#f7faf8", overflow: "hidden", marginBottom: 12 }}>
+            {/* Header: name + discount tag */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "rgba(49,151,84,0.08)" }}>
+              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "rgba(49,151,84,0.14)", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 15 }}>📦</Text>
               </View>
-            ))}
-            <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.3)", paddingTop: 8, marginTop: 4 }}>
-              <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", textDecorationLine: "line-through" }}>฿{m.total.toLocaleString()}</Text>
-              <Text style={{ fontSize: 18, color: "#fff", fontWeight: "700" }}>฿{m.finalPrice.toLocaleString()}</Text>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#1a1a1a" }}>{m.name}</Text>
+              <View style={{ backgroundColor: "#e62e05", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>-10%</Text>
+              </View>
             </View>
-            <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.9)", textAlign: "right" }}>ประหยัด ฿{m.discount.toLocaleString()} (10%)</Text>
-          </LinearGradient>
+
+            {/* Items */}
+            <View style={{ paddingHorizontal: 10 }}>
+              {m.items.map((p, i) => (
+                <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: i < m.items.length - 1 ? 1 : 0, borderBottomColor: "#ecf2ee" }}>
+                  <Image source={getRealProductImage(p.id)} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
+                  <Text numberOfLines={2} style={{ flex: 1, fontSize: 12.5, color: "#262626", lineHeight: 17 }}>{p.name}</Text>
+                  <Text style={{ fontSize: 12.5, color: "#525252", fontWeight: "600" }}>฿{p.price.toLocaleString()}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Footer: total → final price */}
+            <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: "#e7efe9", backgroundColor: "#fff" }}>
+              <View>
+                <Text style={{ fontSize: 11, color: "#a3a3a3" }}>ราคารวม</Text>
+                <Text style={{ fontSize: 13, color: "#a3a3a3", textDecorationLine: "line-through" }}>฿{m.total.toLocaleString()}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 22, color: BRAND_GREEN_DARK, fontWeight: "800", lineHeight: 26 }}>฿{m.finalPrice.toLocaleString()}</Text>
+                <Text style={{ fontSize: 11, color: BRAND_GREEN, fontWeight: "700" }}>ประหยัด ฿{m.discount.toLocaleString()}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* CTA */}
           <PressableScale onPress={() => m.items.forEach((p) => onSend(`เพิ่ม ${p.name} ใส่ตะกร้า`))}>
-            <View style={{ height: 44, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <View style={{ height: 46, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <ShoppingCart size={16} color="#fff" strokeWidth={2.4} />
-              <Text style={{ fontSize: 14, color: "#fff", fontWeight: "600" }}>เพิ่มทั้งชุดเข้าตะกร้า</Text>
+              <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>เพิ่มทั้งชุดเข้าตะกร้า</Text>
             </View>
           </PressableScale>
         </View>
@@ -700,35 +729,46 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
 
       {m.kind === "cart" && (
         <View style={card}>
-          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: m.items.length ? 8 : 0 }}>{m.text}</Text>
+          <Text style={{ fontSize: 13.5, color: "#333", marginBottom: m.items.length ? 10 : 0 }}>{m.text}</Text>
+
           {m.items.length > 0 && (
-            <View style={{ gap: 4 }}>
-              {m.items.map((it) => (
-                <View key={it.id} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                  <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: "#555" }}>×{it.quantity} {it.name}</Text>
-                  <Text style={{ fontSize: 12.5, color: BRAND_GREEN, fontWeight: "600" }}>฿{(it.price * it.quantity).toLocaleString()}</Text>
-                </View>
-              ))}
-              <View style={{ flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#f0f0f0", paddingTop: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 13, color: "#444", fontWeight: "600" }}>ยอดรวม</Text>
-                <Text style={{ fontSize: 15, color: BRAND_GREEN_DARK, fontWeight: "700" }}>฿{m.total.toLocaleString()}</Text>
+            <View style={{ borderRadius: 16, borderWidth: 1, borderColor: "#eee", backgroundColor: "#fafafa", overflow: "hidden", marginBottom: 10 }}>
+              {/* Items */}
+              <View style={{ paddingHorizontal: 10 }}>
+                {m.items.map((it, i) => (
+                  <View key={it.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: i < m.items.length - 1 ? 1 : 0, borderBottomColor: "#efefef" }}>
+                    <Image source={it.image ?? getRealProductImage(it.id.replace(/^c-/, ""))} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text numberOfLines={2} style={{ fontSize: 12.5, color: "#262626", lineHeight: 17 }}>{it.name}</Text>
+                      <Text style={{ fontSize: 11, color: "#a3a3a3", marginTop: 2 }}>฿{it.price.toLocaleString()} × {it.quantity}</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: "#262626", fontWeight: "700" }}>฿{(it.price * it.quantity).toLocaleString()}</Text>
+                  </View>
+                ))}
+              </View>
+              {/* Total */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 11, borderTopWidth: 1, borderTopColor: "#eee", backgroundColor: "#fff" }}>
+                <Text style={{ fontSize: 12.5, color: "#737373", fontWeight: "600" }}>ยอดรวม · {m.items.reduce((s, it) => s + it.quantity, 0)} ชิ้น</Text>
+                <Text style={{ fontSize: 18, color: BRAND_GREEN_DARK, fontWeight: "800" }}>฿{m.total.toLocaleString()}</Text>
               </View>
             </View>
           )}
+
           {m.promos.length > 0 && (
-            <View style={{ gap: 4, marginTop: 8 }}>
+            <View style={{ gap: 6, marginBottom: m.items.length > 0 ? 10 : 0 }}>
               {m.promos.map((p, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fde68a", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 }}>
+                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fde68a", paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12 }}>
                   <Sparkles size={12} color="#f59e0b" strokeWidth={2.4} style={{ marginTop: 1 }} />
                   <Text style={{ flex: 1, fontSize: 11.5, color: "#92400e", lineHeight: 16 }}><Text style={{ fontWeight: "700" }}>{p.title}</Text> — {p.body}</Text>
                 </View>
               ))}
             </View>
           )}
+
           {m.items.length > 0 && (
             <PressableScale onPress={() => onNav("Cart")}>
-              <View style={{ height: 40, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }}>
-                <Text style={{ fontSize: 13, color: "#fff", fontWeight: "600" }}>ดำเนินการชำระเงิน</Text>
+              <View style={{ height: 46, borderRadius: 999, backgroundColor: BRAND_GREEN, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>ดำเนินการชำระเงิน</Text>
                 <ArrowRight size={16} color="#fff" strokeWidth={2.4} />
               </View>
             </PressableScale>

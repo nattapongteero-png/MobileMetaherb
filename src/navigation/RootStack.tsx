@@ -83,6 +83,14 @@ import { ChatListScreen } from "../screens/ChatListScreen";
 import { AIAssistantScreen } from "../screens/AIAssistantScreen";
 import { AIHistoryScreen } from "../screens/AIHistoryScreen";
 import { MyShopScreen } from "../screens/MyShopScreen";
+import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
+import { ShopAccountScreen } from "../screens/ShopAccountScreen";
+import { ShopAddressScreen } from "../screens/ShopAddressScreen";
+import { ShopNotificationsScreen } from "../screens/ShopNotificationsScreen";
+import { ShopShippingScreen } from "../screens/ShopShippingScreen";
+import { ShopPayoutScreen } from "../screens/ShopPayoutScreen";
+import { SupplierInfoScreen } from "../screens/SupplierInfoScreen";
+import { BrandInfoScreen } from "../screens/BrandInfoScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { GlassBackButton } from "../components/GlassBackButton";
 import { BRAND_GREEN } from "../theme/tokens";
@@ -94,7 +102,7 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Login: undefined;
   Register: undefined;
-  ProductDetail: { product: Product };
+  ProductDetail: { product: Product; preview?: boolean };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
   OrderDetail: { orderId: string };
@@ -118,7 +126,7 @@ export type RootStackParamList = {
   Knowledge: { tab?: "articles" | "videos" } | undefined;
   Account: undefined;
   HerbalMarket: undefined;
-  HerbalMarketDetail: { id?: string } | undefined;
+  HerbalMarketDetail: { id?: string; preview?: boolean } | undefined;
   HerbalMarketPR: { id?: string; ids?: string[] } | undefined;
   HerbalMarketPurchase: { id?: string; qty?: number } | undefined;
   HerbalMarketQuote: { id?: string; ids?: string[] } | undefined;
@@ -153,9 +161,17 @@ export type RootStackParamList = {
   TrialRegister: undefined;
   Chat: { shopId?: string; shopName?: string } | undefined;
   ChatList: undefined;
-  AIAssistant: undefined;
+  AIAssistant: { context?: string } | undefined;
   AIHistory: undefined;
-  MyShop: undefined;
+  MyShop: { section?: string } | undefined;
+  MyShopMenu: { current?: string; onSelect?: (id: string) => void } | undefined;
+  ShopAccount: undefined;
+  ShopAddress: undefined;
+  ShopNotifications: undefined;
+  ShopShipping: undefined;
+  ShopPayout: undefined;
+  SupplierInfo: undefined;
+  BrandInfo: undefined;
   Cart: undefined;
   Payment: undefined;
   PromptPayQR: { total: number; orderId: string };
@@ -169,7 +185,7 @@ export type RootStackParamList = {
   TrueMoneyLink: undefined;
   Notification: undefined;
   ShopNotification: undefined;
-  Shop: { sort?: SortKey; category?: string; herbalSort?: HerbalSortKey; herbalCategory?: string } | undefined;
+  Shop: { shopName?: string; sort?: SortKey; category?: string; herbalSort?: HerbalSortKey; herbalCategory?: string } | undefined;
   ShopSort: { current?: SortKey; category?: string; categories?: string[] } | undefined;
   ShopHerbalFilter: { sort?: HerbalSortKey; category?: string; categories?: string[] } | undefined;
 };
@@ -335,6 +351,14 @@ export function RootStack() {
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="AIHistory" component={AIHistoryScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="MyShopMenu" component={MyShopMenuScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopAccount" component={ShopAccountScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopAddress" component={ShopAddressScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopNotifications" component={ShopNotificationsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopShipping" component={ShopShippingScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopPayout" component={ShopPayoutScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="SupplierInfo" component={SupplierInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="BrandInfo" component={BrandInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen
         name="Payment"

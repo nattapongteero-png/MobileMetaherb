@@ -804,6 +804,15 @@ export function HomeScreen() {
               </Text>
             </View>
 
+            {/* เมต้า AI — left of the bell */}
+            <GlassIconButton
+              onPress={() => nav.navigate("AIAssistant")}
+              size={44}
+              accessibilityLabel="ผู้ช่วย AI เมต้า"
+            >
+              <Sparkles size={20} color="#1a1a1a" />
+            </GlassIconButton>
+
             {/* Bell — same x as search-row bell (paddingRight 18 matches) */}
             <HeaderGlassButton
               onPress={() => nav.navigate("Notification")}

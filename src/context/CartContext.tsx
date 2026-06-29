@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { RAW_PRODUCT_BY_ID, getRealProductImage } from "../data/realProducts";
+import { RAW_PRODUCT_BY_ID, REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
 import { shopForKey } from "../data/shops";
 
 export type CartItem = {
@@ -33,7 +33,9 @@ type CartValue = {
 // Build a cart line straight from a real catalog product (the same source the
 // shop / product-detail pages read) so name, price, discount, photo and shop
 // all match what the buyer actually sees in store — no drifting mock copies.
-// The shop is resolved via shopForKey(id), exactly like ProductDetailScreen.
+// The shop comes from the catalog's own `shop` field (the authoritative owner used
+// by the storefront + detail page), falling back to the hash only for ids that are
+// merged away / absent from REAL_PRODUCTS — so cart groupings can't drift.
 function lineFromProduct(
   id: string,
   opts: { option: string; quantity: number; inStock?: boolean },
@@ -48,7 +50,7 @@ function lineFromProduct(
     quantity: opts.quantity,
     inStock: opts.inStock ?? true,
     image: getRealProductImage(id),
-    shop: shopForKey(id).name,
+    shop: REAL_PRODUCTS.find((rp) => rp.id === id)?.shop ?? shopForKey(id).name,
   };
 }
 

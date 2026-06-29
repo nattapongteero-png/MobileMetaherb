@@ -1,4 +1,4 @@
-import type { Product } from "../types/Product";
+import type { Product, ProductImage } from "../types/Product";
 import type { CategoryKey, TypeKey, CatalogProduct } from "./catalog";
 import { GROUP_BY_ID, MERGED_AWAY_IDS, IMAGE_OVERRIDE } from "./productVariants";
 
@@ -64,10 +64,14 @@ const CATALOG_IMAGES: number[] = [
   require("../../assets/products/catalog/product-43.png"),
 ];
 
-/** Photo for a real product id ("1"–"43"). Falls back to the first image. */
-export function getRealProductImage(id: string): number {
+/**
+ * Photo for a real product id. Custom photos in IMAGE_OVERRIDE win (e.g. ids
+ * 44/45 which have no slot in the 1–43 CATALOG_IMAGES array); otherwise the
+ * id→index image, falling back to the first image.
+ */
+export function getRealProductImage(id: string): ProductImage {
   const n = parseInt(id, 10);
-  return CATALOG_IMAGES[n - 1] ?? CATALOG_IMAGES[0];
+  return IMAGE_OVERRIDE[id] ?? CATALOG_IMAGES[n - 1] ?? CATALOG_IMAGES[0];
 }
 
 // Compact source rows — everything except the image, which is resolved by id.
@@ -150,15 +154,20 @@ ROWS.forEach((r) => {
 // "Same product" SKUs collapse into one card per group (cover/first photo +
 // generic name); the rest are hidden and only appear as detail-page options.
 export const REAL_PRODUCTS: CatalogProduct[] = ROWS.filter((r) => !MERGED_AWAY_IDS.has(r.id)).map(
-  (r) => {
+  (r, i) => {
+    // Per-shop ownership: split the catalog two ways by index so every product
+    // belongs to exactly one of the two non-flagship shops (METAHERB Store keeps
+    // its own curated SHOP_PRODUCTS list and is never sourced from here).
+    const shop = i % 2 === 0 ? "บ้านสมุนไพรไทย" : "กรีนลีฟ ออร์แกนิก";
     const raw = RAW_PRODUCT_BY_ID[r.id];
     const group = GROUP_BY_ID[r.id];
-    if (!group) return raw;
+    if (!group) return { ...raw, shop };
     // Keep the merged card in the Flash Sale rail if ANY variant is on flash
     // (else a merged-away SKU could drop the product out of that section).
     const flash = group.items.map((it) => RAW_PRODUCT_BY_ID[it.id]).find((p) => p?.isFlashSale);
     return {
       ...raw,
+      shop,
       name: group.name,
       image: group.cover ?? raw.image,
       ...(flash

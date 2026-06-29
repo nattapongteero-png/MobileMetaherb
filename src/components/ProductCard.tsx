@@ -100,14 +100,14 @@ function MiniCountdown({ initialSeconds }: { initialSeconds: number }) {
  * single definition avoids visual drift between surfaces (Jakob's Law +
  * Consistency Heuristic).
  */
-export function ProductCard({ product, width }: { product: Product; width: number }) {
+export function ProductCard({ product, width, preview }: { product: Product; width: number; preview?: boolean }) {
   const nav = useNavigation<Nav>();
   const tag = getCardTag(product);
   const priceColor = product.discountPercent ? "#e62e05" : "#226a3b";
 
   return (
     <Pressable
-      onPress={() => nav.navigate("ProductDetail", { product })}
+      onPress={() => nav.navigate("ProductDetail", { product, preview })}
       style={{
         width,
         height: 259,

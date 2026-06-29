@@ -1,21 +1,48 @@
 import { View, Text, Pressable } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { NavigationContainerRef } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Sparkles } from "lucide-react-native";
 import { useAIAssistant } from "../context/AIAssistantContext";
 import type { RootStackParamList } from "../navigation/RootStack";
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 const AI_GRAD = ["#0088ff", "#6366f1", "#9747ff"] as const;
+// Don't float the orb on the assistant itself / auth / its own history.
+const HIDE = new Set(["AIAssistant", "AIHistory", "Login", "Register"]);
 
-/** Floating "เมต้า" AI shopping-assistant button — opens the AIAssistant screen. */
-export function AIBubble({ bottom = 110, right = 16 }: { bottom?: number; right?: number }) {
-  const nav = useNavigation<Nav>();
+/** Build a short context note from the current screen so เมต้า knows what the user is looking at. */
+function contextFor(name?: string, params?: object): string | undefined {
+  if (name === "ProductDetail") {
+    const p = (params as { product?: { id: string; name: string; price: number } } | undefined)?.product;
+    if (p) return `สินค้า "${p.name}" (id ${p.id}, ราคา ฿${p.price})`;
+  }
+  return undefined;
+}
+
+/**
+ * Global floating "เมต้า" AI button — lives over every screen (rendered once in App).
+ * Opens the AIAssistant and passes the current screen as context (e.g. the product
+ * being viewed) so "ตัวนี้กินยังไง" / "มีถูกกว่าไหม" just work.
+ */
+export function AIBubble({
+  navRef,
+  routeName,
+  routeParams,
+  bottom = 110,
+  right = 16,
+}: {
+  navRef: NavigationContainerRef<RootStackParamList>;
+  routeName?: string;
+  routeParams?: object;
+  bottom?: number;
+  right?: number;
+}) {
   const { unreadCount } = useAIAssistant();
+  if (!routeName || HIDE.has(routeName)) return null;
+  const context = contextFor(routeName, routeParams);
+
   return (
     <Pressable
-      onPress={() => nav.navigate("AIAssistant")}
+      onPress={() => navRef.navigate("AIAssistant", context ? { context } : undefined)}
       accessibilityLabel="ผู้ช่วย AI เมต้า"
       hitSlop={8}
       style={({ pressed }) => ({ position: "absolute", bottom, right, zIndex: 50, transform: [{ scale: pressed ? 0.94 : 1 }] })}

@@ -43,7 +43,8 @@ import { ProductCard } from "../components/ProductCard";
 import { REAL_PRODUCTS, RAW_PRODUCT_BY_ID } from "../data/realProducts";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
-import { shopForKey } from "../data/shops";
+import { shopForKey, getShop } from "../data/shops";
+import { useShopName } from "../context/SellerContext";
 import { GROUP_BY_ID, GALLERY_OVERRIDE } from "../data/productVariants";
 import { ShopAvatar } from "../components/ShopAvatar";
 import type { Product } from "../types/Product";
@@ -210,9 +211,13 @@ function StepButton({ onPress, disabled, children }: { onPress: () => void; disa
 export function ProductDetailScreen({ route }: Props) {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { product } = route.params;
+  const { product, preview } = route.params;
   const { addToCart, count: cartCount } = useCart();
-  const shop = shopForKey(product.id);
+  // A storefront product carries its own shop; catalog products fall back to the
+  // deterministic hash. Either way the seller shown matches where it's listed.
+  const ownShop = (product as { shop?: string }).shop;
+  const shop = ownShop ? getShop(ownShop) : shopForKey(product.id);
+  const shopName = useShopName(shop.name); // own shop reflects the owner's edited name
   // Some products (coffee, honey, aromatic, …) merge several SKUs into one page.
   const group = GROUP_BY_ID[product.id];
   const variants = group
@@ -455,7 +460,7 @@ export function ProductDetailScreen({ route }: Props) {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: preview ? insets.bottom + 24 : 120 }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false },
@@ -849,7 +854,7 @@ export function ProductDetailScreen({ route }: Props) {
             {/* Name + metrics below the name */}
             <View className="flex-1">
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>
-                {shop.name}
+                {shopName}
               </Text>
               <View className="flex-row flex-wrap items-center" style={{ gap: 12, marginTop: 4 }}>
                 <View className="flex-row items-center" style={{ gap: 4 }}>
@@ -867,20 +872,24 @@ export function ProductDetailScreen({ route }: Props) {
               </View>
             </View>
 
-            {/* Circular action buttons */}
-            <Pressable
-              onPress={() => nav.navigate("Shop")}
-              className="active:opacity-70"
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
-            >
-              <Store size={18} color="#319754" />
-            </Pressable>
-            <Pressable
-              className="active:opacity-70"
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
-            >
-              <MessageCircle size={18} color="#319754" />
-            </Pressable>
+            {/* Circular action buttons — hidden in shop-owner preview */}
+            {!preview && (
+              <>
+                <Pressable
+                  onPress={() => nav.navigate("Shop", { shopName: shop.name })}
+                  className="active:opacity-70"
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Store size={18} color="#319754" />
+                </Pressable>
+                <Pressable
+                  className="active:opacity-70"
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
+                >
+                  <MessageCircle size={18} color="#319754" />
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
 
@@ -973,24 +982,26 @@ export function ProductDetailScreen({ route }: Props) {
           ))}
         </View>
 
-        {/* สินค้าเหมาะกับคุณ — recommended products rail */}
-        <View className="bg-white" style={{ paddingVertical: 16, marginTop: 8 }}>
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-            <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", lineHeight: 24 }}>
-              สินค้าเหมาะกับคุณ
-            </Text>
-            <Pressable
-              onPress={() => nav.navigate("Products")}
-              hitSlop={6}
-              className="flex-row items-center active:opacity-60"
-              style={{ gap: 4 }}
-            >
-              <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ดูทั้งหมด</Text>
-              <ChevronRight size={14} color="#737373" />
-            </Pressable>
+        {/* สินค้าเหมาะกับคุณ — recommended products rail (hidden in preview) */}
+        {!preview && (
+          <View className="bg-white" style={{ paddingVertical: 16, marginTop: 8 }}>
+            <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", lineHeight: 24 }}>
+                สินค้าเหมาะกับคุณ
+              </Text>
+              <Pressable
+                onPress={() => nav.navigate("Products")}
+                hitSlop={6}
+                className="flex-row items-center active:opacity-60"
+                style={{ gap: 4 }}
+              >
+                <Text style={{ fontSize: 12, color: "#737373", lineHeight: 16 }}>ดูทั้งหมด</Text>
+                <ChevronRight size={14} color="#737373" />
+              </Pressable>
+            </View>
+            <RecommendedPager products={recommended} />
           </View>
-          <RecommendedPager products={recommended} />
-        </View>
+        )}
         </View>
       </Animated.ScrollView>
 
@@ -1043,24 +1054,28 @@ export function ProductDetailScreen({ route }: Props) {
           </GlassIconButton>
 
           <View className="flex-row" style={{ gap: 8 }}>
-            <GlassIconButton
-              onPress={onToggleWishlist}
-              accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
-              accessibilityState={{ selected: wishlisted }}
-            >
-              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                <Heart size={20} color={wishlisted ? "#ff383c" : "#1a1a1a"} fill={wishlisted ? "#ff383c" : "transparent"} />
-              </Animated.View>
-            </GlassIconButton>
-
-            <Animated.View style={{ transform: [{ scale: cartBump }] }}>
-              <GlassIconButton onPress={() => nav.navigate("Cart")} accessibilityLabel="ตะกร้าสินค้า">
-                <ShoppingCart size={20} color="#1a1a1a" />
+            {!preview && (
+              <GlassIconButton
+                onPress={onToggleWishlist}
+                accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
+                accessibilityState={{ selected: wishlisted }}
+              >
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Heart size={20} color={wishlisted ? "#ff383c" : "#1a1a1a"} fill={wishlisted ? "#ff383c" : "transparent"} />
+                </Animated.View>
               </GlassIconButton>
-              <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
-                <CountBadge count={cartCount} />
-              </View>
-            </Animated.View>
+            )}
+
+            {!preview && (
+              <Animated.View style={{ transform: [{ scale: cartBump }] }}>
+                <GlassIconButton onPress={() => nav.navigate("Cart")} accessibilityLabel="ตะกร้าสินค้า">
+                  <ShoppingCart size={20} color="#1a1a1a" />
+                </GlassIconButton>
+                <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
+                  <CountBadge count={cartCount} />
+                </View>
+              </Animated.View>
+            )}
 
             <GlassIconButton accessibilityLabel="แชร์">
               <Share2 size={20} color="#1a1a1a" />
@@ -1072,7 +1087,9 @@ export function ProductDetailScreen({ route }: Props) {
       {/* Black scroll-edge shade at the very bottom of the screen. */}
       <BottomFade />
 
-      {/* Floating Liquid Glass action sheet — hovers above the bottom (Apple Maps) */}
+      {/* Floating Liquid Glass action sheet — hovers above the bottom (Apple Maps).
+          Hidden entirely in shop-owner preview (no buy/chat controls). */}
+      {!preview && (
       <View
         style={{
           position: "absolute",
@@ -1176,6 +1193,7 @@ export function ProductDetailScreen({ route }: Props) {
         </GlassView>
         </View>
       </View>
+      )}
 
       {/* Fly-to-cart overlay — animates a copy of the product image from
           the gallery center toward the cart icon in the top bar. Outside

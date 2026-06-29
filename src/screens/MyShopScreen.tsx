@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,10 @@ import {
   Image,
   TextInput,
   Animated,
+  Alert,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
   useWindowDimensions,
   type TextStyle,
   type ScrollViewProps,
@@ -16,6 +20,8 @@ type ScrollHandler = ScrollViewProps["onScroll"];
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
+import { createNativeBottomTabNavigator } from "@bottom-tabs/react-navigation";
+import { useBottomTabBarHeight } from "react-native-bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   AlertCircle,
@@ -27,6 +33,7 @@ import {
   Bell,
   Building2,
   Calendar,
+  Camera,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -34,6 +41,8 @@ import {
   Check,
   ClipboardList,
   Clock,
+  Banknote,
+  Percent,
   DollarSign,
   Download,
   Eye,
@@ -41,31 +50,37 @@ import {
   FlaskConical,
   Info,
   MapPin,
+  Menu,
   MessageCircle,
   Package,
   PackageCheck,
   PackageX,
   Pencil,
-  Plus,
   PlusCircle,
   ScanSearch,
+  Leaf,
   Search,
-  Settings,
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Star,
   Store,
-  Tag,
-  Ticket,
   Truck,
   TrendingDown,
   TrendingUp,
   User,
   Wallet,
+  X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { GlassIconButton } from "../components/GlassIconButton";
 import { BottomSheet } from "../components/BottomSheet";
+import { getImagePicker } from "../utils/imagePicker";
+import { useSeller } from "../context/SellerContext";
+import { BottomFade } from "../components/BottomFade";
+import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
+import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
+import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmtSigned, type Settlement, type SettlementStatus } from "../data/financeTransactions";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   BRAND_GREEN,
@@ -81,18 +96,21 @@ import {
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// Bottom navbar — 3 destinations for the owner console.
-type Tab = "overview" | "shopfront" | "settings";
-const NAV_ITEMS: { id: Tab; label: string; Icon: typeof BarChart3 }[] = [
-  { id: "overview", label: "ภาพรวม", Icon: BarChart3 },
-  { id: "shopfront", label: "หน้าร้านค้า", Icon: Store },
-  { id: "settings", label: "ตั้งค่า", Icon: Settings },
-];
+// Decorative leaves for the green header (matches the home app bar).
+const LEAF_C = require("../../assets/herb-leaf-c.png");
+const LEAF_D = require("../../assets/herb-leaf-d.png");
+const SHOP_TABS = [
+  { id: "products", label: "สินค้า", Icon: Package },
+  { id: "herbal", label: "Herbal Market", Icon: Leaf },
+  { id: "reviews", label: "รีวิวร้านค้า", Icon: Star },
+] as const;
+
+
 
 // Owner-console menu tree — ported from the web OwnerDashboard sidebar.
 // Surfaced on mobile via a bottom-sheet menu (scales to many items + the
 // sub-menus render as accordion sections inside the sheet).
-type SectionId =
+export type SectionId =
   | "dashboard"
   | "orders"
   | "hm_quotations"
@@ -112,7 +130,7 @@ type SectionId =
   | "finance_tx"
   | "complaints";
 
-type MenuNode = {
+export type MenuNode = {
   id: SectionId;
   label: string;
   Icon: typeof BarChart3;
@@ -120,7 +138,7 @@ type MenuNode = {
 };
 
 // Order + structure match the web OwnerDashboard sidebar 1:1.
-const SHOP_MENU: MenuNode[] = [
+export const SHOP_MENU: MenuNode[] = [
   { id: "dashboard", label: "Dashboard", Icon: BarChart3 },
   { id: "orders", label: "คำสั่งซื้อ", Icon: ShoppingCart },
   {
@@ -164,15 +182,6 @@ const SHOP_MENU: MenuNode[] = [
       { id: "report_market", label: "Market Report" },
     ],
   },
-  {
-    id: "finance_overview",
-    label: "การเงิน",
-    Icon: Wallet,
-    children: [
-      { id: "finance_tx", label: "ธุรกรรม" },
-      { id: "finance_overview", label: "ภาพรวม" },
-    ],
-  },
   { id: "complaints", label: "เรื่องร้องเรียน", Icon: AlertTriangle },
 ];
 
@@ -198,32 +207,19 @@ const SECTION_LABEL: Record<SectionId, string> = {
   complaints: "เรื่องร้องเรียน",
 };
 
-// Shop identity — mirrors ShopScreen's SHOP shape so the owner sees the same
-// storefront profile they present to customers.
-const SHOP = {
-  name: "METAHERB Store",
-  avatar: "🌿",
-  description:
-    "ร้านค้าสมุนไพรออร์แกนิกคุณภาพระดับพรีเมียม คัดสรรวัตถุดิบจากแหล่งธรรมชาติทั่วประเทศไทย ผ่านมาตรฐาน อย. และ GMP รับประกันคุณภาพทุกชิ้น จัดส่งรวดเร็วภายใน 1-2 วัน",
-  rating: 4.8,
-  totalReviews: 1250,
-  followers: 8520,
-  totalProducts: 45,
-  totalSold: "15K+",
-  location: "กรุงเทพมหานคร",
-  joined: "ม.ค. 2567",
-  responseRate: 98,
-  responseTime: "ภายใน 5 นาที",
-  verified: true,
-};
+// Shop identity is a single source of truth: the owner console reuses the exact
+// SHOP the customer-facing ShopScreen presents, so name/avatar/banner/description
+// never drift between the live shop and "จัดการร้านค้า".
 
 // Mock wallet figures — same shape as OwnerDashboard's `walletAvailable`,
 // `walletEscrow`, `walletEscrowOrderCount`.
+// Single source: derived from the finance transactions so the dashboard wallet
+// and the การเงิน tab always agree.
 const WALLET = {
-  available: 24580,
-  escrow: 8920,
-  escrowOrderCount: 14,
-  totalIncome: 156200,
+  available: FINANCE_TOTALS.available,
+  escrow: FINANCE_TOTALS.escrow,
+  escrowOrderCount: FINANCE_TOTALS.escrowCount,
+  totalIncome: FINANCE_TOTALS.totalIncome,
 };
 
 // Per-month figures (index 0 = Jan) — same arrays as the web OverviewTab.
@@ -256,18 +252,14 @@ const TRIAL_STATUS = [
   { id: "evaluated", label: "ประเมินแล้ว", count: 11, accent: "#10b981", Icon: PackageCheck },
 ];
 
-const TOP_PRODUCTS = [
-  { name: "ขมิ้นชันแคปซูล", cat: "สมุนไพรแคปซูล", unit: 60, sold: 1842, revenue: 110520, image: require("../../assets/products/catalog/product-01.png") },
-  { name: "ฟ้าทะลายโจร", cat: "สมุนไพรแคปซูล", unit: 145, sold: 1654, revenue: 82700, image: require("../../assets/products/catalog/product-02.png") },
-  { name: "ชาเก๊กฮวยออร์แกนิก", cat: "ชาสมุนไพร", unit: 60, sold: 1523, revenue: 91380, image: require("../../assets/products/catalog/product-03.png") },
-  { name: "น้ำผึ้งดอกลำไย", cat: "ผลิตภัณฑ์ออร์แกนิก", unit: 215, sold: 1389, revenue: 97230, image: require("../../assets/products/catalog/product-04.png") },
-  { name: "ใบบัวบกแคปซูล", cat: "สมุนไพรแคปซูล", unit: 180, sold: 1245, revenue: 74700, image: require("../../assets/products/catalog/product-05.png") },
-  { name: "กระชายขาวสกัด", cat: "สมุนไพรสกัด", unit: 245, sold: 1132, revenue: 79240, image: require("../../assets/products/catalog/product-06.jpg") },
-  { name: "ชาตะไคร้แห้ง", cat: "ชาสมุนไพร", unit: 50, sold: 1048, revenue: 52400, image: require("../../assets/products/catalog/product-07.jpg") },
-  { name: "ขิงผงออร์แกนิก", cat: "ผงสมุนไพร", unit: 80, sold: 962, revenue: 48100, image: require("../../assets/products/catalog/product-08.jpg") },
-  { name: "น้ำมันมะพร้าวสกัดเย็น", cat: "น้ำมันสมุนไพร", unit: 140, sold: 874, revenue: 61180, image: require("../../assets/products/catalog/product-09.jpg") },
-  { name: "เห็ดหลินจือสกัด", cat: "สมุนไพรสกัด", unit: 140, sold: 791, revenue: 39550, image: require("../../assets/products/catalog/product-10.jpg") },
-];
+// "สินค้าขายดี" = the SAME products the customer shop sells (name + image come
+// straight from SHOP_PRODUCTS), with sales stats derived from the catalog sold
+// figure, so the owner console matches the live web shop 1:1.
+const parseSold = (s: string) => (/k/i.test(s) ? Math.round(parseFloat(s) * 1000) : Math.round(parseFloat(s)) || 0);
+const TOP_PRODUCTS = SHOP_PRODUCTS.map((p) => {
+  const sold = parseSold(p.sold);
+  return { name: p.name, cat: p.category, unit: p.price, sold, revenue: p.price * sold, image: p.image as number };
+});
 
 const TOP_CUSTOMERS = [
   { name: "คุณสมชาย", email: "somchai@email.com", orders: 184, total: 25520 },
@@ -331,7 +323,12 @@ type ShopOrder = {
   items: OrderItem[];
 };
 
-const P = (i: number) => TOP_PRODUCTS[i].image; // reuse catalog thumbnails
+// Order line built from the matching shop product — name/image/price always come
+// from the live catalog (SHOP_PRODUCTS), so orders match the web shop. Index wraps.
+const oi = (i: number, option: string, qty: number): OrderItem => {
+  const p = TOP_PRODUCTS[i % TOP_PRODUCTS.length];
+  return { name: p.name, option, qty, price: p.unit * qty, image: p.image };
+};
 
 const ORDERS: ShopOrder[] = [
   {
@@ -339,48 +336,42 @@ const ORDERS: ShopOrder[] = [
     customer: "คุณสมชาย ใจดี", phone: "081-234-5678",
     address: "88/12 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110",
     shippingMethod: "จัดส่งปกติ",
-    items: [{ name: "ขมิ้นชันแคปซูล", option: "60 แคปซูล", qty: 2, price: 440, image: P(0) }],
+    items: [oi(0, "150 g", 2)],
   },
   {
     id: "ORD-20260204-03520", status: "pending_verify", date: "4 ก.พ. 2569 - 11:08 น.",
     customer: "คุณสมหญิง รักสุขภาพ", phone: "089-876-5432",
     address: "120 หมู่ 5 ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
     shippingMethod: "จัดส่งด่วน",
-    items: [
-      { name: "ฟ้าทะลายโจร", option: "50 แคปซูล", qty: 1, price: 145, image: P(1) },
-      { name: "ชาเก๊กฮวยออร์แกนิก", option: "20 ซอง", qty: 2, price: 250, image: P(2) },
-    ],
+    items: [oi(1, "1 หลอด", 1), oi(2, "20 ซอง", 2)],
   },
   {
     id: "ORD-20260203-03517", status: "ready_ship", date: "3 ก.พ. 2569 - 16:45 น.",
     customer: "คุณทานตะวัน งามดี", phone: "086-111-2233",
     address: "55/3 ถ.นิมมานเหมินท์ ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
     shippingMethod: "จัดส่งปกติ",
-    items: [{ name: "น้ำผึ้งดอกลำไย", option: "250 ml", qty: 1, price: 215, image: P(3) }],
+    items: [oi(3, "200 g", 1)],
   },
   {
     id: "ORD-20260202-03512", status: "shipping", date: "2 ก.พ. 2569 - 09:20 น.",
     customer: "คุณสายฝน พรหมมา", phone: "082-555-7788",
     address: "9 ซ.ลาดพร้าว 71 แขวงลาดพร้าว เขตลาดพร้าว กรุงเทพฯ 10230",
     shippingMethod: "จัดส่งด่วน", trackingNumber: "TH6829-4471-220K",
-    items: [
-      { name: "ใบบัวบกแคปซูล", option: "60 แคปซูล", qty: 1, price: 180, image: P(4) },
-      { name: "กระชายขาวสกัด", option: "60 แคปซูล", qty: 1, price: 245, image: P(5) },
-    ],
+    items: [oi(4, "30 แคปซูล", 1), oi(5, "1 ชุด", 1)],
   },
   {
     id: "ORD-20260131-03505", status: "shipped", date: "31 ม.ค. 2569 - 13:05 น.",
     customer: "คุณฟ้าใส แจ่มจันทร์", phone: "087-222-9090",
     address: "203/7 ถ.เพชรเกษม ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
     shippingMethod: "จัดส่งปกติ", trackingNumber: "TH1180-5523-901P", reviewScore: 5,
-    items: [{ name: "ชาตะไคร้หอม", option: "30 ซอง", qty: 3, price: 390, image: P(6) }],
+    items: [oi(6, "150 g", 3)],
   },
   {
     id: "ORD-20260129-03498", status: "cancelled", date: "29 ม.ค. 2569 - 10:41 น.",
     customer: "คุณมานพ ตั้งใจ", phone: "081-444-1212",
     address: "17 หมู่ 2 ต.บางพระ อ.ศรีราชา จ.ชลบุรี 20110",
     shippingMethod: "รับที่ร้าน",
-    items: [{ name: "ขิงผงสำเร็จรูป", option: "100 g", qty: 1, price: 120, image: P(7) }],
+    items: [oi(7, "1 หลอด", 1)],
   },
 ];
 
@@ -452,182 +443,285 @@ function AnimatedNumber({
   );
 }
 
-export function MyShopScreen() {
+// Shared green header for every owner-console tab — back + shop name + leaves.
+function ShopHeader({ headerRight }: { headerRight?: ReactNode }) {
   const nav = useNavigation<Nav>();
-  const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>("overview");
-  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
-  // Overview section + menu sheet — lifted here so the header hamburger opens it.
-  const [sub, setSub] = useState<SectionId>("dashboard");
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // Two-step scroll. Section 1 = the green header (with the tab bar). Section 2 =
-  // the white content sheet. As the user scrolls, the sheet slides UP over the
-  // tab bar (step 1: hide it). Once the sheet has fully covered the tab bar, only
-  // then does the inner list scroll under the pinned title (step 2).
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const [tabH, setTabH] = useState(56);
-  const onScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false },
+  const { shopProfile } = useSeller();
+  const shopName = shopProfile?.shopName?.trim() || "ร้านค้าของคุณ";
+  return (
+    <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
+      {/* Decorative herb leaves — same watermark as the home app bar */}
+      <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+        <Image source={LEAF_D} style={{ position: "absolute", top: 0, right: 2, width: 96, height: 96, opacity: 0.4, transform: [{ rotate: "28deg" }] }} resizeMode="contain" />
+        <Image source={LEAF_C} style={{ position: "absolute", top: 60, right: 40, width: 58, height: 58, opacity: 0.26, transform: [{ rotate: "76deg" }] }} resizeMode="contain" />
+      </View>
+      <View className="flex-row items-center" style={{ paddingLeft: 8, paddingRight: 16, paddingTop: 4, paddingBottom: 12, gap: 8 }}>
+        <GlassIconButton onPress={() => (nav.getParent() ?? nav).goBack()} accessibilityLabel="ย้อนกลับ">
+          <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassIconButton>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: "white", fontSize: 18, fontWeight: "700", letterSpacing: 0.3, includeFontPadding: false }}>ร้านค้าของฉัน</Text>
+          <Text numberOfLines={1} style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 1, includeFontPadding: false }}>{shopName}</Text>
+        </View>
+        {headerRight}
+      </View>
+    </SafeAreaView>
   );
-  const sheetShift = scrollY.interpolate({ inputRange: [0, tabH], outputRange: [0, -tabH], extrapolate: "clamp" });
-  const tabFade = scrollY.interpolate({ inputRange: [0, tabH * 0.7], outputRange: [1, 0], extrapolate: "clamp" });
+}
 
+// Green header + rounded white content area, shared by every tab screen.
+// Full-width bottom nav bar (custom) — solid white, edge-to-edge, with an active
+// green capsule. The nested iOS 26 native bar floats/centres (no full-width prop),
+// so we draw a guaranteed full-width bar styled to match.
+// Green header + rounded white content area, shared by every tab screen.
+// Full-width bottom nav bar (custom) — edge-to-edge. The native iOS 26 bar
+// auto-sizes to its tab count (can't be forced wider with only 3 tabs), so a
+// custom bar is the only way to get a guaranteed full-width 3-tab bar.
+// Green header + rounded white content area, shared by every tab screen.
+function ShopShell({ children, headerRight }: { children: ReactNode; headerRight?: ReactNode }) {
   return (
     <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
       <StatusBar style="light" />
-
-      {/* ===== Section 1: green header — title + tab bar (fixed) ===== */}
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View
-          className="flex-row items-center justify-between"
-          style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12 }}
-        >
-          <Pressable
-            onPress={() => nav.canGoBack() && nav.goBack()}
-            hitSlop={8}
-            className="active:opacity-70"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: "rgba(0,0,0,0.2)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <ChevronLeft size={22} color="white" />
-          </Pressable>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "white" }}>
-            ร้านค้าของฉัน
-          </Text>
-          <View style={{ width: 38, height: 38 }} />
-        </View>
-        {/* Tab bar — stays in the header; the content sheet rises to cover it */}
-        <Animated.View
-          style={{ opacity: tabFade }}
-          onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            if (h > 0 && Math.abs(h - tabH) > 1) setTabH(h);
-          }}
-        >
-          <ShopTopTabs tab={tab} setTab={setTab} />
-        </Animated.View>
-      </SafeAreaView>
-
-      {/* ===== Section 2: white content sheet — slides up over the tab bar ===== */}
-      <Animated.View
-        style={{
-          flex: 1,
-          marginTop: sheetShift,
-          backgroundColor: "#fafafa",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          overflow: "hidden",
-        }}
-      >
-        {tab === "overview" ? (
-          <OverviewTab
-            period={period}
-            onPeriodChange={setPeriod}
-            insetsBottom={insets.bottom + 16}
-            sub={sub}
-            setSub={setSub}
-            menuOpen={menuOpen}
-            setMenuOpen={setMenuOpen}
-            onScroll={onScroll}
-          />
-        ) : tab === "shopfront" ? (
-          <ShopFrontTab insetsBottom={insets.bottom + 16} onScroll={onScroll} />
-        ) : (
-          <SettingsTab insetsBottom={insets.bottom + 16} onScroll={onScroll} />
-        )}
-      </Animated.View>
+      <ShopHeader headerRight={headerRight} />
+      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
+        {children}
+        <BottomFade />
+      </View>
     </View>
   );
 }
 
-// Top tabs in the green header — dark capsule track with a white pill that
-// springs to the active tab (ported from the buyer OrdersScreen StatusTabs).
-function ShopTopTabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const layouts = useRef<Record<string, { x: number; width: number }>>({}).current;
-  const pillX = useRef(new Animated.Value(0)).current;
-  const pillW = useRef(new Animated.Value(0)).current;
-  const [ready, setReady] = useState(false);
+function OverviewScreen() {
+  const nav = useNavigation<Nav>();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [sub, setSub] = useState<SectionId>("dashboard");
+  const openMenu = () => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => setSub(id as SectionId) });
+  return (
+    <ShopShell
+      headerRight={
+        <GlassIconButton onPress={openMenu} accessibilityLabel="เมนู">
+          <Menu size={22} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassIconButton>
+      }
+    >
+      <OverviewTab
+        period={period}
+        onPeriodChange={setPeriod}
+        insetsBottom={tabBarHeight + 16}
+        sub={sub}
+        onOpenMenu={openMenu}
+        hideMenuButton
+      />
+    </ShopShell>
+  );
+}
 
+// "การเงิน" tab — same owner-console shell as ภาพรวม, but lands on the finance
+// section (กระเป๋าเงิน / ธุรกรรม). Reuses OverviewTab so visuals stay identical.
+function FinanceScreen() {
+  const nav = useNavigation<Nav>();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [sub, setSub] = useState<SectionId>("finance_overview");
+  return (
+    <ShopShell
+      headerRight={
+        <GlassIconButton onPress={() => Alert.alert("ดาวน์โหลดเอกสาร", "ส่งออกข้อมูลธุรกรรมเรียบร้อย")} accessibilityLabel="ส่งออกเอกสาร">
+          <Download size={22} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassIconButton>
+      }
+    >
+      <OverviewTab
+        period={period}
+        onPeriodChange={setPeriod}
+        insetsBottom={tabBarHeight + 16}
+        sub={sub}
+        onOpenMenu={() => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => setSub(id as SectionId) })}
+        hideHeader
+      />
+    </ShopShell>
+  );
+}
+
+// Edit-sheet primitives — mirror AccountInfoScreen's "แก้ไขข้อมูลผู้ใช้" sheet so
+// the shop profile editor looks identical (native page-sheet + same field style).
+const SHEET_INPUT = { minHeight: 50, backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: "#374151" } as const;
+
+function FieldLabel({ children }: { children: string }) {
+  return <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{children}</Text>;
+}
+
+function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
+  return (
+    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+      <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
+        <X size={22} color="#1a1a1a" strokeWidth={2.6} />
+      </GlassIconButton>
+      <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
+      <GlassIconButton onPress={onSave} disabled={!canSave} size={44} accessibilityLabel="บันทึก" tintColor="rgba(49,151,84,0.22)">
+        <Check size={22} color={BRAND_GREEN_DARK} strokeWidth={3} />
+      </GlassIconButton>
+    </View>
+  );
+}
+
+// Edit-profile sheet — native page-sheet (same shell as "แก้ไขข้อมูลผู้ใช้"). The
+// owner edits the storefront banner, logo, name and description (→ SellerContext).
+function ShopProfileEditSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const { shopLogoUri, setShopLogoUri, shopBannerUri, setShopBannerUri, shopProfile, setShopProfile } = useSeller();
+  const [name, setName] = useState(shopProfile?.shopName ?? SHOP.name);
+  const [desc, setDesc] = useState(shopProfile?.description ?? SHOP.description);
+  const [logo, setLogo] = useState<string | null>(shopLogoUri);
+  const [banner, setBanner] = useState<string | null>(shopBannerUri);
+
+  // Re-sync local fields from context each time the sheet opens.
   useEffect(() => {
-    const l = layouts[tab];
-    if (!l) return;
-    Animated.parallel([
-      Animated.spring(pillX, { toValue: l.x, useNativeDriver: false, friction: 13, tension: 100 }),
-      Animated.spring(pillW, { toValue: l.width, useNativeDriver: false, friction: 13, tension: 100 }),
-    ]).start();
-  }, [tab, ready, layouts, pillW, pillX]);
+    if (!visible) return;
+    setName(shopProfile?.shopName ?? SHOP.name);
+    setDesc(shopProfile?.description ?? SHOP.description);
+    setLogo(shopLogoUri);
+    setBanner(shopBannerUri);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = async (onPick: (uri: string) => void) => {
+    const P = getImagePicker();
+    if (!P) { Alert.alert("ยังเปลี่ยนรูปไม่ได้", "ตัวรันนี้ยังไม่มีโมดูลคลังรูป — ต้อง build แอปใหม่จึงจะเปลี่ยนรูปได้"); return; }
+    const res = await P.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (!res.canceled && res.assets?.[0]) onPick(res.assets[0].uri);
+  };
+
+  const save = () => {
+    setShopLogoUri(logo);
+    setShopBannerUri(banner);
+    setShopProfile({
+      shopName: name.trim() || SHOP.name,
+      ownerName: shopProfile?.ownerName ?? "",
+      taxId: shopProfile?.taxId ?? "",
+      address: shopProfile?.address ?? "",
+      email: shopProfile?.email ?? "",
+      phone: shopProfile?.phone ?? "",
+      description: desc.trim(),
+    });
+    onClose();
+  };
 
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 2, paddingBottom: 12 }}>
-      <View style={{ borderRadius: 999, backgroundColor: "rgba(0,0,0,0.25)", padding: 4 }}>
-        {/* Inner wrapper so the pill + tabs share one coordinate origin (the
-            capsule's padding would otherwise offset the absolute pill). */}
-        <View>
-          {/* Sliding white pill — behind the labels */}
-          <Animated.View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: pillX,
-              width: pillW,
-              height: 36,
-              borderRadius: 999,
-              backgroundColor: "#ffffff",
-              opacity: ready ? 1 : 0,
-              shadowColor: "#000",
-              shadowOpacity: 0.12,
-              shadowRadius: 4,
-              shadowOffset: { width: 0, height: 2 },
-            }}
-          />
-          <View style={{ flexDirection: "row" }}>
-            {NAV_ITEMS.map((item) => {
-            const active = tab === item.id;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => setTab(item.id)}
-                onLayout={(e) => {
-                  const { x, width } = e.nativeEvent.layout;
-                  layouts[item.id] = { x, width };
-                  if (item.id === tab) {
-                    pillX.setValue(x);
-                    pillW.setValue(width);
-                    if (!ready) setReady(true);
-                  }
-                }}
-                className="flex-row items-center justify-center active:opacity-80"
-                style={{ flex: 1, height: 36, gap: 6 }}
-              >
-                <item.Icon
-                  size={15}
-                  color={active ? BRAND_GREEN : "#ffffff"}
-                  strokeWidth={active ? 2.4 : 2}
-                />
-                <Text
-                  style={{
-                    fontSize: 13.5,
-                    fontWeight: active ? "700" : "600",
-                    color: active ? BRAND_GREEN : "#ffffff",
-                  }}
-                >
-                  {item.label}
-                </Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <SheetHeader title="แก้ไขโปรไฟล์ร้านค้า" onClose={onClose} onSave={save} canSave={name.trim().length > 0} />
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
+          {/* Banner + logo hero — gradient banner with a floating, shadowed logo
+              overlapping its bottom-left (mirrors the real storefront layout). */}
+          <View style={{ gap: 10 }}>
+            <FieldLabel>แบนเนอร์และโลโก้ร้าน</FieldLabel>
+            <View>
+              {/* Banner — shows the CURRENT live banner (custom upload, else the
+                  storefront's default image) so the preview matches the real shop. */}
+              <Pressable onPress={() => pick(setBanner)} className="active:opacity-95" style={{ height: 158, borderRadius: 22, overflow: "hidden", backgroundColor: "#eef7f1" }}>
+                <Image source={banner ? { uri: banner } : SHOP.banner} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+                <LinearGradient pointerEvents="none" colors={["transparent", "rgba(0,0,0,0.30)"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 72 }} />
+                <View style={{ position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.42)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 }}>
+                  <Camera size={13} color="#fff" strokeWidth={2.3} />
+                  <Text style={{ fontSize: 11.5, fontWeight: "700", color: "#fff" }}>เปลี่ยนแบนเนอร์</Text>
+                </View>
               </Pressable>
-            );
-          })}
+              {/* Logo — floating, shadowed, overlapping the banner's bottom-left */}
+              <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: -48, paddingHorizontal: 18, gap: 13 }}>
+                <Pressable onPress={() => pick(setLogo)} className="active:opacity-80">
+                  <View style={{ width: 94, height: 94, borderRadius: 47, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 9, elevation: 7 }}>
+                    <View style={{ width: 86, height: 86, borderRadius: 43, backgroundColor: "#eef7f1", overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+                      {logo ? <Image source={{ uri: logo }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
+                    </View>
+                  </View>
+                  <View style={{ position: "absolute", bottom: 1, right: 1, width: 31, height: 31, borderRadius: 15.5, backgroundColor: BRAND_GREEN, borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center" }}>
+                    <Camera size={14} color="#fff" strokeWidth={2.3} />
+                  </View>
+                </Pressable>
+                <Text style={{ flex: 1, fontSize: 12, color: TEXT_MUTED, lineHeight: 17, marginBottom: 12 }}>แตะโลโก้หรือแบนเนอร์{"\n"}เพื่อเปลี่ยนรูป</Text>
+              </View>
+            </View>
           </View>
-        </View>
+
+          {/* ชื่อร้านค้า */}
+          <View style={{ gap: 8 }}>
+            <FieldLabel>ชื่อร้านค้า</FieldLabel>
+            <TextInput value={name} onChangeText={setName} placeholder="ชื่อร้านค้า" placeholderTextColor="#a3a3a3" style={SHEET_INPUT} />
+          </View>
+
+          {/* รายละเอียดร้านค้า */}
+          <View style={{ gap: 8 }}>
+            <FieldLabel>รายละเอียดร้านค้า</FieldLabel>
+            <TextInput value={desc} onChangeText={setDesc} placeholder="อธิบายร้านค้าของคุณ" placeholderTextColor="#a3a3a3" multiline textAlignVertical="top" style={[SHEET_INPUT, { minHeight: 120, borderRadius: 20, paddingTop: 14 }]} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ShopFrontScreen() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const nav = useNavigation<Nav>();
+  const [editOpen, setEditOpen] = useState(false);
+  // Storefront = web ShopProfilePage hero: banner + card scroll together (the
+  // card overlaps the banner). Floating back/share buttons over the banner.
+  return (
+    <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
+      <StatusBar style="light" />
+      <ShopFrontTab insetsBottom={tabBarHeight + 16} bannerTop={insets.top} />
+      {/* Bottom black fade behind the floating native tab bar — same as the other
+          owner-console tabs (ShopShell). ShopFront has its own layout, so add it here. */}
+      <BottomFade />
+      <View pointerEvents="box-none" style={{ position: "absolute", top: insets.top + 4, left: 8 }}>
+        <GlassIconButton onPress={() => (nav.getParent() ?? nav).goBack()} accessibilityLabel="ย้อนกลับ">
+          <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassIconButton>
       </View>
+      {/* Owner is viewing their OWN shop → the top-right action edits the profile
+          (not share, which is for customers): opens the profile-edit sheet. */}
+      <View pointerEvents="box-none" style={{ position: "absolute", top: insets.top + 4, right: 8 }}>
+        <GlassIconButton onPress={() => setEditOpen(true)} accessibilityLabel="แก้ไขโปรไฟล์">
+          <Pencil size={19} color="#1a1a1a" strokeWidth={2.2} />
+        </GlassIconButton>
+      </View>
+
+      <ShopProfileEditSheet visible={editOpen} onClose={() => setEditOpen(false)} />
     </View>
+  );
+}
+
+function SettingsScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
+  return (
+    <ShopShell>
+      <SettingsTab insetsBottom={tabBarHeight + 16} />
+    </ShopShell>
+  );
+}
+
+// Native iOS tab bar — same setup as the app's main tabs; only the 3 destinations
+// + labels differ, so iOS 26 renders the identical Liquid Glass / floating bar.
+const ShopTab = createNativeBottomTabNavigator();
+
+export function MyShopScreen() {
+  return (
+    <ShopTab.Navigator
+      tabBarActiveTintColor={BRAND_GREEN}
+      tabBarInactiveTintColor="#8e8e93"
+      translucent={false}
+      scrollEdgeAppearance="opaque"
+      tabBarStyle={{ backgroundColor: "#ffffff" }}
+      minimizeBehavior="never"
+      screenOptions={{ lazy: false }}
+    >
+      <ShopTab.Screen name="ShopOverview" component={OverviewScreen} options={{ title: "ภาพรวม", tabBarIcon: () => ({ sfSymbol: "chart.bar.fill" }) }} />
+      <ShopTab.Screen name="ShopFinance" component={FinanceScreen} options={{ title: "การเงิน", tabBarIcon: () => ({ sfSymbol: "creditcard.fill" }) }} />
+      <ShopTab.Screen name="ShopFront" component={ShopFrontScreen} options={{ title: "หน้าร้านค้า", tabBarIcon: () => ({ sfSymbol: "storefront.fill" }) }} />
+      <ShopTab.Screen name="ShopSettings" component={SettingsScreen} options={{ title: "ตั้งค่า", tabBarIcon: () => ({ sfSymbol: "gearshape.fill" }) }} />
+    </ShopTab.Navigator>
   );
 }
 
@@ -748,157 +842,147 @@ function WalletHeroCard() {
 
 /* ============ หน้าร้านค้า (Shop front) ============ */
 
-function ShopFrontTab({ insetsBottom, onScroll }: { insetsBottom: number; onScroll?: ScrollHandler }) {
+// Storefront — how the shop looks to customers (ported from the web ShopProfilePage):
+// cover banner + shop info card (avatar/name/verified/stats) + product grid.
+function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; bannerTop?: number }) {
+  const nav = useNavigation<Nav>();
+  const { width } = useWindowDimensions();
+  // Display fields reflect the owner's profile edits (logo / banner / name / desc);
+  // fall back to the canonical SHOP defaults when not customized.
+  const { shopLogoUri, shopBannerUri, shopProfile } = useSeller();
+  const displayName = shopProfile?.shopName || SHOP.name;
+  const displayDesc = shopProfile?.description || SHOP.description;
+  const bannerSource = shopBannerUri ? { uri: shopBannerUri } : SHOP.banner;
+  const META = [
+    { Icon: MapPin, t: SHOP.location },
+    { Icon: Clock, t: `เข้าร่วม ${SHOP.joined}` },
+    { Icon: MessageCircle, t: `ตอบกลับ ${SHOP.responseRate}%` },
+  ];
+  const STATS = [
+    { v: String(SHOP.rating), l: `${fmtNum(SHOP.totalReviews)} รีวิว`, green: true },
+    { v: fmtNum(SHOP.followers), l: "ผู้ติดตาม" },
+    { v: String(SHOP.totalProducts), l: "สินค้า" },
+    { v: SHOP.totalSold, l: "ขายแล้ว" },
+  ];
+  const [shopTab, setShopTab] = useState<"products" | "herbal" | "reviews">("products");
+  // Canonical storefront data — same source the customer-facing ShopScreen uses,
+  // so the owner's "หน้าร้านค้า" preview matches the real shop 1:1.
+  const herbalMaterials = MATERIALS.filter((m) => m.supplier === SHOP.name);
+  const ratingBreakdown = [5, 4, 3, 2, 1].map((s) => ({ stars: s, count: REVIEWS.filter((r) => r.rating === s).length }));
+  const BANNER_H = bannerTop + 150;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  // Stretch the banner on pull-down (overscroll) so no gap shows above it.
+  const bannerXf = {
+    transform: [
+      { translateY: scrollY.interpolate({ inputRange: [-BANNER_H, 0], outputRange: [-BANNER_H / 2, 0], extrapolate: "clamp" as const }) },
+      { scale: scrollY.interpolate({ inputRange: [-BANNER_H, 0], outputRange: [2, 1], extrapolate: "clamp" as const }) },
+    ],
+  };
   return (
-    <ScrollView
-      onScroll={onScroll}
+    <Animated.ScrollView
+      style={{ backgroundColor: "#fafafa" }}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       scrollEventThrottle={16}
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingTop: 14,
-        paddingBottom: 24 + insetsBottom,
-        gap: 14,
-      }}
+      contentContainerStyle={{ paddingBottom: 24 + insetsBottom }}
       showsVerticalScrollIndicator={false}
     >
-      <ProfileCard />
+      {/* Banner — scrolls with the content; stretches on pull-down (overscroll) */}
+      <View style={{ height: BANNER_H, backgroundColor: "#e5e7eb" }}>
+        {/* No gradient/shade on the banner — show the raw image. The floating
+            back/share buttons rely on their own glass background for contrast. */}
+        <Animated.Image source={bannerSource} style={[{ position: "absolute", top: 0, left: 0, right: 0, height: BANNER_H }, bannerXf]} resizeMode="cover" />
+      </View>
 
-      {/* Shop management menu */}
-      <MenuGroup
-        title="จัดการร้านค้า"
-        items={[
-          { label: "สินค้าของฉัน", Icon: Package, hint: `${SHOP.totalProducts} รายการ` },
-          { label: "เพิ่มสินค้าใหม่", Icon: Plus },
-          { label: "Flash Sale / โปรโมชั่น", Icon: Tag },
-          { label: "คูปองส่วนลด", Icon: Ticket },
-        ]}
-      />
-      <MenuGroup
-        title="ลูกค้าสัมพันธ์"
-        items={[
-          { label: "รีวิวร้านค้า", Icon: Star, hint: `${fmtNum(SHOP.totalReviews)} รีวิว` },
-          { label: "ข้อความจากลูกค้า", Icon: MessageCircle },
-          { label: "การแจ้งเตือน", Icon: Bell },
-        ]}
-      />
-    </ScrollView>
-  );
-}
-
-function ProfileCard() {
-  return (
-    <View
-      style={{
-        backgroundColor: "white",
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 4,
-      }}
-    >
-      {/* Row 1: Avatar + Name + Verified */}
-      <View className="flex-row items-center" style={{ gap: 12 }}>
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: "rgba(49,151,84,0.1)",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ fontSize: 28, lineHeight: 34 }}>{SHOP.avatar}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={{ fontSize: 17, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 22 }}
-          >
-            {SHOP.name}
-          </Text>
-          {SHOP.verified ? (
-            <View
-              className="flex-row items-center self-start"
-              style={{
-                marginTop: 6,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 999,
-                backgroundColor: "rgba(49,151,84,0.1)",
-                gap: 4,
-              }}
-            >
-              <ShieldCheck size={12} color={BRAND_GREEN} />
-              <Text style={{ fontSize: 11, color: BRAND_GREEN_DARK, fontWeight: "600" }}>
-                ยืนยันแล้ว
-              </Text>
+      {/* Shop info card — overlaps the banner (web hero) */}
+      <View style={{ marginTop: -44, marginHorizontal: 14, backgroundColor: "#fff", borderRadius: 18, padding: 16, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(49,151,84,0.1)", borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {shopLogoUri ? (
+                <Image source={{ uri: shopLogoUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              ) : (
+                <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              )}
             </View>
-          ) : null}
-        </View>
-      </View>
+            <View style={{ flex: 1, gap: 5 }}>
+              <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "800", color: "#101828" }}>{displayName}</Text>
+              {SHOP.verified ? (
+                <View style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(49,151,84,0.1)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                  <ShieldCheck size={12} color={BRAND_GREEN} strokeWidth={2.4} />
+                  <Text style={{ fontSize: 10.5, color: BRAND_GREEN, fontWeight: "600" }}>ยืนยันแล้ว</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
 
-      {/* Description */}
-      <Text
-        numberOfLines={2}
-        style={{ fontSize: 13, color: TEXT_SECONDARY, marginTop: 10, lineHeight: 19 }}
-      >
-        {SHOP.description}
-      </Text>
+          <Text numberOfLines={2} style={{ fontSize: 12.5, color: "#6a7282", marginTop: 10, lineHeight: 18 }}>{displayDesc}</Text>
 
-      {/* Meta row */}
-      <View className="flex-row items-center flex-wrap" style={{ marginTop: 10, gap: 12 }}>
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <MapPin size={12} color={TEXT_MUTED} />
-          <Text style={{ fontSize: 11, color: TEXT_MUTED }}>{SHOP.location}</Text>
-        </View>
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <Clock size={12} color={TEXT_MUTED} />
-          <Text style={{ fontSize: 11, color: TEXT_MUTED }}>เข้าร่วม {SHOP.joined}</Text>
-        </View>
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <MessageCircle size={12} color={TEXT_MUTED} />
-          <Text style={{ fontSize: 11, color: TEXT_MUTED }}>
-            ตอบกลับ {SHOP.responseRate}%
-          </Text>
-        </View>
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <Clock size={12} color={TEXT_MUTED} />
-          <Text style={{ fontSize: 11, color: TEXT_MUTED }}>{SHOP.responseTime}</Text>
-        </View>
-      </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
+            {META.map((m, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <m.Icon size={13} color="#99a1af" strokeWidth={2} />
+                <Text style={{ fontSize: 11.5, color: "#6a7282" }}>{m.t}</Text>
+              </View>
+            ))}
+          </View>
 
-      {/* Stats */}
-      <View
-        className="flex-row items-center"
-        style={{
-          marginTop: 14,
-          paddingTop: 12,
-          borderTopWidth: 1,
-          borderTopColor: SURFACE_GRAY,
-        }}
-      >
-        <Stat
-          value={String(SHOP.rating)}
-          label={`${fmtNum(SHOP.totalReviews)} รีวิว`}
-          highlight
-          star
-        />
-        <Divider />
-        <Stat value={fmtNum(SHOP.followers)} label="ผู้ติดตาม" />
-        <Divider />
-        <Stat value={String(SHOP.totalProducts)} label="สินค้า" />
-        <Divider />
-        <Stat value={SHOP.totalSold} label="ยอดขาย" />
-      </View>
-    </View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 14 }}>
+            {STATS.map((s, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                {i > 0 ? <View style={{ width: 1, height: 28, backgroundColor: "#eee" }} /> : null}
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: s.green ? BRAND_GREEN : "#101828" }}>{s.v}</Text>
+                  <Text style={{ fontSize: 9.5, color: "#99a1af", marginTop: 1 }}>{s.l}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Tabs — สินค้า / Herbal Market / รีวิวร้านค้า */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 18 }}>
+          {SHOP_TABS.map((tb) => {
+            const active = shopTab === tb.id;
+            const count = tb.id === "products" ? SHOP_PRODUCTS.length : tb.id === "herbal" ? herbalMaterials.length : REVIEWS.length;
+            return (
+              <Pressable key={tb.id} onPress={() => setShopTab(tb.id)} className="active:opacity-80" style={{ flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 999, backgroundColor: active ? BRAND_GREEN : "#fff", borderWidth: active ? 0 : 1, borderColor: "#e5e7eb" }}>
+                <tb.Icon size={15} color={active ? "#fff" : BRAND_GREEN} strokeWidth={2.2} />
+                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "#fff" : "#374151" }}>{tb.label}</Text>
+                <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: active ? "rgba(255,255,255,0.25)" : "rgba(49,151,84,0.12)", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: active ? "#fff" : BRAND_GREEN }}>{count > 99 ? "99+" : count}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {shopTab === "products" ? (
+          <View style={{ marginTop: 16 }}>
+            <ProductsGrid products={SHOP_PRODUCTS} preview />
+          </View>
+        ) : shopTab === "herbal" ? (
+          <View className="flex-row flex-wrap" style={{ marginTop: 16, paddingHorizontal: 16, gap: 14 }}>
+            {herbalMaterials.map((m) => (
+              <MaterialCard
+                key={m.id}
+                m={m}
+                width={(width - 16 * 2 - 14) / 2}
+                onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id, preview: true })}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={{ marginTop: 16 }}>
+            <ReviewsSection reviews={REVIEWS} ratingBreakdown={ratingBreakdown} shopRating={SHOP.rating} totalReviews={SHOP.totalReviews} />
+          </View>
+        )}
+    </Animated.ScrollView>
   );
 }
 
 function SettingsTab({ insetsBottom, onScroll }: { insetsBottom: number; onScroll?: ScrollHandler }) {
+  const nav = useNavigation<Nav>();
+  const { shopLogoUri, shopProfile } = useSeller();
+  const displayName = shopProfile?.shopName || SHOP.name;
   return (
     <ScrollView
       onScroll={onScroll}
@@ -911,19 +995,54 @@ function SettingsTab({ insetsBottom, onScroll }: { insetsBottom: number; onScrol
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Shop summary card */}
+      <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, padding: 16, gap: 14 }}>
+        <View className="flex-row items-center" style={{ gap: 12 }}>
+          <View style={{ width: 54, height: 54, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: DIVIDER_GRAY }}>
+            <Image source={shopLogoUri ? { uri: shopLogoUri } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View className="flex-row items-center" style={{ gap: 6 }}>
+              <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, flexShrink: 1 }}>{displayName}</Text>
+              {SHOP.verified ? (
+                <View style={{ backgroundColor: "rgba(49,151,84,0.1)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 9.5, fontWeight: "800", color: BRAND_GREEN }}>✓ ยืนยัน</Text>
+                </View>
+              ) : null}
+            </View>
+            <View className="flex-row items-center" style={{ gap: 4, marginTop: 3 }}>
+              <Star size={12} color="#f59e0b" fill="#f59e0b" />
+              <Text numberOfLines={1} style={{ fontSize: 12, color: TEXT_MUTED, flex: 1 }}>{`${SHOP.rating} · ${SHOP.totalReviews} รีวิว · ${SHOP.location}`}</Text>
+            </View>
+          </View>
+        </View>
+        <View className="flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: DIVIDER_GRAY, paddingTop: 12 }}>
+          <Stat value={String(SHOP.totalProducts)} label="สินค้า" />
+          <Divider />
+          <Stat value={`${(SHOP.followers / 1000).toFixed(1)}K`} label="ผู้ติดตาม" />
+          <Divider />
+          <Stat value={SHOP.totalSold} label="ขายแล้ว" />
+        </View>
+      </View>
+
       <MenuGroup
-        title="ร้านค้า"
+        title="ข้อมูลร้านค้า"
         items={[
-          { label: "แก้ไขข้อมูลร้านค้า", Icon: Pencil },
-          { label: "ที่อยู่จัดส่งสินค้า", Icon: MapPin },
-          { label: "บัญชีรับเงิน", Icon: Wallet },
+          { label: "บัญชีร้านค้า", subtitle: "ข้อมูลร้าน เอกสาร และการสมัคร", Icon: Store, tint: "#319754", onPress: () => nav.navigate("ShopAccount") },
+          { label: "ที่อยู่ร้านค้า", subtitle: "ที่อยู่สำหรับจัดส่งและออกบิล", Icon: MapPin, tint: "#0088ff", onPress: () => nav.navigate("ShopAddress") },
+        ]}
+      />
+      <MenuGroup
+        title="การขายและจัดส่ง"
+        items={[
+          { label: "การจัดส่ง", subtitle: "ขนส่ง รับที่ร้าน และ COD", Icon: Truck, tint: "#8b5cf6", onPress: () => nav.navigate("ShopShipping") },
+          { label: "บัญชีรับเงิน", subtitle: "ธนาคารรับเงินจากการขาย", Icon: Wallet, tint: "#f59e0b", onPress: () => nav.navigate("ShopPayout") },
         ]}
       />
       <MenuGroup
         title="ทั่วไป"
         items={[
-          { label: "การแจ้งเตือน", Icon: Bell },
-          { label: "ตั้งค่าทั่วไป", Icon: Settings },
+          { label: "การแจ้งเตือน", subtitle: "ออเดอร์ โปรโมชัน และระบบ", Icon: Bell, tint: "#ef4444", onPress: () => nav.navigate("ShopNotifications") },
         ]}
       />
     </ScrollView>
@@ -935,7 +1054,7 @@ function MenuGroup({
   items,
 }: {
   title: string;
-  items: { label: string; Icon: typeof Package; hint?: string }[];
+  items: { label: string; Icon: typeof Package; subtitle?: string; tint?: string; hint?: string; onPress?: () => void }[];
 }) {
   return (
     <View>
@@ -961,24 +1080,35 @@ function MenuGroup({
           overflow: "hidden",
         }}
       >
-        {items.map((m, i) => (
-          <View key={m.label}>
-            {i > 0 ? (
-              <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginLeft: 52 }} />
-            ) : null}
-            <Pressable
-              className="flex-row items-center active:bg-gray-50"
-              style={{ height: 54, paddingHorizontal: 16, gap: 12 }}
-            >
-              <m.Icon size={20} color={BRAND_GREEN} strokeWidth={2} />
-              <Text style={{ flex: 1, fontSize: 15, color: TEXT_PRIMARY }}>{m.label}</Text>
-              {m.hint ? (
-                <Text style={{ fontSize: 12, color: TEXT_DISABLED }}>{m.hint}</Text>
+        {items.map((m, i) => {
+          const tint = m.tint ?? BRAND_GREEN;
+          return (
+            <View key={m.label}>
+              {i > 0 ? (
+                <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginLeft: 64 }} />
               ) : null}
-              <ChevronRight size={18} color="#c4c4c6" strokeWidth={2.2} />
-            </Pressable>
-          </View>
-        ))}
+              <Pressable
+                onPress={m.onPress}
+                className="flex-row items-center active:bg-gray-50"
+                style={{ minHeight: 64, paddingHorizontal: 14, gap: 12 }}
+              >
+                <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: `${tint}1a`, alignItems: "center", justifyContent: "center" }}>
+                  <m.Icon size={20} color={tint} strokeWidth={2.1} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, color: TEXT_PRIMARY, fontWeight: "600" }}>{m.label}</Text>
+                  {m.subtitle ? (
+                    <Text style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{m.subtitle}</Text>
+                  ) : null}
+                </View>
+                {m.hint ? (
+                  <Text style={{ fontSize: 11, color: "#f59e0b", fontWeight: "600" }}>{m.hint}</Text>
+                ) : null}
+                <ChevronRight size={18} color="#c4c4c6" strokeWidth={2.2} />
+              </Pressable>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -1443,25 +1573,338 @@ function AnimatedMenuButton({ open, onPress }: { open: boolean; onPress: () => v
   );
 }
 
+// Minimal white stat card for the finance view — decorated with a corner coin.
+function FinStat({ label, value, hint, Icon, coin }: { label: string; value: string; hint: string; Icon: typeof Wallet; coin?: number }) {
+  return (
+    <View style={{ flex: 1, borderRadius: 16, padding: 14, gap: 6, backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, overflow: "hidden" }}>
+      {coin ? (
+        <>
+          <Image source={coin} resizeMode="contain" style={{ position: "absolute", width: 56, height: 56, right: -10, bottom: -10, opacity: 0.9, transform: [{ rotate: "-12deg" }] }} />
+          {/* Fade the coin's bottom edge softly into the white card */}
+          <LinearGradient pointerEvents="none" colors={["rgba(255,255,255,0)", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ position: "absolute", right: 0, bottom: 0, width: 88, height: 46 }} />
+        </>
+      ) : null}
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        <Icon size={14} color={TEXT_MUTED} strokeWidth={2.2} />
+        <Text numberOfLines={1} style={{ fontSize: 11.5, fontWeight: "600", color: TEXT_MUTED, flex: 1 }}>{label}</Text>
+      </View>
+      <Text style={{ fontSize: 19, fontWeight: "800", color: TEXT_PRIMARY, fontVariant: ["tabular-nums"] }}>{value}</Text>
+      <Text style={{ fontSize: 10.5, color: TEXT_DISABLED }}>{hint}</Text>
+    </View>
+  );
+}
+
+// "ธุรกรรม" view — wallet hero + GP/withdrawn stats + the transaction movement list.
+// One settlement row — mirrors the web TransactionsTab columns
+// (order no/id, created/paid dates, ยอดรับ / GP / ยอดการชำระเงิน, type pill).
+function SettlementCard({ s, onPress }: { s: Settlement; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} className="active:opacity-70" style={{ backgroundColor: "white", borderRadius: 14, borderWidth: 1, borderColor: DIVIDER_GRAY, padding: 14 }}>
+      <View>
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: BRAND_GREEN }}>{s.orderNo}</Text>
+          <View style={{ flex: 1 }} />
+          <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>{s.paid ? `ชำระ ${s.paid}` : "รอชำระเงิน"}</Text>
+          <ChevronRight size={18} color="#c4c4c6" strokeWidth={2.2} />
+        </View>
+        <Text style={{ fontSize: 11, color: TEXT_DISABLED, marginTop: 2 }}>{`ID: ${s.idCode}`}</Text>
+      </View>
+
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
+
+      <View className="flex-row items-end justify-between">
+        <View>
+          <Text style={{ fontSize: 10.5, color: TEXT_DISABLED }}>ยอดรับ</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a", marginTop: 2, fontVariant: ["tabular-nums"] }}>{fmtBaht(s.gross)}</Text>
+        </View>
+        <View style={{ alignItems: "center" }}>
+          <Text style={{ fontSize: 10.5, color: TEXT_DISABLED }}>GP</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#ef4444", marginTop: 2, fontVariant: ["tabular-nums"] }}>{fmtSigned(s.gp)}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ fontSize: 10.5, color: TEXT_DISABLED }}>ยอดการชำระเงิน</Text>
+          <Text style={{ fontSize: 15, fontWeight: "800", color: BRAND_GREEN, marginTop: 2, fontVariant: ["tabular-nums"] }}>{fmtBaht(s.payout)}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// Breakdown line — label + signed amount (negative = red).
+function BkRow({ label, amount, sub }: { label: string; amount: number; sub?: boolean }) {
+  return (
+    <View className="flex-row items-center justify-between" style={{ paddingVertical: 5 }}>
+      <Text style={{ flex: 1, fontSize: 13, color: sub ? TEXT_MUTED : "#0a0a0a", paddingLeft: sub ? 12 : 0 }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: amount < 0 ? "#ef4444" : "#0a0a0a", fontVariant: ["tabular-nums"] }}>{fmtSigned(amount)}</Text>
+    </View>
+  );
+}
+
+// Label–value meta row (settlement detail).
+function InfoLine({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <View className="flex-row items-center justify-between" style={{ paddingVertical: 7, gap: 12 }}>
+      <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: valueColor ?? "#0a0a0a", flexShrink: 1, textAlign: "right" }}>{value}</Text>
+    </View>
+  );
+}
+
+// Settlement detail — page-sheet with the full earnings breakdown (web SettlementBreakdownPanel).
+function SettlementDetailSheet({ s, onClose }: { s: Settlement; onClose: () => void }) {
+  const b = s.breakdown;
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "white" }}>
+        <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+          <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
+            <X size={22} color="#1a1a1a" strokeWidth={2.6} />
+          </GlassIconButton>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>รายละเอียดการชำระเงิน</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }}>
+          {/* Order header */}
+          <View style={{ paddingVertical: 14 }}>
+            <Text style={{ fontSize: 11, fontWeight: "600", color: BRAND_GREEN }}>หมายเลขคำสั่งซื้อ</Text>
+            <View className="flex-row items-center" style={{ marginTop: 4, gap: 8 }}>
+              <Text style={{ fontSize: 18, fontWeight: "700", color: "#1d5b32", flex: 1 }}>{s.orderNo}</Text>
+              <View style={{ borderWidth: 1, borderColor: "rgba(49,151,84,0.25)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 10.5, fontWeight: "600", color: BRAND_GREEN }}>คำสั่งซื้อ</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 11.5, color: TEXT_DISABLED, marginTop: 4 }}>{`ID: ${s.idCode}`}</Text>
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+
+          {/* Meta */}
+          <View style={{ paddingVertical: 6 }}>
+            <InfoLine label="สถานะ" value={s.status === "settled" ? "ชำระเงินแล้ว" : "รอชำระเงิน"} valueColor={s.status === "settled" ? BRAND_GREEN : "#ff9500"} />
+            <InfoLine label="วันที่สร้าง" value={`${s.created} · ${s.time} น.`} />
+            <InfoLine label="วันที่ใบแจ้งยอด" value={s.paid ?? "—"} />
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+
+          {/* ราคาสุทธิ */}
+          <View style={{ paddingTop: 12 }}>
+            <View className="flex-row items-center justify-between" style={{ paddingVertical: 4 }}>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: "#0a0a0a" }}>ราคาสุทธิ</Text>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: BRAND_GREEN, fontVariant: ["tabular-nums"] }}>{fmtSigned(b.netPrice)}</Text>
+            </View>
+            <BkRow label="ราคาสินค้า (ก่อนหักส่วนลด)" amount={b.productPrice} sub />
+            {b.shopDiscount < 0 ? <BkRow label="ส่วนลดจากร้านค้า" amount={b.shopDiscount} sub /> : null}
+            {b.platformDiscount > 0 ? <BkRow label="ส่วนลดจากแพลตฟอร์ม" amount={b.platformDiscount} sub /> : null}
+            {b.couponDiscount < 0 ? <BkRow label="ส่วนลดจากคูปอง" amount={b.couponDiscount} sub /> : null}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#f0f0f0", marginTop: 12 }} />
+
+          {/* ค่าจัดส่ง */}
+          <View style={{ paddingTop: 12 }}>
+            <View className="flex-row items-center justify-between" style={{ paddingVertical: 4 }}>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: "#0a0a0a" }}>ค่าจัดส่ง</Text>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: BRAND_GREEN, fontVariant: ["tabular-nums"] }}>{fmtSigned(b.customerShippingFee + b.platformShippingDiscount)}</Text>
+            </View>
+            <BkRow label="ค่าขนส่งของลูกค้า" amount={b.customerShippingFee} sub />
+            {b.platformShippingDiscount > 0 ? <BkRow label="ส่วนลดค่าขนส่งจากแพลตฟอร์ม" amount={b.platformShippingDiscount} sub /> : null}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#f0f0f0", marginTop: 12 }} />
+
+          {/* ค่าธรรมเนียมแพลตฟอร์ม */}
+          <View style={{ paddingTop: 12 }}>
+            <View className="flex-row items-center justify-between" style={{ paddingVertical: 4 }}>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: "#0a0a0a" }}>ค่าธรรมเนียมแพลตฟอร์ม</Text>
+              <Text style={{ fontSize: 14.5, fontWeight: "700", color: "#ef4444", fontVariant: ["tabular-nums"] }}>{fmtSigned(b.commission)}</Text>
+            </View>
+            <BkRow label="ค่าธรรมเนียม GP (MetaHerb 7%)" amount={b.commission} sub />
+          </View>
+
+          <View style={{ height: 1, backgroundColor: "#f0f0f0", marginTop: 12 }} />
+
+          {/* VAT note */}
+          <View className="flex-row items-start" style={{ gap: 8, paddingVertical: 12 }}>
+            <Info size={14} color="#9ca3af" strokeWidth={2.2} style={{ marginTop: 1 }} />
+            <Text style={{ flex: 1, fontSize: 12, color: "#9ca3af", lineHeight: 18 }}>{`ภาษีมูลค่าเพิ่ม VAT 7% (รวมในราคาแล้ว) ≈ ${fmtBaht(b.vat)}`}</Text>
+          </View>
+        </ScrollView>
+
+        {/* Footer — total payout (floating bar) */}
+        <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "white", borderTopWidth: 1, borderTopColor: DIVIDER_GRAY, paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 14 }}>
+          <View style={{ backgroundColor: BRAND_GREEN, borderRadius: 16, paddingHorizontal: 18, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View>
+              <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "500" }}>จำนวนเงินที่ชำระทั้งหมด</Text>
+              <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, marginTop: 1 }}>{s.status === "settled" ? "เข้ากระเป๋าร้านค้าแล้ว" : "รอปล่อยยอด"}</Text>
+            </View>
+            <Text style={{ color: "white", fontSize: 23, fontWeight: "800", fontVariant: ["tabular-nums"] }}>{fmtBaht(s.payout)}</Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// Compact month dropdown (icon + month + chevron) → glass-ish popover anchored under it.
+function MonthSelect({ value, onSelect }: { value: string; onSelect: (m: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ y: 0, right: 12 });
+  const ref = useRef<View>(null);
+  const { width } = useWindowDimensions();
+  const openMenu = () =>
+    ref.current?.measureInWindow((x, y, w, h) => {
+      setAnchor({ y: y + h + 6, right: Math.max(12, width - x - w) });
+      setOpen(true);
+    });
+  return (
+    <View>
+      <Pressable ref={ref} onPress={() => (open ? setOpen(false) : openMenu())} className="flex-row items-center active:opacity-70" style={{ gap: 5 }}>
+        <Calendar size={13} color={TEXT_MUTED} strokeWidth={2.2} />
+        <Text style={{ fontSize: 12.5, fontWeight: "600", color: TEXT_MUTED }}>{value}</Text>
+        <ChevronDown size={13} color={TEXT_MUTED} strokeWidth={2.4} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+        <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
+          <View style={{ position: "absolute", top: anchor.y, right: anchor.right, minWidth: 162, backgroundColor: "white", borderRadius: 14, paddingVertical: 4, borderWidth: 1, borderColor: "#f0f0f0", shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 12 }}>
+            {MONTH_OPTIONS.map((m) => {
+              const active = m === value;
+              return (
+                <Pressable key={m} onPress={() => { onSelect(m); setOpen(false); }} className="flex-row items-center active:opacity-50" style={{ paddingHorizontal: 14, height: 42, gap: 8 }}>
+                  <View style={{ width: 18 }}>{active ? <Check size={16} color={BRAND_GREEN} strokeWidth={2.8} /> : null}</View>
+                  <Text style={{ fontSize: 14, color: "#1c1c1e", fontWeight: active ? "600" : "400" }}>{m}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function FinanceTransactionsView() {
+  const [tab, setTab] = useState<SettlementStatus>("settled");
+  const [selected, setSelected] = useState<Settlement | null>(null);
+  const [month, setMonth] = useState(DEFAULT_MONTH);
+  const rows = SETTLEMENTS.filter((s) => s.status === tab && s.monthLabel === month);
+  const tabs: { id: SettlementStatus; label: string }[] = [
+    { id: "settled", label: "ชำระเงินแล้ว" },
+    { id: "pending", label: "ที่จะชำระเงิน" },
+  ];
+  const [segW, setSegW] = useState(0);
+  const indicator = useRef(new Animated.Value(0)).current;
+  const listFade = useRef(new Animated.Value(1)).current;
+  const pillW = segW > 0 ? (segW - 6) / 2 : 0;
+  const switchTab = (id: SettlementStatus) => {
+    if (id === tab) return;
+    setTab(id);
+    Animated.spring(indicator, { toValue: id === "settled" ? 0 : 1, useNativeDriver: true, friction: 9, tension: 90 }).start();
+    listFade.setValue(0);
+    Animated.timing(listFade, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  };
+  return (
+    <>
+      {/* Wallet hero — same card as the ภาพรวม dashboard */}
+      <WalletHeroCard />
+
+      {/* GP fee + withdrawn */}
+      <View className="flex-row" style={{ gap: 10 }}>
+        <FinStat label="ค่าธรรมเนียม GP" value={fmtBaht(FINANCE_TOTALS.gpFees)} hint="หักแพลตฟอร์ม 7%" Icon={Percent} coin={require("../../assets/coins/cion1.png")} />
+        <FinStat label="ถอนไปแล้ว" value={fmtBaht(FINANCE_TOTALS.withdrawn)} hint="โอนเข้าบัญชีแล้ว" Icon={Banknote} coin={require("../../assets/coins/cion3.png")} />
+      </View>
+
+      {/* Settlements — tabs + list (web TransactionsTab) */}
+      <View>
+        <View className="flex-row items-center justify-between" style={{ marginBottom: 10 }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY }}>ธุรกรรม</Text>
+          <MonthSelect value={month} onSelect={setMonth} />
+        </View>
+        <View
+          onLayout={(e) => setSegW(e.nativeEvent.layout.width)}
+          className="flex-row"
+          style={{ backgroundColor: "#eef0ee", borderRadius: 999, padding: 3 }}
+        >
+          {pillW > 0 ? (
+            <Animated.View
+              style={{
+                position: "absolute",
+                top: 3,
+                bottom: 3,
+                left: 3,
+                width: pillW,
+                borderRadius: 999,
+                backgroundColor: "white",
+                shadowColor: "#000",
+                shadowOpacity: 0.08,
+                shadowOffset: { width: 0, height: 1 },
+                shadowRadius: 3,
+                elevation: 2,
+                transform: [{ translateX: indicator.interpolate({ inputRange: [0, 1], outputRange: [0, pillW] }) }],
+              }}
+            />
+          ) : null}
+          {tabs.map((tb) => {
+            const active = tab === tb.id;
+            return (
+              <Pressable
+                key={tb.id}
+                onPress={() => switchTab(tb.id)}
+                className="flex-row items-center justify-center active:opacity-80"
+                style={{ flex: 1, height: 38, borderRadius: 999 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: active ? "#0a0a0a" : TEXT_MUTED }}>{tb.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Animated.View style={{ gap: 10, marginTop: 12, opacity: listFade }}>
+          {rows.length > 0 ? (
+            rows.map((s) => <SettlementCard key={s.idCode} s={s} onPress={() => setSelected(s)} />)
+          ) : (
+            <View style={{ alignItems: "center", paddingVertical: 28 }}>
+              <Text style={{ fontSize: 13, color: TEXT_DISABLED }}>ไม่มีรายการในเดือนนี้</Text>
+            </View>
+          )}
+        </Animated.View>
+        <Text style={{ fontSize: 11.5, color: TEXT_DISABLED, marginTop: 12 }}>{`แถวทั้งหมด: ${rows.length}`}</Text>
+      </View>
+
+      {selected ? <SettlementDetailSheet s={selected} onClose={() => setSelected(null)} /> : null}
+    </>
+  );
+}
+
 function OverviewTab({
   period,
   onPeriodChange,
   insetsBottom,
   sub,
-  setSub,
-  menuOpen,
-  setMenuOpen,
+  onOpenMenu,
   onScroll,
+  hideHeader,
+  headerRight,
+  headerTitle,
+  hideMenuButton,
 }: {
   period: "monthly" | "yearly";
   onPeriodChange: (p: "monthly" | "yearly") => void;
   insetsBottom: number;
-  // Section + menu state lifted to MyShopScreen so the header hamburger drives it.
+  // Active section + the full-screen menu opener, driven from MyShopScreen.
   sub: SectionId;
-  setSub: (id: SectionId) => void;
-  menuOpen: boolean;
-  setMenuOpen: (v: boolean) => void;
+  onOpenMenu: () => void;
   onScroll?: ScrollHandler;
+  // Hide the section title + burger menu (e.g. the การเงิน tab is single-purpose).
+  hideHeader?: boolean;
+  // Optional action shown on the right of the (slim) app bar when hideHeader.
+  headerRight?: ReactNode;
+  // Page name shown on the left of the app bar when hideHeader.
+  headerTitle?: string;
+  // Hide the in-content burger (e.g. it's moved onto the ร้านค้าของฉัน app bar).
+  hideMenuButton?: boolean;
 }) {
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
   // Controlled calendar selection — drives every scoped figure below.
@@ -1745,7 +2188,7 @@ function OverviewTab({
   const topProductsCard = (
     <TopListCard
       title="Top Product"
-      subtitle={`10 อันดับสินค้าขายดี · ${ctxLabel}`}
+      subtitle={`อันดับสินค้าขายดี · ${ctxLabel}`}
       mainLabel="สินค้า"
       metricLabel="ยอดขาย(ชิ้น)"
       valueLabel="รายได้ (฿)"
@@ -1800,22 +2243,32 @@ function OverviewTab({
     >
       {/* [0] Section heading + menu — pins to the top (step 2). ALL spacing around
           the title lives on this header so the title↔content gap is identical
-          whether resting or pinned. */}
-      <View
-        className="flex-row items-center justify-between"
-        style={{ backgroundColor: "#fafafa", paddingTop: 14, paddingBottom: 14 }}
-      >
-        <Text style={{ fontSize: 20, fontWeight: "700", color: TEXT_PRIMARY }}>
-          {SECTION_LABEL[sub]}
-        </Text>
-        <AnimatedMenuButton open={menuOpen} onPress={() => setMenuOpen(true)} />
-      </View>
+          whether resting or pinned. Hidden on single-purpose tabs (การเงิน) —
+          still index 0 so stickyHeaderIndices stays valid (thin spacer instead). */}
+      {hideHeader ? (
+        headerTitle || headerRight ? (
+          <View className="flex-row items-center justify-between" style={{ backgroundColor: "#fafafa", paddingTop: 14, paddingBottom: 12 }}>
+            <Text style={{ fontSize: 20, fontWeight: "700", color: TEXT_PRIMARY }}>{headerTitle}</Text>
+            {headerRight}
+          </View>
+        ) : (
+          <View style={{ height: 16, backgroundColor: "#fafafa" }} />
+        )
+      ) : (
+        <View
+          className="flex-row items-center justify-between"
+          style={{ backgroundColor: "#fafafa", paddingTop: 14, paddingBottom: 14 }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: "700", color: TEXT_PRIMARY }}>
+            {SECTION_LABEL[sub]}
+          </Text>
+          {hideMenuButton ? null : <AnimatedMenuButton open={false} onPress={onOpenMenu} />}
+        </View>
+      )}
 
       {/* Content wrapper holds the 14px rhythm; the header sits outside it so the
           first gap isn't doubled (header padding + wrapper gap). */}
       <View style={{ gap: 14 }}>
-      {/* Wallet hero belongs to the Dashboard only. */}
-      {sub === "dashboard" ? <WalletHeroCard /> : null}
 
       {/* ===== Per-section content (order mirrors the web OverviewTab) ===== */}
       {sub === "dashboard" ? (
@@ -1860,31 +2313,7 @@ function OverviewTab({
       {sub === "report_customers" ? <>{topCustomersCard}</> : null}
       {sub === "report_products" ? <>{topProductsCard}</> : null}
 
-      {sub === "finance_overview" ? (
-        <>
-          {salesCard}
-          <View className="flex-row" style={{ gap: 10 }}>
-            <KpiCard
-              label="ยอดที่รอปล่อย"
-              value={fmtTHBShort(WALLET.escrow)}
-              unit=""
-              delta={0}
-              deltaLabel={periodLabel}
-              accent="#f59e0b"
-              Icon={Clock}
-            />
-            <KpiCard
-              label="รายได้สะสม"
-              value={fmtTHBShort(WALLET.totalIncome)}
-              unit=""
-              delta={delta.sales}
-              deltaLabel={periodLabel}
-              accent={BRAND_GREEN}
-              Icon={Wallet}
-            />
-          </View>
-        </>
-      ) : null}
+      {sub === "finance_overview" ? <FinanceTransactionsView /> : null}
 
       {/* Herbal Market documents — quotation / PR / PO */}
       {sub === "hm_quotations" ? <QuotationSection /> : null}
@@ -1918,16 +2347,6 @@ function OverviewTab({
       ) : null}
       </View>
 
-      {/* Menu sheet — full sidebar tree with accordion sub-menus */}
-      <MenuSheet
-        visible={menuOpen}
-        current={sub}
-        onClose={() => setMenuOpen(false)}
-        onSelect={(id) => {
-          setSub(id);
-          setMenuOpen(false);
-        }}
-      />
 
       {/* Sales breakdown sheet — opened by "ดูรายละเอียด" on the sales cards */}
       <SalesBreakdownSheet
@@ -2091,118 +2510,6 @@ function SalesLineCard({ line }: { line: SalesLine }) {
         </Text>
       </View>
     </View>
-  );
-}
-
-/* ============ Menu sheet (sidebar → bottom sheet) ============ */
-
-function MenuSheet({
-  visible,
-  current,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  current: SectionId;
-  onClose: () => void;
-  onSelect: (id: SectionId) => void;
-}) {
-  // Auto-expand whichever group owns the current section.
-  const ownerOf = (id: SectionId) =>
-    SHOP_MENU.find((n) => n.id === id || n.children?.some((c) => c.id === id))?.id;
-  const [expanded, setExpanded] = useState<SectionId | null>(() => ownerOf(current) ?? null);
-
-  const toggle = (id: SectionId) =>
-    setExpanded((cur) => (cur === id ? null : id));
-
-  return (
-    <BottomSheet visible={visible} onClose={onClose} title="เมนูร้านค้า">
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-        {SHOP_MENU.map((node) => {
-          const hasChildren = !!node.children?.length;
-          const isOpen = expanded === node.id;
-          const groupActive =
-            current === node.id || node.children?.some((c) => c.id === current);
-          return (
-            <View key={node.id}>
-              <Pressable
-                onPress={() => (hasChildren ? toggle(node.id) : onSelect(node.id))}
-                className="flex-row items-center active:bg-gray-50"
-                style={{ height: 50, paddingHorizontal: 10, borderRadius: 10, gap: 12 }}
-              >
-                <node.Icon
-                  size={20}
-                  color={groupActive ? BRAND_GREEN : TEXT_SECONDARY}
-                  strokeWidth={2}
-                />
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: 15,
-                    fontWeight: groupActive ? "600" : "500",
-                    color: groupActive ? BRAND_GREEN_DARK : TEXT_PRIMARY,
-                  }}
-                >
-                  {node.label}
-                </Text>
-                {hasChildren ? (
-                  <View style={{ transform: [{ rotate: isOpen ? "180deg" : "0deg" }] }}>
-                    <ChevronDown size={18} color={TEXT_MUTED} />
-                  </View>
-                ) : current === node.id ? (
-                  <Check size={18} color={BRAND_GREEN} strokeWidth={2.5} />
-                ) : null}
-              </Pressable>
-
-              {/* Accordion children */}
-              {hasChildren && isOpen ? (
-                <View style={{ marginBottom: 4 }}>
-                  {node.children!.map((child) => {
-                    const active = current === child.id;
-                    return (
-                      <Pressable
-                        key={child.id}
-                        onPress={() => onSelect(child.id)}
-                        className="flex-row items-center active:bg-gray-50"
-                        style={{
-                          height: 44,
-                          paddingLeft: 42,
-                          paddingRight: 10,
-                          borderRadius: 10,
-                          gap: 8,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 5,
-                            height: 5,
-                            borderRadius: 3,
-                            backgroundColor: active ? BRAND_GREEN : "#d4d4d4",
-                          }}
-                        />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            fontWeight: active ? "600" : "400",
-                            color: active ? BRAND_GREEN_DARK : TEXT_SECONDARY,
-                          }}
-                        >
-                          {child.label}
-                        </Text>
-                        {active ? (
-                          <Check size={16} color={BRAND_GREEN} strokeWidth={2.5} />
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-    </BottomSheet>
   );
 }
 
@@ -2517,7 +2824,7 @@ const matImg = (name: string): number => {
     ["อัญชัน", 9], ["คำฝอย", 9], ["มะรุม", 5],
   ];
   const hit = map.find(([k]) => name.includes(k));
-  return TOP_PRODUCTS[hit ? hit[1] : 0].image;
+  return TOP_PRODUCTS[(hit ? hit[1] : 0) % TOP_PRODUCTS.length].image;
 };
 
 // Counterparty companies — ported verbatim from the web BUYER_PROFILES.

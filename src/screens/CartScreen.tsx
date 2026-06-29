@@ -59,6 +59,7 @@ function cartItemToProduct(item: CartItem): Product {
     rating: getShop(item.shop).rating,
     sold: "ขายดี",
     image: item.image,
+    shop: item.shop, // keep the seller so the detail page shows the right shop
   };
 }
 

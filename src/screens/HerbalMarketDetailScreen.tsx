@@ -50,6 +50,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MATERIALS, HerbalMaterial, MaterialCard } from "./HerbalMarketScreen";
 import { useCart } from "../context/CartContext";
 import { getShop } from "../data/shops";
+import { useShopName } from "../context/SellerContext";
 import { ShopAvatar } from "../components/ShopAvatar";
 
 /** Resolve a local bundled image (require → number) or remote URL string. */
@@ -97,7 +98,7 @@ const REVIEWS = [
   { user: "คาเฟ่ออร์แกนิก", rating: 4, date: "3 มิ.ย. 2569", comment: "ของดีตรงปก กลิ่นหอมธรรมชาติ รอบนี้ส่งช้านิดหน่อยแต่โดยรวมโอเค" },
 ];
 
-type Params = { id?: string };
+type Params = { id?: string; preview?: boolean };
 
 // Full-bleed white section — same rhythm as ProductDetailScreen (paddingH 16,
 // marginTop 8 between blocks) so the two detail pages feel like siblings.
@@ -216,7 +217,7 @@ export function HerbalMarketDetailScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
   const route = useRoute();
-  const { id } = (route.params as Params) ?? {};
+  const { id, preview } = (route.params as Params) ?? {};
   const { addToCart, count: cartCount } = useCart();
 
   const material = useMemo(
@@ -224,6 +225,7 @@ export function HerbalMarketDetailScreen() {
     [id],
   );
   const shop = getShop(material.supplier);
+  const shopName = useShopName(material.supplier); // own shop reflects the owner's edited name
 
   const [galleryIdx, setGalleryIdx] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -414,7 +416,7 @@ export function HerbalMarketDetailScreen() {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: preview ? insets.bottom + 24 : 120 }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
           useNativeDriver: false,
         })}
@@ -740,7 +742,7 @@ export function HerbalMarketDetailScreen() {
               </View>
               <View className="flex-1" style={{ gap: 4 }}>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>
-                  {material.supplier}
+                  {shopName}
                 </Text>
                 <View className="flex-row flex-wrap items-center" style={{ gap: 12, marginTop: 4 }}>
                   <View className="flex-row items-center" style={{ gap: 4 }}>
@@ -758,20 +760,24 @@ export function HerbalMarketDetailScreen() {
                 </View>
               </View>
 
-              <Pressable
-                onPress={() => nav.navigate("Shop" as never)}
-                className="active:opacity-70"
-                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
-              >
-                <Store size={18} color={BRAND_GREEN} />
-              </Pressable>
-              <Pressable
-                onPress={() => (nav.navigate as (route: string) => void)("Chat")}
-                className="active:opacity-70"
-                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
-              >
-                <MessageCircle size={18} color={BRAND_GREEN} />
-              </Pressable>
+              {!preview && (
+                <Pressable
+                  onPress={() => (nav.navigate as (route: string, params?: object) => void)("Shop", { shopName: material.supplier })}
+                  className="active:opacity-70"
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Store size={18} color={BRAND_GREEN} />
+                </Pressable>
+              )}
+              {!preview && (
+                <Pressable
+                  onPress={() => (nav.navigate as (route: string) => void)("Chat")}
+                  className="active:opacity-70"
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
+                >
+                  <MessageCircle size={18} color={BRAND_GREEN} />
+                </Pressable>
+              )}
             </View>
           </View>
 
@@ -843,7 +849,7 @@ export function HerbalMarketDetailScreen() {
           </View>
 
           {/* Related materials */}
-          {recommended.length > 0 ? (
+          {!preview && recommended.length > 0 ? (
             <View className="bg-white" style={{ paddingVertical: 16, marginTop: 8 }}>
               <Text
                 style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", paddingHorizontal: 16, marginBottom: 12 }}
@@ -889,24 +895,28 @@ export function HerbalMarketDetailScreen() {
           </GlassIconButton>
 
           <View className="flex-row" style={{ gap: 8 }}>
-            <GlassIconButton
-              onPress={onToggleWishlist}
-              accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
-              accessibilityState={{ selected: wishlisted }}
-            >
-              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                <Heart size={20} color={wishlisted ? "#ff383c" : "#1a1a1a"} fill={wishlisted ? "#ff383c" : "transparent"} />
-              </Animated.View>
-            </GlassIconButton>
-
-            <Animated.View style={{ transform: [{ scale: cartBump }] }}>
-              <GlassIconButton onPress={() => (nav.navigate as (r: string) => void)("Cart")} accessibilityLabel="ตะกร้าสินค้า">
-                <ShoppingCart size={20} color="#1a1a1a" />
+            {!preview && (
+              <GlassIconButton
+                onPress={onToggleWishlist}
+                accessibilityLabel={wishlisted ? "นำออกจากรายการโปรด" : "เพิ่มเข้ารายการโปรด"}
+                accessibilityState={{ selected: wishlisted }}
+              >
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Heart size={20} color={wishlisted ? "#ff383c" : "#1a1a1a"} fill={wishlisted ? "#ff383c" : "transparent"} />
+                </Animated.View>
               </GlassIconButton>
-              <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
-                <CountBadge count={cartCount} />
-              </View>
-            </Animated.View>
+            )}
+
+            {!preview && (
+              <Animated.View style={{ transform: [{ scale: cartBump }] }}>
+                <GlassIconButton onPress={() => (nav.navigate as (r: string) => void)("Cart")} accessibilityLabel="ตะกร้าสินค้า">
+                  <ShoppingCart size={20} color="#1a1a1a" />
+                </GlassIconButton>
+                <View style={{ position: "absolute", top: -2, right: -4 }} pointerEvents="none">
+                  <CountBadge count={cartCount} />
+                </View>
+              </Animated.View>
+            )}
 
             <GlassIconButton accessibilityLabel="แชร์">
               <Share2 size={20} color="#1a1a1a" />
@@ -918,7 +928,9 @@ export function HerbalMarketDetailScreen() {
       {/* Black scroll-edge shade at the very bottom of the screen. */}
       <BottomFade />
 
-      {/* Floating Liquid Glass action sheet — hovers above the bottom (Apple Maps) */}
+      {/* Floating Liquid Glass action sheet — hovers above the bottom (Apple Maps).
+          Hidden in shop-owner preview (no buy/chat controls). */}
+      {!preview && (
       <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
         <View
           style={{
@@ -1002,6 +1014,7 @@ export function HerbalMarketDetailScreen() {
           </GlassView>
         </View>
       </View>
+      )}
 
       {/* Fly-to-cart overlay — animates a copy of the material image toward the
           cart icon in the top bar. Outside ScrollView so it renders on top. */}

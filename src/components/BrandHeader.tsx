@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Image, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Bell, ChevronLeft, Search, ShoppingCart } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Bell, ChevronLeft, Search, ShoppingCart, Sparkles } from "lucide-react-native";
 import { GlassIconButton } from "./GlassIconButton";
 import { CountBadge } from "./CountBadge";
 import { BRAND_GREEN } from "../theme/tokens";
@@ -62,6 +63,8 @@ type Props = {
   showLogo?: boolean;
   /** Show the notification (bell) button. */
   showBell?: boolean;
+  /** Show the เมต้า AI button (left of the bell). Navigates to AIAssistant. */
+  showAI?: boolean;
   /** Show the cart button. */
   showCart?: boolean;
   /** Scroll position of the page below. When provided, the header collapses
@@ -91,11 +94,13 @@ export function BrandHeader({
   titleSize = 18,
   showLogo = true,
   showBell = true,
+  showAI = true,
   showCart = true,
   searchPlaceholder = "ค้นหาสินค้า, สมุนไพร, ร้านค้า...",
   bellCount = 3,
   cartCount,
 }: Props) {
+  const nav = useNavigation();
   // Cart badge reflects the shared cart unless a screen overrides cartCount.
   const { count: liveCartCount } = useCart();
   const effectiveCartCount = cartCount ?? liveCartCount;
@@ -149,6 +154,16 @@ export function BrandHeader({
     </View>
   );
 
+  const ai = showAI ? (
+    <GlassIconButton
+      onPress={() => (nav.navigate as (r: string) => void)("AIAssistant")}
+      size={44}
+      accessibilityLabel="ผู้ช่วย AI เมต้า"
+    >
+      <Sparkles size={20} color="#1a1a1a" />
+    </GlassIconButton>
+  ) : null;
+
   const bell = showBell ? (
     <GlassHeaderButton
       onPress={onBell}
@@ -201,6 +216,7 @@ export function BrandHeader({
             {back}
             {showLogo ? <Image source={LOGO} style={{ width: 44, height: 44 }} resizeMode="contain" /> : null}
             {titleBlock}
+            {ai}
             {bell}
             {cart}
           </View>
@@ -248,6 +264,7 @@ export function BrandHeader({
             ) : null}
           </View>
 
+          {ai}
           {showBell ? (
             <GlassHeaderButton
               onPress={onBell}

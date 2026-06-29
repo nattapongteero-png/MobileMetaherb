@@ -63,7 +63,7 @@ const GOAL_LABEL: Record<HealthGoal, string> = {
 /** Words that hint each goal might fit certain product names/categories. */
 const GOAL_PRODUCT_HINTS: Record<HealthGoal, string[]> = {
   sleep:       ["คาโมมายล์", "ดอกคำฝอย", "ลาเวนเดอร์", "อัญชัน", "ชา", "พิมเสน"],
-  weight_loss: ["ดีท็อกซ์", "ขมิ้น", "ฟ้าทะลาย", "ชาเขียว", "น้ำผัก", "มะนาว"],
+  weight_loss: ["ดีท็อกซ์", "ดีทอกซ์", "ชา", "น้ำผัก", "มะนาว", "ส้มแขก", "การ์ซิเนีย", "บุก", "ไฟเบอร์"],
   weight_gain: ["บำรุง", "โสม", "ถั่งเช่า", "กาแฟ"],
   skin:        ["คอลลาเจน", "วิตามินซี", "ผิว", "อโรม่า", "น้ำผึ้ง", "มะนาว"],
   hair:        ["บำรุงผม", "งา", "ใบบัวบก"],
@@ -186,11 +186,75 @@ export function recommendForGoals(products: P[], goals: HealthGoal[], limit = 5)
       .sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0) || b.rating - a.rating)
       .slice(0, limit);
   }
-  return products
-    .map((p) => ({ p, s: scoreProduct(p, goals, "") }))
+  // Only products that genuinely match a goal hint — never pad a themed set
+  // with unrelated items (e.g. a ยาดม in a weight-loss set). Generic boosts
+  // (isRecommended / rating) must not sneak an off-theme product in.
+  const goalHitScore = (p: P): number => {
+    const text = `${p.name} ${categoryLabel(p.category)}`.toLowerCase();
+    let s = 0;
+    goals.forEach((g) => GOAL_PRODUCT_HINTS[g].forEach((hint) => { if (text.includes(hint.toLowerCase())) s += 1; }));
+    return s;
+  };
+  const matched = products
+    .map((p) => ({ p, hit: goalHitScore(p), s: scoreProduct(p, goals, "") }))
+    .filter(({ hit }) => hit > 0)
     .sort((a, b) => b.s - a.s || b.p.rating - a.p.rating)
     .slice(0, limit)
     .map(({ p }) => p);
+  // Fallback: catalog has nothing for this goal → top picks rather than empty.
+  if (matched.length === 0) {
+    return [...products]
+      .sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0) || b.rating - a.rating)
+      .slice(0, limit);
+  }
+  return matched;
+}
+
+/** ===== Smart filter — price / rating / promo / benefit / sort (LLM agent) ===== */
+const soldNum = (s?: string) => parseInt((s ?? "").replace(/[^0-9]/g, ""), 10) || 0;
+
+export interface ProductFilter {
+  query?: string;
+  goals?: HealthGoal[];
+  category?: string;
+  maxPrice?: number;
+  minPrice?: number;
+  minRating?: number;
+  promoOnly?: boolean;
+  sort?: "price_asc" | "price_desc" | "rating" | "sold";
+  limit?: number;
+}
+
+export function filterProducts(products: P[], f: ProductFilter): P[] {
+  const goals = f.goals ?? [];
+  const q = f.query ?? "";
+  let list = products.filter((p) => {
+    if (f.category && p.category !== f.category) return false;
+    if (f.maxPrice != null && p.price > f.maxPrice) return false;
+    if (f.minPrice != null && p.price < f.minPrice) return false;
+    if (f.minRating != null && p.rating < f.minRating) return false;
+    if (f.promoOnly && !(p.isFlashSale || p.hasCoupon || (p.discountPercent ?? 0) > 0)) return false;
+    return true;
+  });
+
+  const scored = q.trim().length > 0 || goals.length > 0;
+  if (scored) {
+    list = list
+      .map((p) => ({ p, s: scoreProduct(p, goals, q) }))
+      .filter(({ s }) => s > 0 || goals.length > 0)
+      .sort((a, b) => b.s - a.s || b.p.rating - a.p.rating)
+      .map(({ p }) => p);
+  }
+
+  switch (f.sort) {
+    case "price_asc": list = [...list].sort((a, b) => a.price - b.price); break;
+    case "price_desc": list = [...list].sort((a, b) => b.price - a.price); break;
+    case "rating": list = [...list].sort((a, b) => b.rating - a.rating); break;
+    case "sold": list = [...list].sort((a, b) => soldNum(b.sold) - soldNum(a.sold)); break;
+    default:
+      if (!scored) list = [...list].sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0) || b.rating - a.rating);
+  }
+  return list.slice(0, f.limit ?? 6);
 }
 
 /** ===== Comparison ===== */

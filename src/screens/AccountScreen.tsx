@@ -479,7 +479,7 @@ export function AccountScreen() {
               <View style={{ gap: 10 }}>
                 <MenuList
                   items={[
-                    { label: "แดชบอร์ดร้านค้า", Icon: Store, onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดร้านค้ากำลังพัฒนา") },
+                    { label: "แดชบอร์ดร้านค้า", Icon: Store, onPress: () => go("MyShop") },
                     ...(isSupplier ? [{ label: "จัดการ Herbal Market", Icon: Beaker, onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ด Herbal Market กำลังพัฒนา") }] : []),
                     ...(isTrialBrand ? [{ label: "จัดการแบรนด์ทดสอบ", Icon: FlaskConical, onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดแบรนด์ทดสอบ กำลังพัฒนา") }] : []),
                   ]}

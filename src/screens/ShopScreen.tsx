@@ -41,6 +41,9 @@ import type { Product } from "../types/Product";
 import { type SortKey } from "../data/shopSort";
 import { type HerbalSortKey } from "../data/herbalSort";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
+import { SHOPS, getShop } from "../data/shops";
+import { REAL_PRODUCTS } from "../data/realProducts";
+import { useSeller } from "../context/SellerContext";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -68,11 +71,13 @@ const CARD_OVERLAP = CARD_PADDING_TOP + AVATAR_HALF; // = 44
 
 // Mock shop data — mirrors the `Shop` shape from web's data/shops.ts so we
 // can wire to the real store later by replacing this with a context/fetch.
-const SHOP = {
+export const SHOP = {
   id: "metaherb",
   name: "METAHERB Store",
-  avatar: "🌿",
-  banner: require("../../assets/banner/banner_18_1773366718.jpg"),
+  // The shop's logo IS the brand's main logo (same asset the app header uses),
+  // so METAHERB Store presents one identity across the whole app.
+  logo: require("../../assets/logo.png"),
+  banner: SHOPS[0].banner, // METAHERB Store — single source of truth (data/shops)
   description:
     "ร้านค้าสมุนไพรออร์แกนิกคุณภาพระดับพรีเมียม คัดสรรวัตถุดิบจากแหล่งธรรมชาติทั่วประเทศไทย ผ่านมาตรฐาน อย. และ GMP รับประกันคุณภาพทุกชิ้น จัดส่งรวดเร็วภายใน 1-2 วัน",
   rating: 4.8,
@@ -96,7 +101,7 @@ type Review = {
   helpful: number;
 };
 
-const REVIEWS: Review[] = [
+export const REVIEWS: Review[] = [
   { id: "sr1", userName: "user01", rating: 5, comment: "ร้านดีมากค่ะ สินค้าคุณภาพ ส่งเร็ว แพ็คดี", date: "15 มี.ค. 2569", helpful: 24 },
   { id: "sr2", userName: "สมชาย", rating: 5, comment: "ซื้อประจำเลยครับ สินค้าออร์แกนิกจริง ไม่มีสารเคมี", date: "12 มี.ค. 2569", helpful: 18 },
   { id: "sr3", userName: "นุ่น", rating: 4, comment: "สินค้าดี แต่บางครั้งส่งช้าไปหน่อย", date: "10 มี.ค. 2569", helpful: 8 },
@@ -104,15 +109,18 @@ const REVIEWS: Review[] = [
   { id: "sr5", userName: "มินนี่", rating: 4, comment: "แพ็คเกจสวย ให้เป็นของขวัญได้เลย ราคาดีด้วย", date: "5 มี.ค. 2569", helpful: 12 },
 ];
 
-type ShopProduct = Product & { category: string };
+type ShopProduct = Product & { category: string; shop?: string };
 
-const SHOP_PRODUCTS: ShopProduct[] = [
-  { id: "sp1", name: "อบเชยเทศ Cinnamon Varum 150g", price: 199, originalPrice: 249, discountPercent: 20, rating: 4.8, sold: "1.2k", image: require("../../assets/products/catalog/product-37.jpg"), category: "ผลิตภัณฑ์สมุนไพร" },
-  { id: "sp2", name: "ยาดมสมุนไพรเมต้าเฮิร์บ", price: 89, rating: 4.7, sold: "856", image: require("../../assets/products/catalog/product-10.jpg"), category: "ผลิตภัณฑ์สมุนไพร" },
-  { id: "sp3", name: "ชามะลิอินทรีย์", price: 159, originalPrice: 199, discountPercent: 20, rating: 4.9, sold: "2.1k", image: require("../../assets/products/catalog/product-16.jpg"), category: "อาหารและเครื่องดื่ม" },
-  { id: "sp4", name: "กาแฟอินทรีย์เมต้า", price: 220, rating: 4.6, sold: "640", image: require("../../assets/products/catalog/product-03.png"), category: "อาหารและเครื่องดื่ม" },
-  { id: "sp5", name: "เลมอนซอฟต์เจล", price: 129, rating: 4.5, sold: "420", image: require("../../assets/products/catalog/product-01.png"), category: "ผลิตภัณฑ์สุขภาพ" },
-  { id: "sp6", name: "ชุดของขวัญสมุนไพร", price: 399, originalPrice: 499, discountPercent: 20, rating: 4.9, sold: "320", image: require("../../assets/products/catalog/product-19.jpg"), category: "ชุดของชำร่วย/ของขวัญ" },
+// These six are METAHERB Store's own storefront products → their seller is always
+// METAHERB (so detail page ↔ storefront never disagree). บ้านสมุนไพรไทย / กรีนลีฟ get
+// their distinct products via the Herbal Market + trial catalogs (split per shop).
+export const SHOP_PRODUCTS: ShopProduct[] = [
+  { id: "sp1", name: "อบเชยเทศ Cinnamon Varum 150g", price: 199, originalPrice: 249, discountPercent: 20, rating: 4.8, sold: "1.2k", image: require("../../assets/products/catalog/product-37.jpg"), category: "ผลิตภัณฑ์สมุนไพร", shop: "METAHERB Store" },
+  { id: "sp2", name: "ยาดมสมุนไพรเมต้าเฮิร์บ", price: 89, rating: 4.7, sold: "856", image: require("../../assets/products/catalog/product-10.jpg"), category: "ผลิตภัณฑ์สมุนไพร", shop: "METAHERB Store" },
+  { id: "sp3", name: "ชามะลิอินทรีย์", price: 159, originalPrice: 199, discountPercent: 20, rating: 4.9, sold: "2.1k", image: require("../../assets/products/catalog/product-16.jpg"), category: "อาหารและเครื่องดื่ม", shop: "METAHERB Store" },
+  { id: "sp4", name: "กาแฟอินทรีย์เมต้า", price: 220, rating: 4.6, sold: "640", image: require("../../assets/products/catalog/product-03.png"), category: "อาหารและเครื่องดื่ม", shop: "METAHERB Store" },
+  { id: "sp5", name: "เลมอนซอฟต์เจล", price: 129, rating: 4.5, sold: "420", image: require("../../assets/products/catalog/product-01.png"), category: "ผลิตภัณฑ์สุขภาพ", shop: "METAHERB Store" },
+  { id: "sp6", name: "ชุดของขวัญสมุนไพร", price: 399, originalPrice: 499, discountPercent: 20, rating: 4.9, sold: "320", image: require("../../assets/products/catalog/product-19.jpg"), category: "ชุดของชำร่วย/ของขวัญ", shop: "METAHERB Store" },
 ];
 
 // Display order matches the web's category dropdown — same labels.
@@ -130,6 +138,25 @@ type TabKey = "products" | "herbal" | "reviews";
 export function ShopScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+
+  // Which shop are we viewing? The route may target ANY of the three shops; when
+  // absent we default to the flagship (METAHERB Store) for back-compat.
+  const route = useRoute<RouteProp<RootStackParamList, "Shop">>();
+  const shopName = route.params?.shopName ?? "METAHERB Store";
+  const isMine = shopName === "METAHERB Store";
+  const meta = getShop(shopName); // full identity from data/shops.ts
+
+  // Reflect the owner's profile edits (name / desc / logo / banner) so the public
+  // shop page always matches "จัดการร้านค้า" — but ONLY for METAHERB Store (the
+  // owner console only edits the flagship). Other shops use their static identity.
+  const { shopLogoUri, shopBannerUri, shopProfile } = useSeller();
+  const displayName = isMine ? shopProfile?.shopName || meta.name : meta.name;
+  const displayDesc = isMine
+    ? shopProfile?.description || meta.description || ""
+    : meta.description ?? "";
+  const displayLogo = isMine && shopLogoUri ? { uri: shopLogoUri } : meta.avatar ?? SHOP.logo;
+  const displayBanner =
+    isMine && shopBannerUri ? { uri: shopBannerUri } : meta.banner ?? SHOP.banner;
   const [following, setFollowing] = useState(false);
   const [showFollowToast, setShowFollowToast] = useState(false);
   const [tab, setTab] = useState<TabKey>("products");
@@ -142,7 +169,6 @@ export function ShopScreen() {
   const [herbalSort, setHerbalSort] = useState<HerbalSortKey>("popular");
 
   // The native filter sheets hand their choices back via route params.
-  const route = useRoute<RouteProp<RootStackParamList, "Shop">>();
   const routeSort = route.params?.sort;
   const routeCategory = route.params?.category;
   const routeHerbalSort = route.params?.herbalSort;
@@ -210,7 +236,7 @@ export function ShopScreen() {
   };
 
   // Live followers count — visible system response to the user's action.
-  const liveFollowers = SHOP.followers + (following ? 1 : 0);
+  const liveFollowers = (meta.followers ?? SHOP.followers) + (following ? 1 : 0);
 
   // Banner height is dynamic — it depends on the device's safe-area inset so
   // the green region always ends at the avatar's vertical center regardless
@@ -231,19 +257,39 @@ export function ShopScreen() {
     extrapolate: "clamp",
   });
 
+  // This shop's storefront products. METAHERB keeps its curated SHOP_PRODUCTS
+  // (also powering the owner console); the other two shops draw their distinct
+  // products from the main catalog, split per shop by the `shop` field (Phase 1).
+  const shopProducts = useMemo(
+    () =>
+      isMine
+        ? (SHOP_PRODUCTS as ShopProduct[])
+        : (REAL_PRODUCTS.filter((p) => p.shop === shopName) as ShopProduct[]),
+    [isMine, shopName],
+  );
+
   // Categories with counts derived from products (web pattern).
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
-    SHOP_PRODUCTS.forEach((p) => counts.set(p.category, (counts.get(p.category) || 0) + 1));
-    // Only categories this shop actually stocks (drop empty ones).
+    shopProducts.forEach((p) => counts.set(p.category, (counts.get(p.category) || 0) + 1));
+    // Build the chip list from whatever categories this shop actually stocks.
+    // SHOP_PRODUCTS use Thai labels (ordered via CATEGORY_ORDER); REAL_PRODUCTS
+    // use CategoryKey codes (not in CATEGORY_ORDER) — append those after, so both
+    // product sources surface their real categories.
     const ordered = CATEGORY_ORDER.map((name) => ({ name, count: counts.get(name) || 0 })).filter(
       (c) => c.count > 0,
     );
-    return [{ name: "ทั้งหมด", count: SHOP_PRODUCTS.length }, ...ordered];
-  }, []);
+    const extra = Array.from(counts.keys())
+      .filter((name) => !CATEGORY_ORDER.includes(name))
+      .map((name) => ({ name, count: counts.get(name) || 0 }));
+    return [{ name: "ทั้งหมด", count: shopProducts.length }, ...ordered, ...extra];
+  }, [shopProducts]);
 
   // Herbal Market materials this shop supplies — only show the tab if it has any.
-  const herbalMaterials = useMemo(() => MATERIALS.filter((m) => m.supplier === SHOP.name), []);
+  const herbalMaterials = useMemo(
+    () => MATERIALS.filter((m) => m.supplier === shopName),
+    [shopName],
+  );
   const hasHerbal = herbalMaterials.length > 0;
 
   // Distinct material categories this shop stocks (for the herbal filter/chips).
@@ -270,7 +316,7 @@ export function ShopScreen() {
   // Apply category + search filter, then sort.
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = SHOP_PRODUCTS.filter((p) => {
+    let list = shopProducts.filter((p) => {
       const inCategory = category === "ทั้งหมด" || p.category === category;
       const inSearch = !q || p.name.toLowerCase().includes(q);
       return inCategory && inSearch;
@@ -279,7 +325,7 @@ export function ShopScreen() {
     else if (sort === "price-desc") list = [...list].sort((a, b) => b.price - a.price);
     else if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
     return list;
-  }, [category, search, sort]);
+  }, [shopProducts, category, search, sort]);
 
   const ratingBreakdown = useMemo(() => {
     return [5, 4, 3, 2, 1].map((s) => ({
@@ -335,7 +381,7 @@ export function ShopScreen() {
         {/* Shop cover image (natural herb banner) — stretches on pull-down */}
         <View style={{ height: bannerHeight, backgroundColor: "#319754" }}>
           <Animated.View style={{ width: "100%", height: "100%", transform: [{ translateY: bannerTranslateY }, { scale: bannerScale }] }}>
-            <Image source={SHOP.banner} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <Image source={displayBanner} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
             <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(13,49,29,0.28)" }} />
           </Animated.View>
         </View>
@@ -365,9 +411,10 @@ export function ShopScreen() {
                 backgroundColor: "rgba(49,151,84,0.1)",
                 alignItems: "center",
                 justifyContent: "center",
+                overflow: "hidden",
               }}
             >
-              <Text style={{ fontSize: 28, lineHeight: 34 }}>{SHOP.avatar}</Text>
+              <Image source={displayLogo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -375,9 +422,9 @@ export function ShopScreen() {
                 numberOfLines={1}
                 style={{ fontSize: 17, fontWeight: "700", color: "#0a0a0a", lineHeight: 22 }}
               >
-                {SHOP.name}
+                {displayName}
               </Text>
-              {SHOP.verified ? (
+              {(meta.verified ?? SHOP.verified) ? (
                 <View
                   className="flex-row items-center self-start"
                   style={{
@@ -448,25 +495,25 @@ export function ShopScreen() {
             numberOfLines={2}
             style={{ fontSize: 13, color: "#525252", marginTop: 10, lineHeight: 19 }}
           >
-            {SHOP.description}
+            {displayDesc}
           </Text>
 
           {/* Meta row */}
           <View className="flex-row items-center flex-wrap" style={{ marginTop: 10, gap: 12 }}>
             <View className="flex-row items-center" style={{ gap: 4 }}>
               <MapPin size={12} color="#737373" />
-              <Text style={{ fontSize: 11, color: "#737373" }}>{SHOP.location}</Text>
+              <Text style={{ fontSize: 11, color: "#737373" }}>{meta.location ?? SHOP.location}</Text>
             </View>
             <View className="flex-row items-center" style={{ gap: 4 }}>
               <Clock size={12} color="#737373" />
               <Text style={{ fontSize: 11, color: "#737373" }}>
-                เข้าร่วม {SHOP.joined}
+                เข้าร่วม {meta.joined ?? SHOP.joined}
               </Text>
             </View>
             <View className="flex-row items-center" style={{ gap: 4 }}>
               <MessageCircle size={12} color="#737373" />
               <Text style={{ fontSize: 11, color: "#737373" }}>
-                ตอบ {SHOP.responseRate}%
+                ตอบ {meta.responseRate ?? SHOP.responseRate}%
               </Text>
             </View>
           </View>
@@ -481,7 +528,7 @@ export function ShopScreen() {
               borderTopColor: "#f5f5f5",
             }}
           >
-            <Stat value={String(SHOP.rating)} label="คะแนน" highlight star />
+            <Stat value={String(meta.rating ?? SHOP.rating)} label="คะแนน" highlight star />
             <Divider />
             <Stat
               value={formatNumber(liveFollowers)}
@@ -489,9 +536,9 @@ export function ShopScreen() {
               highlight={following}
             />
             <Divider />
-            <Stat value={String(SHOP.totalProducts)} label="สินค้า" />
+            <Stat value={String(meta.totalProducts ?? SHOP.totalProducts)} label="สินค้า" />
             <Divider />
-            <Stat value={SHOP.totalSold} label="ยอดขาย" />
+            <Stat value={meta.totalSold ?? SHOP.totalSold} label="ยอดขาย" />
           </View>
 
         </View>
@@ -506,7 +553,7 @@ export function ShopScreen() {
           <TabPill
             active={tab === "products"}
             label="สินค้า"
-            count={SHOP_PRODUCTS.length}
+            count={shopProducts.length}
             Icon={Package}
             onPress={() => setTab("products")}
           />
@@ -703,8 +750,8 @@ export function ShopScreen() {
             <ReviewsSection
               reviews={REVIEWS}
               ratingBreakdown={ratingBreakdown}
-              shopRating={SHOP.rating}
-              totalReviews={SHOP.totalReviews}
+              shopRating={meta.rating ?? SHOP.rating}
+              totalReviews={meta.totalReviews ?? SHOP.totalReviews}
             />
           </View>
         )}
@@ -742,7 +789,7 @@ export function ShopScreen() {
           >
             <Heart size={14} color="#ef4444" fill="#ef4444" />
             <Text style={{ color: "white", fontSize: 13, fontWeight: "500" }}>
-              ติดตามร้าน {SHOP.name} แล้ว
+              ติดตามร้าน {displayName} แล้ว
             </Text>
           </View>
         </Animated.View>
@@ -868,7 +915,7 @@ function Divider() {
   return <View style={{ width: 1, height: 28, backgroundColor: "#f0f0f0" }} />;
 }
 
-function ProductsGrid({ products }: { products: Product[] }) {
+export function ProductsGrid({ products, preview }: { products: Product[]; preview?: boolean }) {
   // Match HomeScreen's 2-col grid (gap 12, horizontal padding 16) so card
   // dimensions are identical across screens.
   const cardWidth = (SCREEN_WIDTH - 16 * 2 - 12) / 2;
@@ -889,13 +936,13 @@ function ProductsGrid({ products }: { products: Product[] }) {
       style={{ paddingHorizontal: 16, gap: 12 }}
     >
       {products.map((p) => (
-        <ProductCard key={p.id} product={p} width={cardWidth} />
+        <ProductCard key={p.id} product={p} width={cardWidth} preview={preview} />
       ))}
     </View>
   );
 }
 
-function ReviewsSection({
+export function ReviewsSection({
   reviews,
   ratingBreakdown,
   shopRating,

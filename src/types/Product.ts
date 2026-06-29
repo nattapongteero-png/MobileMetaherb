@@ -18,4 +18,6 @@ export type Product = {
   flashSaleEndsIn?: number;
   /** 0–100 sold progress for the Flash Sale Goal-Gradient bar */
   soldPercent?: number;
+  /** Owning shop's display name — drives multi-shop seller attribution. */
+  shop?: string;
 };

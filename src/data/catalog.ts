@@ -48,7 +48,7 @@ export const PRICE_RANGES: PriceRange[] = [
   { key: "gt300", label: "มากกว่า ฿300", min: 300, max: Infinity },
 ];
 
-export type CatalogProduct = Product & { category: CategoryKey; type: TypeKey };
+export type CatalogProduct = Product & { category: CategoryKey; type: TypeKey; shop?: string };
 
 // The Products tab now serves the real METAHERB samples (names, prices, photos)
 // ported from the web app. See src/data/realProducts.ts.
