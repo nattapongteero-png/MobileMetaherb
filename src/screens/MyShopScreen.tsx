@@ -70,6 +70,8 @@ import {
   TrendingUp,
   User,
   Wallet,
+  Ticket,
+  Zap,
   X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -81,6 +83,10 @@ import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
 import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmtSigned, type Settlement, type SettlementStatus } from "../data/financeTransactions";
+import { ShopComplaintsView } from "./ShopComplaintsView";
+import { ShopSalesReportView } from "./ShopSalesReportView";
+import { SalesDatePicker, type DateSel } from "../components/SalesDatePicker";
+import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   BRAND_GREEN,
@@ -184,6 +190,62 @@ export const SHOP_MENU: MenuNode[] = [
   },
   { id: "complaints", label: "เรื่องร้องเรียน", Icon: AlertTriangle },
 ];
+
+// Flattened sections for the overview menu grid (8 per page, 4×2, swipeable).
+const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[] = [
+  { id: "orders", label: "คำสั่งซื้อ", Icon: ShoppingCart },
+  { id: "products_manage", label: "สินค้า", Icon: Package },
+  { id: "flash_sale", label: "Flash Sale", Icon: Zap },
+  { id: "promotions", label: "โปรโมชั่น", Icon: Percent },
+  { id: "coupons", label: "คูปอง", Icon: Ticket },
+  { id: "hm_quotations", label: "ใบเสนอราคา", Icon: FileText },
+  { id: "hm_pr", label: "ใบ PR", Icon: ClipboardList },
+  { id: "hm_po", label: "ใบ PO", Icon: PackageCheck },
+  { id: "trials_products", label: "สินค้าทดลอง", Icon: FlaskConical },
+  { id: "trials_tracking", label: "ติดตามทดลอง", Icon: ScanSearch },
+  { id: "report_sales", label: "รายงานขาย", Icon: BarChart3 },
+  { id: "report_customers", label: "ข้อมูลลูกค้า", Icon: User },
+  { id: "report_products", label: "ข้อมูลสินค้า", Icon: Package },
+  { id: "report_market", label: "Market", Icon: Beaker },
+  { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
+];
+
+/** Paged menu grid (8 per page · 4×2) shown on the overview tab — swipe for more. */
+function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
+  const [w, setW] = useState(0);
+  const [page, setPage] = useState(0);
+  const pages: (typeof SHOP_MENU_GRID)[] = [];
+  for (let i = 0; i < SHOP_MENU_GRID.length; i += 8) pages.push(SHOP_MENU_GRID.slice(i, i + 8));
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ paddingVertical: 2 }}>
+      {w > 0 ? (
+        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / w))}>
+          {pages.map((pg, pi) => (
+            <View key={pi} style={{ width: w, flexDirection: "row", flexWrap: "wrap" }}>
+              {pg.map((m) => (
+                <Pressable key={m.id} onPress={() => onSelect?.(m.id)} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                    <m.Icon size={22} color={BRAND_GREEN_DARK} strokeWidth={2} />
+                  </View>
+                  <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>{m.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={{ height: 168 }} />
+      )}
+      {pages.length > 1 ? (
+        <View className="flex-row items-center justify-center" style={{ gap: 6, marginTop: 6 }}>
+          {pages.map((_, i) => (
+            <View key={i} style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 3, backgroundColor: i === page ? BRAND_GREEN : "#d4d4d4" }} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 // Flat label lookup for the section selector button.
 const SECTION_LABEL: Record<SectionId, string> = {
@@ -511,6 +573,7 @@ function OverviewScreen() {
         insetsBottom={tabBarHeight + 16}
         sub={sub}
         onOpenMenu={openMenu}
+        onSelectSection={setSub}
         hideMenuButton
       />
     </ShopShell>
@@ -538,6 +601,7 @@ function FinanceScreen() {
         insetsBottom={tabBarHeight + 16}
         sub={sub}
         onOpenMenu={() => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => setSub(id as SectionId) })}
+        onSelectSection={setSub}
         hideHeader
       />
     </ShopShell>
@@ -1884,6 +1948,7 @@ function OverviewTab({
   insetsBottom,
   sub,
   onOpenMenu,
+  onSelectSection,
   onScroll,
   hideHeader,
   headerRight,
@@ -1896,6 +1961,8 @@ function OverviewTab({
   // Active section + the full-screen menu opener, driven from MyShopScreen.
   sub: SectionId;
   onOpenMenu: () => void;
+  // Navigate straight to a section (e.g. from the overview menu grid).
+  onSelectSection?: (id: SectionId) => void;
   onScroll?: ScrollHandler;
   // Hide the section title + burger menu (e.g. the การเงิน tab is single-purpose).
   hideHeader?: boolean;
@@ -1910,6 +1977,12 @@ function OverviewTab({
   // Controlled calendar selection — drives every scoped figure below.
   const [cal, setCal] = useState<CalSel>({ month: 0, year: 2026, day: 16 });
   const { month, year, day } = cal;
+  // Sales-report scope — lifted so its date picker can ride on the page title row.
+  const [salesPeriod, setSalesPeriod] = useState<Period>("daily");
+  const [salesDate, setSalesDate] = useState<DateSel>(() => {
+    const d = new Date();
+    return { day: d.getDate(), month: d.getMonth(), year: d.getFullYear() + 543 };
+  });
 
   // ----- Top-level KPI: depend on the selected month (monthly) or whole year.
   const yearlySales = MONTHLY_SALES_DATA.reduce((a, b) => a + b, 0);
@@ -2254,15 +2327,20 @@ function OverviewTab({
         ) : (
           <View style={{ height: 16, backgroundColor: "#fafafa" }} />
         )
+      ) : sub === "dashboard" ? (
+        <View style={{ height: 14, backgroundColor: "#fafafa" }} />
       ) : (
         <View
           className="flex-row items-center justify-between"
           style={{ backgroundColor: "#fafafa", paddingTop: 14, paddingBottom: 14 }}
         >
-          <Text style={{ fontSize: 20, fontWeight: "700", color: TEXT_PRIMARY }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 20, fontWeight: "700", color: TEXT_PRIMARY }}>
             {SECTION_LABEL[sub]}
           </Text>
-          {hideMenuButton ? null : <AnimatedMenuButton open={false} onPress={onOpenMenu} />}
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            {sub === "report_sales" ? <SalesDatePicker period={salesPeriod} sel={salesDate} onChange={setSalesDate} /> : null}
+            {hideMenuButton ? null : <AnimatedMenuButton open={false} onPress={onOpenMenu} />}
+          </View>
         </View>
       )}
 
@@ -2273,6 +2351,9 @@ function OverviewTab({
       {/* ===== Per-section content (order mirrors the web OverviewTab) ===== */}
       {sub === "dashboard" ? (
         <>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, marginBottom: -6 }}>เมนู</Text>
+          <ShopMenuGrid onSelect={onSelectSection} />
+          <Text style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, marginTop: 10, marginBottom: -6 }}>ภาพรวม</Text>
           {orderTrackingCard}
           {quotationCard}
           {trialCard}
@@ -2295,20 +2376,7 @@ function OverviewTab({
 
       {sub === "products_manage" ? <>{topProductsCard}</> : null}
 
-      {sub === "report_sales" ? (
-        <>
-          <DashboardCalendar
-            period={period}
-            onPeriodChange={onPeriodChange}
-            sel={cal}
-            onChange={setCal}
-          />
-          {salesCard}
-          {kpiPair}
-          {subKpiPair}
-          {contextualSalesCard}
-        </>
-      ) : null}
+      {sub === "report_sales" ? <ShopSalesReportView period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
 
       {sub === "report_customers" ? <>{topCustomersCard}</> : null}
       {sub === "report_products" ? <>{topProductsCard}</> : null}
@@ -2320,6 +2388,9 @@ function OverviewTab({
       {sub === "hm_pr" ? <DocSection kind="pr" /> : null}
       {sub === "hm_po" ? <DocSection kind="po" /> : null}
 
+      {/* เรื่องร้องเรียน — owner view (linked to customer แจ้งปัญหาสินค้า) */}
+      {sub === "complaints" ? <ShopComplaintsView /> : null}
+
       {/* Sections without a dedicated mockup view yet */}
       {sub === "flash_sale" ||
       sub === "promotions" ||
@@ -2327,8 +2398,7 @@ function OverviewTab({
       sub === "trials_products" ||
       sub === "trials_tracking" ||
       sub === "report_market" ||
-      sub === "finance_tx" ||
-      sub === "complaints" ? (
+      sub === "finance_tx" ? (
         <View
           style={{
             backgroundColor: "white",

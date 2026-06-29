@@ -88,6 +88,72 @@ function BankBadge({ code, size }: { code: string; size: number }) {
   );
 }
 
+// Lighten (amt>0) / darken (amt<0) a hex color toward white / black.
+function shade(hex: string, amt: number): string {
+  const h = hex.replace("#", "").padStart(6, "0");
+  const n = parseInt(h, 16);
+  const f = (c: number) => Math.max(0, Math.min(255, Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt))));
+  const r = f((n >> 16) & 255), g = f((n >> 8) & 255), b = f(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
+// Gold EMV chip.
+function CardChip() {
+  return (
+    <View style={{ width: 38, height: 28, borderRadius: 6, backgroundColor: "#e9c46a", overflow: "hidden", justifyContent: "center", paddingHorizontal: 3 }}>
+      <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.2)", marginVertical: 2.5 }} />
+      <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.2)", marginVertical: 2.5 }} />
+      <View style={{ position: "absolute", left: "50%", top: 4, bottom: 4, width: 1, backgroundColor: "rgba(0,0,0,0.2)" }} />
+    </View>
+  );
+}
+
+// Bankbook / passbook visual — bank-color gradient card (mirrors the web owner console).
+function BankCard({ code, accountNo, accountName, verified = true }: { code: string; accountNo: string; accountName: string; verified?: boolean }) {
+  const b = bankByCode(code);
+  const logo = bankLogo(code);
+  return (
+    <LinearGradient
+      colors={[shade(b.color, 0.2), b.color, shade(b.color, -0.34)]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ borderRadius: 20, padding: 18, minHeight: 196, justifyContent: "space-between", overflow: "hidden", shadowColor: b.color, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 6 }}
+    >
+      <View pointerEvents="none" style={{ position: "absolute", top: -44, right: -34, width: 156, height: 156, borderRadius: 78, backgroundColor: "rgba(255,255,255,0.1)" }} />
+      <View pointerEvents="none" style={{ position: "absolute", bottom: -54, left: -22, width: 134, height: 134, borderRadius: 67, backgroundColor: "rgba(255,255,255,0.06)" }} />
+
+      <View className="flex-row items-start justify-between">
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(255,255,255,0.72)", fontWeight: "700" }}>BANK</Text>
+          <Text numberOfLines={1} style={{ fontSize: 16, color: "#fff", fontWeight: "700", marginTop: 2 }}>{b.name}</Text>
+        </View>
+        <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden", marginLeft: 10 }}>
+          {logo ? <Image source={logo} style={{ width: 28, height: 28 }} resizeMode="contain" /> : <Landmark size={18} color={b.color} strokeWidth={2.2} />}
+        </View>
+      </View>
+
+      <View>
+        <CardChip />
+        <Text style={{ fontSize: 22, color: "#fff", fontWeight: "700", letterSpacing: 3, marginTop: 10 }}>{accountNo}</Text>
+      </View>
+
+      <View className="flex-row items-end justify-between">
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 9, letterSpacing: 1, color: "rgba(255,255,255,0.72)", fontWeight: "700" }}>ACCOUNT HOLDER</Text>
+          <Text numberOfLines={1} style={{ fontSize: 14, color: "#fff", fontWeight: "600", marginTop: 2 }}>{accountName}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end", marginLeft: 10 }}>
+          <Text style={{ fontSize: 9, letterSpacing: 1, color: "rgba(255,255,255,0.72)", fontWeight: "700" }}>STATUS</Text>
+          <View className="flex-row items-center" style={{ gap: 3, marginTop: 2 }}>
+            <Check size={12} color="#fff" strokeWidth={3} />
+            <Text style={{ fontSize: 12, color: "#fff", fontWeight: "600" }}>{verified ? "ยืนยันแล้ว" : "รอตรวจสอบ"}</Text>
+          </View>
+        </View>
+      </View>
+    </LinearGradient>
+  );
+}
+
 /** บัญชีรับเงิน — payout bank account only (view + page-sheet edit). */
 export function ShopPayoutScreen() {
   const nav = useNavigation<Nav>();
@@ -130,6 +196,16 @@ export function ShopPayoutScreen() {
 
       <View style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+          {/* Bankbook / passbook visual — floats on the page bg (no card chrome) */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 18 }}>
+            <View>
+              {/* stacked white sheets peeking below the card → passbook (เล่มสมุด) look */}
+              <View style={{ position: "absolute", left: 16, right: 16, top: 12, bottom: -12, borderRadius: 18, backgroundColor: "#e9e9e9", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(0,0,0,0.07)" }} />
+              <View style={{ position: "absolute", left: 8, right: 8, top: 6, bottom: -6, borderRadius: 19, backgroundColor: "#ffffff", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(0,0,0,0.07)" }} />
+              <BankCard code={bankCode} accountNo={accountNo} accountName={accountName} />
+            </View>
+          </View>
+
           {/* Bank account — view + edit */}
           <Section title="บัญชีธนาคารรับเงิน" right={<EditIconButton onPress={openEdit} />}>
             <View className="flex-row items-center" style={{ gap: 12, marginBottom: 16 }}>

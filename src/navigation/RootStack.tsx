@@ -89,6 +89,7 @@ import { ShopAddressScreen } from "../screens/ShopAddressScreen";
 import { ShopNotificationsScreen } from "../screens/ShopNotificationsScreen";
 import { ShopShippingScreen } from "../screens/ShopShippingScreen";
 import { ShopPayoutScreen } from "../screens/ShopPayoutScreen";
+import { ShopComplaintDetailScreen } from "../screens/ShopComplaintDetailScreen";
 import { SupplierInfoScreen } from "../screens/SupplierInfoScreen";
 import { BrandInfoScreen } from "../screens/BrandInfoScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -170,6 +171,7 @@ export type RootStackParamList = {
   ShopNotifications: undefined;
   ShopShipping: undefined;
   ShopPayout: undefined;
+  ShopComplaintDetail: { id: string };
   SupplierInfo: undefined;
   BrandInfo: undefined;
   Cart: undefined;
@@ -357,6 +359,7 @@ export function RootStack() {
       <Stack.Screen name="ShopNotifications" component={ShopNotificationsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopShipping" component={ShopShippingScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopPayout" component={ShopPayoutScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopComplaintDetail" component={ShopComplaintDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="SupplierInfo" component={SupplierInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="BrandInfo" component={BrandInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

@@ -26,6 +26,7 @@ import { ChatProvider } from "./src/context/ChatContext";
 import { AIAssistantProvider } from "./src/context/AIAssistantContext";
 import { SecurityProvider } from "./src/context/SecurityContext";
 import { SellerProvider } from "./src/context/SellerContext";
+import { ComplaintProvider } from "./src/context/ComplaintContext";
 
 // Keep the branded splash up at least this long so a fast font load doesn't
 // flash it for a single frame.
@@ -114,7 +115,9 @@ export default function App() {
                           <TrialProvider>
                             <SecurityProvider>
                               <SellerProvider>
-                                <RootStack />
+                                <ComplaintProvider>
+                                  <RootStack />
+                                </ComplaintProvider>
                               </SellerProvider>
                             </SecurityProvider>
                           </TrialProvider>

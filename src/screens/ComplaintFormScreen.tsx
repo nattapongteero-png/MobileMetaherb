@@ -10,6 +10,7 @@ import { Camera, X, CheckCircle2, Landmark, Wallet, ChevronRight } from "lucide-
 import { SubPageHeader } from "../components/SubPageHeader";
 import { useOrders } from "../context/OrderContext";
 import { useRefund, TRUEWALLET_ID } from "../context/RefundContext";
+import { useComplaints } from "../context/ComplaintContext";
 import { getImagePicker } from "../utils/imagePicker";
 import { maskPhone } from "./TrueMoneyLinkScreen";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
@@ -55,6 +56,7 @@ export function ComplaintFormScreen() {
 
   // Refund channel (bank account / TrueWallet) lives in context, picked via a sheet.
   const { accounts, trueWallet, selectedId } = useRefund();
+  const { addComplaint } = useComplaints();
   const isWallet = selectedId === TRUEWALLET_ID;
   const selBank = accounts.find((a) => a.id === selectedId);
   const selBankInfo = selBank ? bankByCode(selBank.bankCode) : undefined;
@@ -119,7 +121,30 @@ export function ComplaintFormScreen() {
       Alert.alert("กรุณากรอกรายละเอียด", "โปรดอธิบายปัญหาที่พบก่อนส่งเรื่องร้องเรียน");
       return;
     }
-    const complaintId = `CMP-${order.id.slice(-5)}`;
+    if (images.length === 0) {
+      Alert.alert("กรุณาแนบหลักฐาน", "โปรดแนบรูปถ่ายหรือคลิปวิดีโอประกอบอย่างน้อย 1 รายการ");
+      return;
+    }
+    const last4 = isWallet ? trueWallet?.slice(-4) : selBank?.accountNo?.slice(-4);
+    const refundChannel = `${channelTitle}${last4 ? ` [*${last4}]` : ""}`;
+    const M = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+    const now = new Date();
+    const createdAt = `${now.getDate()} ${M[now.getMonth()]} ${now.getFullYear() + 543}`;
+    // Push the case into the shared store so it appears in the owner's เรื่องร้องเรียน list.
+    const complaintId = addComplaint({
+      orderId: order.id,
+      customer: order.recipient?.name ?? "ลูกค้า",
+      customerEmail: email.trim() || "-",
+      customerPhone: order.recipient?.phone ?? "-",
+      type,
+      product: order.items[0]?.name ?? "-",
+      description: detail.trim(),
+      amount: totalRefund,
+      refundChannel,
+      createdAt,
+      items: order.items.map((it) => ({ name: it.name, option: it.option, qty: it.quantity, price: it.price, image: it.image })),
+      evidence: images.map((uri) => ({ source: { uri } })),
+    });
     Alert.alert(
       "ส่งเรื่องร้องเรียนแล้ว",
       `รหัสคำร้อง ${complaintId}\nยอดเงินคืน ฿${totalRefund.toLocaleString()}\nเราจะติดต่อกลับทางอีเมลของคุณ`,
