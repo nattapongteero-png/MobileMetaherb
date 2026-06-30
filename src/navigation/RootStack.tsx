@@ -95,6 +95,7 @@ import { ShopComplaintDetailScreen } from "../screens/ShopComplaintDetailScreen"
 import { ShopComplaintsScreen } from "../screens/ShopComplaintsView";
 import { ShopReportScreen } from "../screens/ShopReportView";
 import { ShopManagerChatScreen } from "../screens/ShopManagerChatScreen";
+import { CafeScreen } from "../screens/CafeScreen";
 import { SupplierInfoScreen } from "../screens/SupplierInfoScreen";
 import { BrandInfoScreen } from "../screens/BrandInfoScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -181,6 +182,7 @@ export type RootStackParamList = {
   ShopComplaints: undefined;
   ShopReport: { kind: "sales" | "customers" | "products" | "market" };
   ShopManagerChat: undefined;
+  Cafe: undefined;
   SupplierInfo: undefined;
   BrandInfo: undefined;
   Cart: undefined;
@@ -373,6 +375,7 @@ export function RootStack() {
       <Stack.Screen name="ShopComplaints" component={ShopComplaintsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopReport" component={ShopReportScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopManagerChat" component={ShopManagerChatScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="Cafe" component={CafeScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="SupplierInfo" component={SupplierInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="BrandInfo" component={BrandInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

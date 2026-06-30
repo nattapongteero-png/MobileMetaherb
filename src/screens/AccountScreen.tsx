@@ -9,6 +9,7 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -143,6 +144,7 @@ function MenuList({ items }: { items: MenuItem[] }) {
 const STORE_IMG = require("../../assets/products-store.png");
 const REGIS_SUPPLIER = require("../../assets/regissupplier.png");
 const REGIS_BRAND = require("../../assets/test-product.png");
+const CAFE_IMG = require("../../assets/caffe.png");
 
 /** CTA shown until the user registers as a seller — tap to apply (opens a shop).
  *  Same design language as the Herbal Market "สมัคร Supplier" card. */
@@ -196,6 +198,43 @@ function ShopFeatureCard({ image, title, subtitle, buttonLabel, onPress }: {
   );
 }
 
+/** META Caffe promo — same gradient layout as SellerApplyCard, coffee-themed.
+ *  A new company feature: order food / snacks / drinks from the café. */
+function CafeFeatureCard({ onPress }: { onPress: () => void }) {
+  return (
+    <View style={{ borderRadius: 18, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 7 }}>
+      <Pressable onPress={onPress} className="active:opacity-90" style={{ borderRadius: 18, overflow: "hidden" }}>
+        <LinearGradient
+          colors={["#0b3d2e", "#125239", "#1a7a4c"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ padding: 16, minHeight: 108, justifyContent: "center", gap: 16, borderWidth: 1, borderColor: "rgba(212,175,55,0.35)", borderRadius: 18 }}
+        >
+          <Image source={CAFE_IMG} style={{ position: "absolute", right: 2, bottom: -10, width: 120, height: 120 }} resizeMode="contain" />
+          <View style={{ gap: 3 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: "#fff", lineHeight: 22, letterSpacing: 0.2 }}>META Caffe</Text>
+              <View style={{ backgroundColor: "#e8c878", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1.5 }}>
+                <Text style={{ fontSize: 9.5, fontWeight: "800", color: "#0b3d2e", letterSpacing: 0.3 }}>ใหม่</Text>
+              </View>
+            </View>
+            <Text numberOfLines={1} style={{ fontSize: 12, color: "rgba(255,255,255,0.88)", lineHeight: 16 }}>สั่งอาหาร ขนม เครื่องดื่ม จากคาเฟ่ของเรา</Text>
+          </View>
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            isInteractive
+            style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingLeft: 14, paddingRight: 10, paddingVertical: 8 }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>สั่งเลย</Text>
+            <ChevronRight size={15} color="#fff" strokeWidth={2.6} />
+          </GlassView>
+        </LinearGradient>
+      </Pressable>
+    </View>
+  );
+}
+
 export function AccountScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
@@ -233,7 +272,8 @@ export function AccountScreen() {
       | "SupplierRegister"
       | "BrandRegister"
       | "NotificationTest"
-      | "MyShop",
+      | "MyShop"
+      | "Cafe",
   ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
@@ -448,6 +488,9 @@ export function AccountScreen() {
             ]}
           />
 
+          {/* META Caffe — new café-ordering feature from the company */}
+          <CafeFeatureCard onPress={() => go("Cafe")} />
+
           {/* More services */}
           <View>
             <Text style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 8, marginLeft: 4 }}>บริการเพิ่มเติม</Text>
@@ -519,8 +562,6 @@ export function AccountScreen() {
                 { label: "โหมดทดสอบร้านค้า", Icon: Store, toggle: { value: isSeller, onValueChange: setIsSeller } },
                 { label: "โหมดทดสอบ Supplier", Icon: Beaker, toggle: { value: isSupplier, onValueChange: setIsSupplier } },
                 { label: "โหมดทดสอบแบรนด์ทดสอบ", Icon: FlaskConical, toggle: { value: isTrialBrand, onValueChange: setIsTrialBrand } },
-                { label: "Owner Console (จัดการร้าน)", Icon: Store, onPress: () => go("MyShop") },
-                { label: "ตั้งค่าบนเว็บไซต์", Icon: Settings, onPress: () => go("Settings") },
               ]}
             />
           </View>

@@ -15,7 +15,6 @@ import { StatusBar } from "expo-status-bar";
 import {
   Bell,
   ChevronRight,
-  Coffee,
   Search,
   ShoppingCart,
   Star,
@@ -60,9 +59,6 @@ type Category =
 // Categories taken from the web menu — 6 entries that match the real catalog.
 // `\n` placed manually so labels break at word boundaries, not mid-word.
 const CATEGORIES: Category[] = [
-  // Cafe service — first item per request; coffee icon distinguishes it from the
-  // product categories that follow.
-  { label: "บริการคาเฟ่\nMETAHERB", Icon: Coffee, color: "#8b5e3c" },
   { label: "ผลิตภัณฑ์\nสุขภาพ", image: require("../../assets/IMG_4022.png"), color: "#319754" },
   { label: "อาหาร\n& เครื่องดื่ม", image: require("../../assets/IMG_4021.png"), color: "#16a34a" },
   { label: "เครื่องหอม\n& อโรม่า", image: require("../../assets/IMG_4020.png"), color: "#52b788" },
