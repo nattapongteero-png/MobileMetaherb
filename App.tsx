@@ -12,6 +12,7 @@ import {
   IBMPlexSansThaiLooped_700Bold,
 } from "@expo-google-fonts/ibm-plex-sans-thai-looped";
 import { RootStack } from "./src/navigation/RootStack";
+import { ToastHost } from "./src/components/Toast";
 import { SplashScreen } from "./src/components/SplashScreen";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { CartProvider } from "./src/context/CartContext";
@@ -59,11 +60,19 @@ function applyThaiFontDefault() {
       ? Object.assign({}, ...element.props.style.filter(Boolean))
       : { ...(element.props.style || {}) };
     const family = flat.fontFamily || resolveFamily(flat.fontWeight);
+    // On native the array is flattened by NativeText. On web, Text.render has
+    // already produced the resolved DOM <span>, so handing react-dom a style
+    // ARRAY throws ("indexed property [0]" on CSSStyleDeclaration). Merge into a
+    // flat object on web so the DOM receives a plain style object.
+    const style =
+      Platform.OS === "web"
+        ? { ...flat, fontFamily: family }
+        : [{ fontFamily: family }, element.props.style];
     return {
       ...element,
       props: {
         ...element.props,
-        style: [{ fontFamily: family }, element.props.style],
+        style,
       },
     };
   };
@@ -132,6 +141,7 @@ export default function App() {
             </LanguageProvider>
           </ErrorBoundary>
         </NavigationContainer>
+        <ToastHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

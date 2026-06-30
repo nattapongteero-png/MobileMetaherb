@@ -106,6 +106,8 @@ import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmt
 import { ShopSalesReportView } from "./ShopSalesReportView";
 import { ShopReportView } from "./ShopReportView";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { TrialRegistryOwnerSection } from "./TrialRegistryView";
+import { TrialTrackingOwnerSection } from "./TrialTrackingView";
 import { SalesDatePicker, type DateSel } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -2609,6 +2611,7 @@ function OverviewTab({
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       onScroll={onScroll}
       scrollEventThrottle={16}
@@ -2696,12 +2699,17 @@ function OverviewTab({
 
       {/* เรื่องร้องเรียน — owner view (linked to customer แจ้งปัญหาสินค้า) */}
 
+      {/* สินค้าทดลอง — ทะเบียนสินค้าทดลอง (ported from web owner console) */}
+      {sub === "trials_products" ? <TrialRegistryOwnerSection /> : null}
+
+      {/* สินค้าทดลอง — ติดตามสินค้าทดลอง (registration roster, ported from web) */}
+      {sub === "trials_tracking" ? <TrialTrackingOwnerSection /> : null}
+
       {/* Sections without a dedicated mockup view yet */}
       {sub === "flash_sale" ||
       sub === "promotions" ||
       sub === "coupons" ||
-      sub === "trials_products" ||
-      sub === "trials_tracking" ||
+      sub === "report_market" ||
       sub === "finance_tx" ? (
         <View
           style={{
@@ -2728,6 +2736,33 @@ function OverviewTab({
         onClose={() => setSalesSheet(null)}
       />
     </ScrollView>
+
+    {/* Floating "เพิ่มสินค้าทดลอง" FAB — only on the ทะเบียนสินค้าทดลอง section.
+        Fixed bottom-right, expanded pill (Fitts's Law: large always-reachable target). */}
+    {sub === "trials_products" ? (
+      <Pressable
+        onPress={() => nav.navigate("TrialAddProduct")}
+        accessibilityLabel="เพิ่มสินค้าทดลอง"
+        className="items-center justify-center active:opacity-90"
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: 24,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: BRAND_GREEN,
+          shadowColor: "#000",
+          shadowOpacity: 0.22,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+        }}
+      >
+        <Plus size={26} color="#fff" strokeWidth={2.6} />
+      </Pressable>
+    ) : null}
+    </View>
   );
 }
 

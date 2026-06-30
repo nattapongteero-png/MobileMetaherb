@@ -58,6 +58,8 @@ import { TrialApplyScreen } from "../screens/TrialApplyScreen";
 import { TrialSuccessScreen } from "../screens/TrialSuccessScreen";
 import { TrialRequestDetailScreen } from "../screens/TrialRequestDetailScreen";
 import { TrialEvalScreen } from "../screens/TrialEvalScreen";
+import { TrialRegistryDetailScreen } from "../screens/TrialRegistryDetailScreen";
+import { TrialAddProductScreen } from "../screens/TrialAddProductScreen";
 import { TrialEvalSuccessScreen } from "../screens/TrialEvalSuccessScreen";
 import { B2BDocsScreen } from "../screens/B2BDocsScreen";
 import { B2BDocDetailScreen } from "../screens/B2BDocDetailScreen";
@@ -144,6 +146,8 @@ export type RootStackParamList = {
   TrialSuccess: { productName: string; rewardPoints: number };
   TrialRequestDetail: { id: string };
   TrialEval: { id: string; kind: "pre" | "post" };
+  TrialRegistryDetail: { id: string };
+  TrialAddProduct: { editId?: string } | undefined;
   TrialEvalSuccess: { productName: string; points: number; completed: boolean };
   B2BDocs: { kind: "rfq" | "pr" | "po" };
   B2BDocDetail: { kind: "rfq" | "pr" | "po"; id: string };
@@ -337,6 +341,8 @@ export function RootStack() {
       <Stack.Screen name="TrialSuccess" component={TrialSuccessScreen} options={{ headerShown: false, animation: "slide_from_right", gestureEnabled: false }} />
       <Stack.Screen name="TrialRequestDetail" component={TrialRequestDetailScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="TrialEval" component={TrialEvalScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="TrialRegistryDetail" component={TrialRegistryDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="TrialAddProduct" component={TrialAddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="TrialEvalSuccess" component={TrialEvalSuccessScreen} options={{ headerShown: false, animation: "slide_from_right", gestureEnabled: false }} />
       <Stack.Screen name="B2BDocs" component={B2BDocsScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="B2BDocDetail" component={B2BDocDetailScreen} options={{ animation: "slide_from_right" }} />
