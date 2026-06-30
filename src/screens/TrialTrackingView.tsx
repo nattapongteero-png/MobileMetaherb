@@ -138,6 +138,7 @@ export function TrialTrackingOwnerSection() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={{ borderRadius: 999, overflow: "hidden" }}
           contentContainerStyle={{ gap: 4, alignItems: "center" }}
         >
           {pills.map((p) => (

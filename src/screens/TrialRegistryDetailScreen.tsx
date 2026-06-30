@@ -18,14 +18,11 @@
 
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  ChevronLeft,
-  ChevronDown,
   Pencil,
   Trash2,
   Download,
@@ -36,6 +33,7 @@ import {
   Star,
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
+import { SubPageHeader } from "../components/SubPageHeader";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { TrialDetailOverview } from "./trialDetail/TrialDetailOverview";
@@ -132,59 +130,48 @@ export function TrialRegistryDetailScreen() {
   const ratingText = avgRating > 0 ? avgRating.toFixed(1) : "—";
 
   return (
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
-      {/* Header — back pill | edit / delete / export */}
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View className="flex-row items-center" style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 6, paddingBottom: 10, gap: 8 }}>
-          {/* กลับ — green-tint pill */}
-          <Pressable
-            onPress={() => nav.goBack()}
-            accessibilityLabel="กลับ"
-            hitSlop={8}
-            className="flex-row items-center active:opacity-80"
-            style={{ height: 32, paddingHorizontal: 16, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.15)", gap: 6 }}
-          >
-            <ChevronLeft size={14} color="#fff" strokeWidth={2.5} />
-            <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>กลับ</Text>
-          </Pressable>
-          <View style={{ flex: 1 }} />
-          {/* แก้ไข — round white */}
-          <Pressable
-            onPress={editProduct}
-            accessibilityLabel="แก้ไขข้อมูลสินค้า"
-            hitSlop={6}
-            className="items-center justify-center active:opacity-80"
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff" }}
-          >
-            <Pencil size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
-          </Pressable>
-          {/* ลบ — round white */}
-          <Pressable
-            onPress={deleteProduct}
-            accessibilityLabel="ลบสินค้าทดลอง"
-            hitSlop={6}
-            className="items-center justify-center active:opacity-80"
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff" }}
-          >
-            <Trash2 size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
-          </Pressable>
-          {/* ส่งออก — green pill */}
-          <Pressable
-            onPress={exportData}
-            accessibilityLabel="ส่งออก"
-            hitSlop={6}
-            className="flex-row items-center active:opacity-80"
-            style={{ height: 40, paddingHorizontal: 18, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 6 }}
-          >
-            <Download size={15} color="#fff" strokeWidth={2.4} />
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>ส่งออก</Text>
-            <ChevronDown size={13} color="#fff" strokeWidth={2.4} />
-          </Pressable>
-        </View>
-      </SafeAreaView>
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <StatusBar style="dark" />
+      {/* Faint mint app bar (shared SubPageHeader) — back + title | edit / delete / export */}
+      <SubPageHeader
+        title="สินค้าทดลอง"
+        subtitle={product.name}
+        onBack={() => nav.goBack()}
+        showSearch={false}
+        rightSlot={
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <Pressable
+              onPress={editProduct}
+              accessibilityLabel="แก้ไขข้อมูลสินค้า"
+              hitSlop={6}
+              className="items-center justify-center active:opacity-80"
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
+            >
+              <Pencil size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
+            </Pressable>
+            <Pressable
+              onPress={deleteProduct}
+              accessibilityLabel="ลบสินค้าทดลอง"
+              hitSlop={6}
+              className="items-center justify-center active:opacity-80"
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
+            >
+              <Trash2 size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
+            </Pressable>
+            <Pressable
+              onPress={exportData}
+              accessibilityLabel="ส่งออก"
+              hitSlop={6}
+              className="items-center justify-center active:opacity-80"
+              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: BRAND_GREEN }}
+            >
+              <Download size={16} color="#fff" strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        }
+      />
 
-      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
           {/* ===== HERO CARD (Figma 8066:10951) ===== */}
           <View style={{ backgroundColor: "#fff", borderRadius: 24, borderWidth: 1, borderColor: "#f0f0f0", marginTop: 12, overflow: "visible" }}>
@@ -195,8 +182,7 @@ export function TrialRegistryDetailScreen() {
                 paddingHorizontal: 16,
                 paddingTop: 16,
                 paddingBottom: 16,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
+                borderRadius: 24,
               }}
             >
               <View className="flex-row items-start" style={{ gap: 16 }}>
@@ -245,7 +231,7 @@ export function TrialRegistryDetailScreen() {
                 {/* category / title / store */}
                 <View style={{ flex: 1, minWidth: 0, gap: 4, paddingTop: 2 }}>
                   <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>{product.category}</Text>
-                  <Text numberOfLines={2} style={{ fontSize: 16, fontWeight: "700", color: "#fff", lineHeight: 21 }}>
+                  <Text numberOfLines={2} style={{ fontSize: 14, fontWeight: "700", color: "#fff", lineHeight: 19 }}>
                     {product.name}
                   </Text>
                   <View className="flex-row items-center" style={{ gap: 5, marginTop: 2 }}>
@@ -261,7 +247,7 @@ export function TrialRegistryDetailScreen() {
               {/* เกี่ยวกับผลิตภัณฑ์ */}
               <View style={{ gap: 4 }}>
                 <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>เกี่ยวกับผลิตภัณฑ์</Text>
-                <Text style={{ fontSize: 16, fontWeight: "500", color: "rgba(0,0,0,0.85)", lineHeight: 23 }}>
+                <Text style={{ fontSize: 14, fontWeight: "500", color: "rgba(0,0,0,0.85)", lineHeight: 20 }}>
                   {product.tagline}
                 </Text>
               </View>
@@ -275,7 +261,7 @@ export function TrialRegistryDetailScreen() {
                   >
                     <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>{k.label}</Text>
                     <View className="flex-row items-baseline" style={{ gap: 5, marginTop: 3 }}>
-                      <Text style={{ fontSize: 21, fontWeight: "700", color: "#000" }}>{k.value}</Text>
+                      <Text style={{ fontSize: 17, fontWeight: "700", color: "#000" }}>{k.value}</Text>
                       <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>{k.sub}</Text>
                     </View>
                   </View>

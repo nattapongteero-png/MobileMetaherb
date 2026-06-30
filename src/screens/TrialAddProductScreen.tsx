@@ -25,7 +25,6 @@ import {
   Alert,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -53,6 +52,7 @@ import {
 import { getImagePicker } from "../utils/imagePicker";
 import { addTrialDraft, upsertTrialDraft, getAddedTrials } from "../data/trialDrafts";
 import { showToast } from "../components/Toast";
+import { SubPageHeader } from "../components/SubPageHeader";
 import {
   generateEvalQuestions,
   PHASE_META,
@@ -699,7 +699,7 @@ export function TrialAddProductScreen() {
         return (
           <View style={{ gap: 0 }}>
             <SectionHeader Icon={Package} title="รูปภาพสินค้า" sub="อัปโหลดได้สูงสุด 3 รูป (JPG, PNG, WebP) ขนาดไม่เกิน 2MB" />
-            <View className="flex-row flex-wrap" style={{ gap: 12, marginTop: 12 }}>
+            <View className="flex-row" style={{ gap: 10, marginTop: 12 }}>
               {[
                 { label: "รูปปกสินค้า", sub: "รูปหลัก", primary: true },
                 { label: "รูป 2", sub: "เพิ่มเติม", primary: false },
@@ -712,8 +712,9 @@ export function TrialAddProductScreen() {
                     onPress={() => pickImage(slot)}
                     className="active:opacity-80"
                     style={{
-                      width: 150,
-                      height: 150,
+                      flex: 1,
+                      minWidth: 0,
+                      aspectRatio: 1,
                       borderRadius: 16,
                       borderWidth: 2,
                       borderStyle: uploaded ? "solid" : "dashed",
@@ -728,8 +729,10 @@ export function TrialAddProductScreen() {
                       <>
                         <Image source={{ uri: uploaded }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
                         {item.primary ? (
-                          <View style={{ position: "absolute", top: 8, right: 8, backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                            <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
+                          <View style={{ position: "absolute", bottom: 8, left: 0, right: 0, alignItems: "center" }}>
+                            <View style={{ backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                              <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
+                            </View>
                           </View>
                         ) : null}
                         <Pressable
@@ -743,8 +746,10 @@ export function TrialAddProductScreen() {
                     ) : (
                       <>
                         {item.primary ? (
-                          <View style={{ position: "absolute", top: 8, right: 8, backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                            <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
+                          <View style={{ position: "absolute", bottom: 8, left: 0, right: 0, alignItems: "center" }}>
+                            <View style={{ backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                              <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
+                            </View>
                           </View>
                         ) : null}
                         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", alignItems: "center", justifyContent: "center" }}>
@@ -1310,23 +1315,21 @@ export function TrialAddProductScreen() {
 
   return (
     <FocusScrollCtx.Provider value={onInputFocus}>
-    <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
-      <StatusBar style="light" />
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
-        <View className="flex-row items-center" style={{ paddingLeft: 8, paddingRight: 16, paddingTop: 4, paddingBottom: 10, gap: 8 }}>
-          <Pressable onPress={() => nav.goBack()} hitSlop={8} className="flex-row items-center active:opacity-80" style={{ height: 32, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.15)", gap: 6 }}>
-            <ChevronLeft size={14} color="#fff" strokeWidth={2.5} />
-            <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>กลับ</Text>
+    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+      <StatusBar style="dark" />
+      <SubPageHeader
+        title={editing ? "แก้ไขสินค้าทดลอง" : "เพิ่มสินค้าทดลองใหม่"}
+        onBack={() => nav.goBack()}
+        showSearch={false}
+        rightSlot={
+          <Pressable onPress={save} disabled={!canSave} className="flex-row items-center active:opacity-80" style={{ height: 38, paddingHorizontal: 16, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 5, opacity: canSave ? 1 : 0.5 }}>
+            <Check size={15} color="#fff" strokeWidth={2.6} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>บันทึก</Text>
           </Pressable>
-          <Text style={{ flex: 1, fontSize: 17, fontWeight: "700", color: "#fff" }}>{editing ? "แก้ไขสินค้าทดลอง" : "เพิ่มสินค้าทดลองใหม่"}</Text>
-          <Pressable onPress={save} disabled={!canSave} className="flex-row items-center active:opacity-80" style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, backgroundColor: "#fff", gap: 5, opacity: canSave ? 1 : 0.5 }}>
-            <Check size={15} color={BRAND_GREEN_DARK} strokeWidth={2.6} />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: BRAND_GREEN_DARK }}>บันทึก</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+        }
+      />
 
-      <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
         {/* Step bar */}
         <View style={{ backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f1f1f1", paddingVertical: 10 }}>
           <ScrollView ref={stepBarRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 6, alignItems: "center" }}>
@@ -1380,7 +1383,7 @@ export function TrialAddProductScreen() {
         </ScrollView>
 
         {/* Footer nav — ย้อนกลับ / ถัดไป (or บันทึกสินค้า on the last step) */}
-        <View className="flex-row items-center" style={{ gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f1f1f1" }}>
+        <View className="flex-row items-center" style={{ gap: 10, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f1f1f1" }}>
           <Pressable
             onPress={() => goStep(activeStep - 1)}
             disabled={isFirst}
