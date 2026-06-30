@@ -135,7 +135,7 @@ export function BrandHeader({
       else if (prev - y > 6) t = 1;
       if (t !== searchTarget.current) {
         searchTarget.current = t;
-        Animated.timing(searchVisible, { toValue: t, duration: 200, useNativeDriver: false }).start();
+        Animated.timing(searchVisible, { toValue: t, duration: 300, useNativeDriver: false }).start();
       }
     });
     return () => sy.removeListener(id);

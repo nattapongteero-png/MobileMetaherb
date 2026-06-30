@@ -671,7 +671,7 @@ export function HomeScreen() {
       else if (prev - y > 6) target = 1; // scrolling up → show
       if (target !== searchTarget.current) {
         searchTarget.current = target;
-        Animated.timing(searchVisible, { toValue: target, duration: 200, useNativeDriver: false }).start();
+        Animated.timing(searchVisible, { toValue: target, duration: 300, useNativeDriver: false }).start();
       }
     });
     return () => scrollY.removeListener(id);

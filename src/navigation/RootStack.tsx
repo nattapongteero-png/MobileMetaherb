@@ -83,6 +83,8 @@ import { ChatListScreen } from "../screens/ChatListScreen";
 import { AIAssistantScreen } from "../screens/AIAssistantScreen";
 import { AIHistoryScreen } from "../screens/AIHistoryScreen";
 import { MyShopScreen } from "../screens/MyShopScreen";
+import type { MarketDoc, DocKind } from "../screens/MyShopScreen";
+import { ShopDocDetailScreen } from "../screens/ShopDocDetailScreen";
 import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
 import { ShopAccountScreen } from "../screens/ShopAccountScreen";
 import { ShopAddressScreen } from "../screens/ShopAddressScreen";
@@ -168,6 +170,7 @@ export type RootStackParamList = {
   AIAssistant: { context?: string } | undefined;
   AIHistory: undefined;
   MyShop: { section?: string } | undefined;
+  ShopDocDetail: { doc: MarketDoc; kind: DocKind };
   MyShopMenu: { current?: string; onSelect?: (id: string) => void } | undefined;
   ShopAccount: undefined;
   ShopAddress: undefined;
@@ -359,6 +362,7 @@ export function RootStack() {
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="AIHistory" component={AIHistoryScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopDocDetail" component={ShopDocDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="MyShopMenu" component={MyShopMenuScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="ShopAccount" component={ShopAccountScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopAddress" component={ShopAddressScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
