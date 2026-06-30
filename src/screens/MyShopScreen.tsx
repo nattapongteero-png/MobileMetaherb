@@ -9,6 +9,7 @@ import {
   Animated,
   Alert,
   Modal,
+  Switch,
   PanResponder,
   KeyboardAvoidingView,
   Platform,
@@ -94,8 +95,10 @@ import {
   X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassView } from "expo-glass-effect";
+import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { getImagePicker } from "../utils/imagePicker";
 import { useSeller } from "../context/SellerContext";
@@ -805,11 +808,18 @@ function AnimatedNumber({
   );
 }
 
-// Shared green header for every owner-console tab — back + shop name + leaves.
-function ShopHeader({ headerRight }: { headerRight?: ReactNode }) {
+// Shared green header for every owner-console tab — back + title + leaves.
+// `title`/`subtitle` default to "ร้านค้าของฉัน" + shop name; sub-sections pass the
+// section name as title and "" as subtitle so the page name rides on the app bar.
+// `onBack` defaults to leaving the console; sub-sections override it to step back
+// to the dashboard instead of all the way to the home tab.
+function ShopHeader({ title, subtitle, onBack, headerRight }: { title?: string; subtitle?: string; onBack?: () => void; headerRight?: ReactNode }) {
   const nav = useNavigation<Nav>();
   const { shopProfile } = useSeller();
   const shopName = shopProfile?.shopName?.trim() || "ร้านค้าของคุณ";
+  const titleText = title ?? "ร้านค้าของฉัน";
+  const subText = subtitle ?? shopName;
+  const back = onBack ?? (() => (nav.getParent() ?? nav).goBack());
   return (
     <SafeAreaView edges={["top"]} style={{ backgroundColor: BRAND_GREEN }}>
       {/* Decorative herb leaves — same watermark as the home app bar */}
@@ -818,12 +828,12 @@ function ShopHeader({ headerRight }: { headerRight?: ReactNode }) {
         <Image source={LEAF_C} style={{ position: "absolute", top: 60, right: 40, width: 58, height: 58, opacity: 0.26, transform: [{ rotate: "76deg" }] }} resizeMode="contain" />
       </View>
       <View className="flex-row items-center" style={{ paddingLeft: 8, paddingRight: 16, paddingTop: 4, paddingBottom: 12, gap: 8 }}>
-        <GlassIconButton onPress={() => (nav.getParent() ?? nav).goBack()} accessibilityLabel="ย้อนกลับ">
+        <GlassIconButton onPress={back} accessibilityLabel="ย้อนกลับ">
           <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
         </GlassIconButton>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: "white", fontSize: 18, fontWeight: "700", letterSpacing: 0.3, includeFontPadding: false }}>ร้านค้าของฉัน</Text>
-          <Text numberOfLines={1} style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 1, includeFontPadding: false }}>{shopName}</Text>
+          <Text numberOfLines={1} style={{ color: "white", fontSize: 18, fontWeight: "700", letterSpacing: 0.3, includeFontPadding: false }}>{titleText}</Text>
+          {subText ? <Text numberOfLines={1} style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, marginTop: 1, includeFontPadding: false }}>{subText}</Text> : null}
         </View>
         {headerRight}
       </View>
@@ -840,11 +850,11 @@ function ShopHeader({ headerRight }: { headerRight?: ReactNode }) {
 // auto-sizes to its tab count (can't be forced wider with only 3 tabs), so a
 // custom bar is the only way to get a guaranteed full-width 3-tab bar.
 // Green header + rounded white content area, shared by every tab screen.
-function ShopShell({ children, headerRight }: { children: ReactNode; headerRight?: ReactNode }) {
+function ShopShell({ children, title, subtitle, onBack, headerRight }: { children: ReactNode; title?: string; subtitle?: string; onBack?: () => void; headerRight?: ReactNode }) {
   return (
     <View className="flex-1" style={{ backgroundColor: BRAND_GREEN }}>
       <StatusBar style="light" />
-      <ShopHeader headerRight={headerRight} />
+      <ShopHeader title={title} subtitle={subtitle} onBack={onBack} headerRight={headerRight} />
       <View style={{ flex: 1, backgroundColor: "#fafafa", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }}>
         {children}
         <BottomFade />
@@ -858,6 +868,8 @@ function OverviewScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [sub, setSub] = useState<SectionId>("dashboard");
+  // Product-management active tab (lifted so the add FAB adds the right type).
+  const [pmType, setPmType] = useState<"regular" | "material">("regular");
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
@@ -866,6 +878,39 @@ function OverviewScreen() {
     setSub(id);
   };
   const openMenu = () => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => selectSection(id as SectionId) });
+  const isDash = sub === "dashboard";
+
+  // Sub-sections (คำสั่งซื้อ / สินค้า / PR / PO / ใบเสนอราคา) use the white
+  // SubPageHeader — same chrome as the report subpages — instead of the green
+  // shop app bar. Dashboard keeps the green "ร้านค้าของฉัน" header.
+  if (!isDash) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
+        <StatusBar style="dark" />
+        <SubPageHeader title={SECTION_LABEL[sub]} onBack={() => setSub("dashboard")} showSearch={false} />
+        <OverviewTab
+          period={period}
+          onPeriodChange={setPeriod}
+          insetsBottom={tabBarHeight + (sub === "products_manage" ? 84 : 16)}
+          sub={sub}
+          onOpenMenu={openMenu}
+          onSelectSection={selectSection}
+          hideMenuButton
+          titleInAppBar
+          pmType={pmType}
+          onPmType={setPmType}
+        />
+        {/* FAB — add product/material based on the active tab */}
+        {sub === "products_manage" ? (
+          <PMAddFab
+            bottom={tabBarHeight + 16}
+            onPress={() => nav.navigate("AddProduct", { mode: pmType })}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <ShopShell>
       <OverviewTab
@@ -875,6 +920,8 @@ function OverviewScreen() {
         sub={sub}
         onOpenMenu={openMenu}
         onSelectSection={selectSection}
+        hideMenuButton
+        titleInAppBar
       />
     </ShopShell>
   );
@@ -2260,6 +2307,9 @@ function OverviewTab({
   headerRight,
   headerTitle,
   hideMenuButton,
+  titleInAppBar,
+  pmType,
+  onPmType,
 }: {
   period: "monthly" | "yearly";
   onPeriodChange: (p: "monthly" | "yearly") => void;
@@ -2278,6 +2328,14 @@ function OverviewTab({
   headerTitle?: string;
   // Hide the in-content burger (e.g. it's moved onto the ร้านค้าของฉัน app bar).
   hideMenuButton?: boolean;
+  // The section title is shown on the green app bar instead of inside the content,
+  // so drop the in-content title row (keep only right-side controls like the
+  // report date picker).
+  titleInAppBar?: boolean;
+  // Product-management active tab (controlled by MyShopScreen so the add FAB
+  // knows which type to create).
+  pmType?: "regular" | "material";
+  onPmType?: (t: "regular" | "material") => void;
 }) {
   const nav = useNavigation<Nav>();
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
@@ -2637,6 +2695,15 @@ function OverviewTab({
         )
       ) : sub === "dashboard" ? (
         <View style={{ height: 16, backgroundColor: "#fafafa" }} />
+      ) : titleInAppBar ? (
+        // Title lives on the app bar — keep only right-side controls (date picker).
+        sub.startsWith("report_") ? (
+          <View className="flex-row items-center justify-end" style={{ backgroundColor: "#fafafa", paddingTop: 14, paddingBottom: 14 }}>
+            <SalesDatePicker period={salesPeriod} sel={salesDate} onChange={setSalesDate} />
+          </View>
+        ) : (
+          <View style={{ height: 14, backgroundColor: "#fafafa" }} />
+        )
       ) : (
         <View
           className="flex-row items-center justify-between"
@@ -2682,7 +2749,7 @@ function OverviewTab({
 
       {sub === "orders" ? <OrdersSection /> : null}
 
-      {sub === "products_manage" ? <ProductsManageSection /> : null}
+      {sub === "products_manage" ? <ProductsManageSection type={pmType ?? "regular"} setType={onPmType ?? (() => {})} /> : null}
 
       {sub === "report_sales" ? <ShopSalesReportView period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
 
@@ -3338,11 +3405,15 @@ const PURCHASE_ORDERS_DOC: MarketDoc[] = [
     items: [{ name: "ดอกอัญชันแห้ง", grade: "พรีเมียม", qty: 100, unit: "กก.", pricePerUnit: 520 }] },
 ];
 
+// Look up a PO document by its number (e.g. a PR's refId / a quote's poNumber).
+const findPoDoc = (id?: string): MarketDoc | undefined => (id ? PURCHASE_ORDERS_DOC.find((d) => d.id === id) : undefined);
+
 const docLineTotal = (it: DocItem) => it.qty * it.pricePerUnit;
 const docSubtotal = (d: MarketDoc) => d.items.reduce((s, it) => s + docLineTotal(it), 0);
 
 // ใบเสนอราคา — dedicated section with a search box + web-matching cards.
 function QuotationSection() {
+  const nav = useNavigation<Nav>();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const visible = QUOTATIONS.filter((d) => {
@@ -3387,7 +3458,7 @@ function QuotationSection() {
           <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบใบเสนอราคา</Text>
         </View>
       ) : (
-        visible.map((d) => <QuotationCard key={d.id} doc={d} />)
+        visible.map((d) => <QuotationCard key={d.id} doc={d} onOpenDetail={() => nav.navigate("ShopDocDetail", { doc: d, kind: "qt" })} />)
       )}
     </View>
   );
@@ -3395,18 +3466,19 @@ function QuotationSection() {
 
 // ใบเสนอราคา card — mirrors the web QuotationCard (pre-VAT, validity chip,
 // buyer row, per-unit pricing, download action). No status pill / VAT.
-function QuotationCard({ doc }: { doc: MarketDoc }) {
+function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDetail?: () => void }) {
   const total = docSubtotal(doc);
   const days = doc.daysRemaining ?? 0;
   const daysColor = days <= 0 ? "#dc2626" : days <= 7 ? "#dc2626" : days <= 30 ? "#d97706" : "#319754";
   return (
-    <View style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}>
-      {/* Issuer label */}
+    <Pressable onPress={onOpenDetail} className="active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}>
+      {/* Issuer label + open-detail chevron */}
       <View className="flex-row items-center" style={{ gap: 8, marginBottom: 8 }}>
         <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
           <ClipboardList size={13} color="#fff" strokeWidth={2.4} />
         </View>
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }}>ใบเสนอราคา (Quotation)</Text>
+        <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0a0a0a" }}>ใบเสนอราคา (Quotation)</Text>
+        <ChevronRight size={16} color={TEXT_MUTED} />
       </View>
 
       {/* id + days chip + date */}
@@ -3467,21 +3539,13 @@ function QuotationCard({ doc }: { doc: MarketDoc }) {
 
       <View style={{ height: 1, backgroundColor: "#e7e7ea", marginVertical: 12 }} />
 
-      {/* Total + download */}
-      <View className="flex-row items-center justify-between" style={{ flexWrap: "wrap", gap: 10 }}>
-        <View className="flex-row items-baseline" style={{ gap: 6 }}>
-          <Text style={{ fontSize: 13, color: TEXT_MUTED, fontWeight: "500" }}>ยอดรวม:</Text>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: BRAND_GREEN }}>{fmtTHBShort(total)}</Text>
-        </View>
-        <Pressable
-          className="flex-row items-center justify-center active:opacity-85"
-          style={{ height: 40, paddingHorizontal: 18, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 6 }}
-        >
-          <Download size={16} color="#fff" strokeWidth={2.2} />
-          <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#fff" }}>โหลดเอกสาร</Text>
-        </Pressable>
+      {/* Total — label left, price right (same column as item line totals, so
+          the eye scans straight down: each item price → grand total) */}
+      <View className="flex-row items-center justify-between">
+        <Text style={{ fontSize: 14, color: TEXT_PRIMARY, fontWeight: "700" }}>ยอดรวม</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: BRAND_GREEN }}>{fmtTHBShort(total)}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -3495,8 +3559,8 @@ const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[
   { id: "สินค้าหมด", label: "สินค้าหมด", Icon: AlertTriangle },
 ];
 
-function ProductsManageSection() {
-  const [type, setType] = useState<"regular" | "material">("regular");
+function ProductsManageSection({ type, setType }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void }) {
+  const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | PMStatus>("all");
   const [query, setQuery] = useState("");
   // Local copies so toggle-status / delete persist within the session.
@@ -3506,6 +3570,16 @@ function ProductsManageSection() {
 
   const list = type === "regular" ? regular : material;
   const setList = type === "regular" ? setRegular : setMaterial;
+
+  // Tap a card → storefront preview shown as a swipe-up sheet (customer view).
+  const openPreview = (p: PMProduct) => {
+    if (type === "material") {
+      nav.navigate("HerbalMarketPreview", { id: p.id, preview: true });
+    } else {
+      const sp = SHOP_PRODUCTS.find((x) => x.id === p.id);
+      if (sp) nav.navigate("ProductPreview", { product: sp, preview: true });
+    }
+  };
 
   const count = (id: "all" | PMStatus) => (id === "all" ? list.length : list.filter((p) => p.status === id).length);
 
@@ -3524,8 +3598,6 @@ function ProductsManageSection() {
       { text: "ยกเลิก", style: "cancel" },
       { text: "ลบ", style: "destructive", onPress: () => { setList((prev) => prev.filter((x) => x.id !== p.id)); setMenuFor(null); } },
     ]);
-
-  const addLabel = type === "regular" ? "เพิ่มผลิตภัณฑ์" : "เพิ่มวัตถุดิบ";
 
   return (
     <View style={{ gap: 14 }}>
@@ -3556,8 +3628,7 @@ function ProductsManageSection() {
         })}
       </View>
 
-      {/* Add button — full width, green, + icon in a soft circle (matches web) */}
-      <PMAddButton label={addLabel} type={type} />
+      {/* Add action is a floating FAB rendered by OverviewScreen (above the tab bar). */}
 
       {/* Search */}
       <View
@@ -3604,105 +3675,129 @@ function ProductsManageSection() {
           <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า</Text>
         </View>
       ) : (
-        visible.map((p) => <PMCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
+        visible.map((p) => <PMCard key={p.id} p={p} onMenu={() => setMenuFor(p)} onPreview={() => openPreview(p)} />)
       )}
 
       {/* 3-dot action menu */}
       <PMActionSheet
         product={menuFor}
         onClose={() => setMenuFor(null)}
-        onToggle={(p) => { setStatus(p.id, p.status === "เปิดขาย" ? "ปิดขาย" : "เปิดขาย"); setMenuFor(null); }}
+        onToggle={(prod) => {
+          const next: PMStatus = prod.status === "เปิดขาย" ? "ปิดขาย" : "เปิดขาย";
+          setStatus(prod.id, next);
+          // Update the open sheet's product so the switch reflects the new state.
+          setMenuFor({ ...prod, status: next, statusColor: PM_STATUS_COLOR[next] });
+        }}
         onDelete={remove}
       />
     </View>
   );
 }
 
-// Full-width add button — green, soft + circle (web parity).
-function PMAddButton({ label, type }: { label: string; type: "regular" | "material" }) {
+// Floating "+" add button (FAB) — sits above the bottom tab bar on the
+// product-management page.
+function PMAddFab({ bottom, onPress }: { bottom: number; onPress: () => void }) {
   const [pressed, setPressed] = useState(false);
   return (
-    <View style={{ borderRadius: 999, shadowColor: BRAND_GREEN, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 12 }}>
+    <View style={{ position: "absolute", right: 16, bottom, borderRadius: 30, shadowColor: BRAND_GREEN, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 14 }}>
       <Pressable
-        onPress={() => Alert.alert(label, `แบบฟอร์ม${label}กำลังพัฒนา`)}
+        onPress={onPress}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
+        accessibilityLabel="เพิ่มสินค้า"
         style={{
-          flexDirection: "row", alignItems: "center", justifyContent: "center",
-          height: 46, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8,
-          transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.95 : 1,
-          shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3,
+          width: 58, height: 58, borderRadius: 29, backgroundColor: BRAND_GREEN,
+          alignItems: "center", justifyContent: "center",
+          transform: [{ scale: pressed ? 0.92 : 1 }],
+          shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 6,
         }}
       >
-        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center" }}>
-          <Plus size={15} color="white" strokeWidth={2.6} />
-        </View>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: "white" }}>{label}</Text>
+        <Plus size={26} color="white" strokeWidth={2.6} />
       </Pressable>
     </View>
   );
 }
 
-// Product card — thumbnail + info + status/type/flash pills + 3-dot trigger.
-function PMCard({ p, onMenu }: { p: PMProduct; onMenu: () => void }) {
+// Product card — tap = storefront preview; 3-dot = action menu.
+function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; onPreview: () => void }) {
   const dimmed = p.status !== "เปิดขาย";
   const overlay = p.status === "สินค้าหมด" ? "หมด" : p.status === "ปิดขาย" ? "ปิด" : null;
   const stockMatch = p.stockText.match(/^([\d,]+)\s*(.*)$/);
 
-  const Pill = ({ text, color, bg, Icon }: { text: string; color: string; bg: string; Icon?: typeof Package }) => (
-    <View className="flex-row items-center" style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, gap: 4 }}>
+  const Pill = ({ text, color, bg, border, Icon }: { text: string; color: string; bg: string; border?: string; Icon?: typeof Package }) => (
+    <View
+      className="flex-row items-center"
+      style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 999, gap: 4, borderWidth: border ? 1 : 0, borderColor: border }}
+    >
       {Icon ? <Icon size={10} color={color} strokeWidth={2.6} /> : null}
-      <Text style={{ fontSize: 10.5, fontWeight: "600", color }}>{text}</Text>
+      <Text style={{ fontSize: 10.5, fontWeight: "700", color }}>{text}</Text>
     </View>
   );
 
   return (
-    <Pressable
-      onPress={onMenu}
-      className="flex-row active:bg-neutral-50"
-      style={{ backgroundColor: "white", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 12, gap: 12 }}
-    >
-      {/* Thumbnail */}
-      <View style={{ width: 72, height: 72, borderRadius: 16, overflow: "hidden", backgroundColor: SURFACE_GRAY, borderWidth: 1, borderColor: BORDER_GRAY }}>
-        <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
-        {overlay ? (
-          <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
-            <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>{overlay}</Text>
+    <View>
+      {/* Front: main white product card (stacks above the gray pill tray) */}
+      <Pressable
+        onPress={onPreview}
+        className="flex-row active:bg-neutral-50"
+        style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: "#ececed", padding: 12, gap: 12, zIndex: 2 }}
+      >
+        {/* Thumbnail */}
+        <View style={{ width: 84, height: 84, borderRadius: 16, overflow: "hidden", backgroundColor: SURFACE_GRAY, borderWidth: 1, borderColor: BORDER_GRAY }}>
+          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
+          {overlay ? (
+            <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
+              <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>{overlay}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Info */}
+        <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
+          <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }} numberOfLines={1}>{p.name}</Text>
+            <Pressable
+              onPress={onMenu}
+              hitSlop={8}
+              className="items-center justify-center active:opacity-70"
+              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}
+            >
+              <MoreHorizontal size={16} color={TEXT_SECONDARY} />
+            </Pressable>
           </View>
-        ) : null}
-      </View>
 
-      {/* Info */}
-      <View style={{ flex: 1, gap: 6 }}>
-        <View className="flex-row items-start justify-between" style={{ gap: 8 }}>
-          <Text style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#0a0a0a", lineHeight: 19 }} numberOfLines={2}>{p.name}</Text>
-          <Pressable
-            onPress={onMenu}
-            hitSlop={8}
-            className="items-center justify-center active:opacity-70"
-            style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}
-          >
-            <MoreHorizontal size={16} color={TEXT_SECONDARY} />
-          </Pressable>
+          <Text style={{ fontSize: 13, color: TEXT_MUTED }} numberOfLines={1}>{p.category}</Text>
+
+          <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 17, fontWeight: "800", color: "#0a0a0a" }}>{p.priceText}</Text>
+            <Text numberOfLines={1} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
+              {stockMatch ? (<><Text style={{ fontWeight: "700" }}>{stockMatch[1]}</Text> {stockMatch[2]}</>) : p.stockText}
+            </Text>
+          </View>
         </View>
+      </Pressable>
 
-        <Text style={{ fontSize: 12, color: TEXT_MUTED }} numberOfLines={1}>{p.category}</Text>
-
-        <View className="flex-row items-center" style={{ gap: 12 }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: BRAND_GREEN }}>{p.priceText}</Text>
-          <Text style={{ fontSize: 12, color: TEXT_SECONDARY }}>
-            {stockMatch ? (<><Text style={{ fontWeight: "600" }}>{stockMatch[1]}</Text> {stockMatch[2]}</>) : p.stockText}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center" style={{ gap: 6, flexWrap: "wrap" }}>
-          <Pill text={p.status} color={p.statusColor} bg={p.statusColor + "1a"} Icon={Package} />
-          <Pill text={p.type} color={p.typeColor} bg={p.typeColor + "1a"} />
+      {/* Behind: soft brand-green tray, tucked under the card and peeking below */}
+      <View
+        style={{
+          backgroundColor: "#eef6f1", borderRadius: 20,
+          borderWidth: 1, borderColor: "rgba(49,151,84,0.12)",
+          marginHorizontal: 8, marginTop: -18,
+          paddingTop: 26, paddingBottom: 11, paddingHorizontal: 16,
+          zIndex: 1,
+        }}
+      >
+        {/* Single non-wrapping row → tray height is identical on every card
+            (products with Flash/แนะนำ no longer push the tray to two lines). */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", gap: 6 }}>
+          {/* White fill + colored border so the pills pop against the tray */}
+          <Pill text={p.status} color={p.statusColor} bg="#ffffff" border={p.statusColor + "55"} Icon={Package} />
+          <Pill text={p.type} color={p.typeColor} bg="#ffffff" border={p.typeColor + "55"} />
           {p.flash ? <Pill text="Flash" color="#fff" bg="#e62e05" Icon={Zap} /> : null}
           {p.recommended ? <Pill text="★ แนะนำ" color="#fff" bg={BRAND_GREEN} /> : null}
-        </View>
+        </ScrollView>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -3720,19 +3815,19 @@ function PMActionSheet({
     <Pressable
       onPress={onPress}
       className="flex-row items-center active:bg-neutral-50"
-      style={{ paddingHorizontal: 16, paddingVertical: 15, gap: 14, borderTopWidth: divider ? 1 : 0, borderTopColor: "#f0f0f0" }}
+      style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 14, borderTopWidth: divider ? 1 : 0, borderTopColor: "#f0f0f0" }}
     >
-      <Icon size={19} color={color === "#0a0a0a" ? TEXT_SECONDARY : color} strokeWidth={2.2} />
+      <Icon size={20} color={color === "#0a0a0a" ? TEXT_SECONDARY : color} strokeWidth={2.2} />
       <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color }}>{label}</Text>
     </Pressable>
   );
 
   return (
-    <BottomSheet visible={!!p} onClose={onClose} onDone={onClose} title="ตัวเลือกสินค้า" minHeightRatio={0.42} maxHeightRatio={0.6}>
+    <BottomSheet visible={!!p} onClose={onClose} centerTitle title="ตัวเลือกสินค้า" minHeightRatio={0.1} maxHeightRatio={0.85}>
       {p ? (
-        <>
+        <View>
           {/* Product summary — name + category · price · stock */}
-          <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 }}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
             <Text style={{ fontSize: 13, color: TEXT_MUTED, marginTop: 2 }}>
               {p.category}{" · "}
@@ -3741,29 +3836,25 @@ function PMActionSheet({
             </Text>
           </View>
 
-          <ScrollView
-            contentContainerStyle={{ padding: 16, paddingTop: 8, gap: 12 }}
-            showsVerticalScrollIndicator={false}
-            style={{ backgroundColor: "#fafafa" }}
-          >
-            {/* Grouped white card — same card treatment as the rest of the app */}
-            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, overflow: "hidden" }}>
-              <Row
-                Icon={p.status === "เปิดขาย" ? EyeOff : PackageCheck}
-                label={p.status === "เปิดขาย" ? "ปิดการขาย" : "เปิดการขาย"}
-                color={p.status === "เปิดขาย" ? TEXT_SECONDARY : BRAND_GREEN}
-                onPress={() => onToggle(p)}
+          {/* Plain white rows with hairline dividers (same as other sheets) */}
+          <View style={{ borderTopWidth: 1, borderTopColor: "#f0f0f0" }}>
+            {/* Sale on/off — switch toggle */}
+            <View className="flex-row items-center" style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 14 }}>
+              <PackageCheck size={20} color={p.status === "เปิดขาย" ? BRAND_GREEN : TEXT_SECONDARY} strokeWidth={2.2} />
+              <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: "#0a0a0a" }}>เปิดการขาย</Text>
+              <Switch
+                value={p.status === "เปิดขาย"}
+                onValueChange={() => onToggle(p)}
+                trackColor={{ false: "#d4d4d4", true: BRAND_GREEN }}
+                thumbColor="#ffffff"
+                ios_backgroundColor="#d4d4d4"
               />
-              <Row divider Icon={Pencil} label="แก้ไขสินค้า" onPress={() => { onClose(); Alert.alert("แก้ไขสินค้า", `${p.name}\n(แบบฟอร์มกำลังพัฒนา)`); }} />
-              <Row divider Icon={Boxes} label="จัดการสตอกสินค้า" onPress={() => { onClose(); Alert.alert("จัดการสตอก", `${p.name}\n(กำลังพัฒนา)`); }} />
             </View>
-
-            {/* Destructive action in its own group (iOS-style separation) */}
-            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, overflow: "hidden" }}>
-              <Row Icon={Trash2} label="ลบสินค้า" color="#ff3b30" onPress={() => onDelete(p)} />
-            </View>
-          </ScrollView>
-        </>
+            <Row divider Icon={Pencil} label="แก้ไขสินค้า" onPress={() => { onClose(); Alert.alert("แก้ไขสินค้า", `${p.name}\n(แบบฟอร์มกำลังพัฒนา)`); }} />
+            <Row divider Icon={Boxes} label="จัดการสตอกสินค้า" onPress={() => { onClose(); Alert.alert("จัดการสตอก", `${p.name}\n(กำลังพัฒนา)`); }} />
+            <Row divider Icon={Trash2} label="ลบสินค้า" color="#ff3b30" onPress={() => onDelete(p)} />
+          </View>
+        </View>
       ) : null}
     </BottomSheet>
   );
@@ -3860,77 +3951,33 @@ function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; o
     </View>
   );
 
-  const Btn = ({ label, variant, Icon, flex }: { label: string; variant: "primary" | "outline" | "blue"; Icon?: typeof BarChart3; flex?: boolean }) => {
-    const s = variant === "primary"
-      ? { bg: BRAND_GREEN, border: BRAND_GREEN, text: "#fff" }
-      : variant === "blue"
-        ? { bg: "#007aff", border: "#007aff", text: "#fff" }
-        // Secondary — clear green outline so it reads as a button (was faint gray).
-        : { bg: "transparent", border: BRAND_GREEN, text: BRAND_GREEN };
-    const filled = variant === "primary" || variant === "blue";
-    const [pressed, setPressed] = useState(false);
-    const btn = (
-      <Pressable
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        style={{
-          flexDirection: "row", alignItems: "center", justifyContent: "center",
-          flex: filled ? 1 : (flex ? 1 : undefined), height: 42, paddingHorizontal: 16, borderRadius: 999, backgroundColor: s.bg, borderWidth: 1, borderColor: s.border, gap: 5,
-          // Press feedback — quick scale-down + dim.
-          transform: [{ scale: pressed ? 0.97 : 1 }],
-          opacity: pressed ? 0.9 : 1,
-          // Key shadow — x0 y2 blur4 #000 15% (filled only).
-          ...(filled ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 } : {}),
-        }}>
-        {Icon ? <Icon size={15} color={s.text} strokeWidth={2.2} /> : null}
-        <Text style={{ fontSize: 13, fontWeight: "600", color: s.text }}>{label}</Text>
-      </Pressable>
-    );
-    // Ambient shadow — x0 y6 blur12 #000 8% on a same-size wrapper (filled only).
-    return filled ? (
-      <View style={{ flex: flex ? 1 : undefined, borderRadius: 999, shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12 }}>
-        {btn}
-      </View>
-    ) : btn;
-  };
-
-  const primaryBtn =
-    kind === "pr" && doc.refId ? <Btn label={`ดูใบ ${doc.refId}`} variant="blue" Icon={FileText} flex /> :
-    kind === "po" && doc.status === "received" ? <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} flex /> :
-    kind === "po" && doc.status === "preparing" ? <Btn label="ยืนยันจัดส่ง" variant="primary" Icon={Truck} flex /> :
-    null;
-
   return (
     <Pressable
       onPress={onOpenDetail}
       className="active:opacity-90"
       style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}
     >
-      {/* Row 1: status badge + date + open-detail chevron */}
-      <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
-        <View
-          className="flex-row items-center"
-          style={{ backgroundColor: accent + "1a", paddingLeft: 8, paddingRight: 10, paddingVertical: 4, borderRadius: 999, gap: 6 }}
-        >
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: accent }} />
-          <Text style={{ fontSize: 11, fontWeight: "700", color: accent }}>{cfg.label}</Text>
-        </View>
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <Text style={{ fontSize: 11.5, color: TEXT_DISABLED }}>{doc.date}</Text>
-          <ChevronRight size={16} color={TEXT_MUTED} />
-        </View>
-      </View>
-
-      {/* Row 2: supplier */}
-      <View className="flex-row items-center" style={{ gap: 8, marginTop: 10 }}>
+      {/* Row 1: supplier + date + open-detail chevron (one row) */}
+      <View className="flex-row items-center" style={{ gap: 8 }}>
         <Building2 size={16} color={BRAND_GREEN} strokeWidth={2.2} />
         <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>
           {doc.company}
         </Text>
+        <Text style={{ fontSize: 11.5, color: TEXT_DISABLED }}>{doc.date}</Text>
+        <ChevronRight size={16} color={TEXT_MUTED} />
       </View>
 
-      {/* Row 3: doc id */}
-      <Text style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: "500", marginTop: 4 }}>{doc.id}</Text>
+      {/* Row 2: doc id + status / ภายใน / เครดิต tag pills */}
+      <View className="flex-row items-center" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+        <Text style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: "500", marginRight: 2 }}>{doc.id}</Text>
+        <View style={{ backgroundColor: accent + "1a", paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: "700", color: accent }}>{cfg.label}</Text>
+        </View>
+        {doc.needBy ? (
+          <Chip text={`${needLabel} ${doc.needBy}`} color="#319754" bg="rgba(49,151,84,0.1)" />
+        ) : null}
+        <Chip text={doc.paymentTerms} color="#d97706" bg="rgba(245,158,11,0.12)" />
+      </View>
 
       <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
 
@@ -3944,23 +3991,14 @@ function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; o
           <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>VAT 7%</Text>
           <Text style={{ fontSize: 13, color: TEXT_SECONDARY }}>{fmtTHBShort(vat)}</Text>
         </View>
-        <View className="flex-row items-center justify-between" style={{ marginTop: 2 }}>
-          <View className="flex-row items-center" style={{ gap: 6, flexShrink: 1, flexWrap: "wrap" }}>
-            <Text style={{ fontSize: 14, color: TEXT_PRIMARY, fontWeight: "700", marginRight: 2 }}>ยอดรวม</Text>
-            {doc.needBy ? (
-              <Chip text={`${needLabel} ${doc.needBy}`} color="#319754" bg="rgba(49,151,84,0.1)" />
-            ) : null}
-            <Chip text={doc.paymentTerms} color="#d97706" bg="rgba(245,158,11,0.12)" />
-          </View>
+        {/* Divider separating the grand total */}
+        <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 6 }} />
+        <View className="flex-row items-center justify-between">
+          <Text style={{ fontSize: 14, color: TEXT_PRIMARY, fontWeight: "700" }}>ยอดรวม</Text>
           <Text style={{ fontSize: 20, fontWeight: "700", color: "#ef4444" }}>{fmtTHBShort(total)}</Text>
         </View>
       </View>
 
-      {/* Actions */}
-      <View className="flex-row items-center" style={{ gap: 8, marginTop: 12 }}>
-        <Btn label="ติดต่อลูกค้า" variant="outline" Icon={MessageCircle} flex={!primaryBtn} />
-        {primaryBtn}
-      </View>
     </Pressable>
   );
 }
@@ -3970,12 +4008,32 @@ function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; o
 // Buyer-internal fields (approver / justification / urgency / ERP) are NOT shown
 // to the supplier.
 export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc; kind: DocKind; insetsBottom?: number }) {
+  const nav = useNavigation<Nav>();
+  // push (not navigate): we're already on a ShopDocDetail screen, so navigate to
+  // the same route would only swap params in place (no push, no transition).
+  const goPo = (id?: string) => {
+    const po = findPoDoc(id);
+    if (!po) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    nav.push("ShopDocDetail", { doc: po, kind: "po" });
+  };
   const cfg = DOC_STATUS[kind][doc.status];
   const subtotal = docSubtotal(doc);
   const vat = Math.round(subtotal * 0.07);
   const total = subtotal + vat;
   const needLabel = kind === "po" ? "วันที่จัดส่ง" : "ต้องการภายใน";
   const KindIcon = kind === "po" ? Package : FileText;
+
+  // Primary contextual action for the floating bottom bar (User-page style).
+  const primaryAction: { label: string; Icon: typeof BarChart3; onPress?: () => void } | null =
+    kind === "po" && doc.status === "received" ? { label: "พร้อมจัดส่ง", Icon: ArrowRightCircle } :
+    kind === "po" && doc.status === "preparing" ? { label: "ยืนยันจัดส่ง", Icon: Truck } :
+    kind === "pr" && doc.refId ? { label: doc.refId, Icon: FileText, onPress: () => goPo(doc.refId) } :
+    null;
+
+  const canCancel =
+    (kind === "po" && (doc.status === "received" || doc.status === "preparing")) ||
+    (kind === "pr" && doc.status === "received");
 
   const Section = ({ title, children }: { title: string; children: ReactNode }) => (
     <View style={{ backgroundColor: "#fff", marginTop: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
@@ -3991,9 +4049,10 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
   );
 
   return (
+    <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: insetsBottom + 40 }}
+      contentContainerStyle={{ paddingBottom: insetsBottom + 110 }}
       style={{ backgroundColor: "#fafafa" }}
     >
       {/* Status banner */}
@@ -4004,7 +4063,7 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>
-              {kind === "po" ? "สถานะใบสั่งซื้อ" : "สถานะใบขอสั่งซื้อ"}
+              {kind === "po" ? "สถานะใบสั่งซื้อ" : kind === "qt" ? "สถานะใบเสนอราคา" : "สถานะใบขอสั่งซื้อ"}
             </Text>
             <Text style={{ fontSize: 15, fontWeight: "700", color: cfg.color, marginTop: 1 }}>{cfg.label}</Text>
           </View>
@@ -4033,32 +4092,57 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
           ))}
         </View>
         <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 14 }} />
-        <View style={{ gap: 6 }}>
-          <InfoRow label="ยอดรวม" value={fmtTHBShort(subtotal)} />
-          <InfoRow label="VAT 7%" value={fmtTHBShort(vat)} />
-        </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>รวมทั้งสิ้น</Text>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: "#ff383c" }}>{fmtTHBShort(total)}</Text>
-        </View>
+        {kind === "qt" ? (
+          // Quotation = pre-VAT (mirrors the buyer's ใบเสนอราคา).
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>ยอดรวมทั้งสิ้น</Text>
+            <Text style={{ fontSize: 22, fontWeight: "800", color: BRAND_GREEN }}>{fmtTHBShort(subtotal)}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={{ gap: 6 }}>
+              <InfoRow label="ยอดรวม" value={fmtTHBShort(subtotal)} />
+              <InfoRow label="VAT 7%" value={fmtTHBShort(vat)} />
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>รวมทั้งสิ้น</Text>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: "#ff383c" }}>{fmtTHBShort(total)}</Text>
+            </View>
+          </>
+        )}
       </Section>
 
-      {/* Payment / reference */}
-      <Section title="ข้อมูลการชำระเงิน / อ้างอิง">
-        <InfoRow label="เงื่อนไขชำระเงิน" value={doc.paymentTerms} valueColor="#d97706" />
-        {doc.needBy ? <InfoRow label={needLabel} value={doc.needBy} /> : null}
-        {doc.shippingMethod ? <InfoRow label="วิธีจัดส่ง" value={doc.shippingMethod} /> : null}
-        {doc.trackingNumber ? <InfoRow label="เลขพัสดุ" value={doc.trackingNumber} /> : null}
-        {doc.refId ? (
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}>
-            <Text style={{ fontSize: 13, color: TEXT_MUTED }}>เลข PO ที่ออกแล้ว</Text>
-            <View className="flex-row items-center" style={{ gap: 2 }}>
-              <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#007aff" }}>{doc.refId}</Text>
-              <ChevronRight size={15} color="#007aff" />
+      {/* Quotation info (qt) — validity; or payment/reference (pr/po) */}
+      {kind === "qt" ? (
+        <Section title="ข้อมูลใบเสนอราคา">
+          <InfoRow label="วันที่เสนอราคา" value={doc.date} />
+          {doc.validUntil ? <InfoRow label="มีผลถึง" value={doc.validUntil} /> : null}
+          {doc.daysRemaining !== undefined ? (
+            <InfoRow
+              label="คงเหลือ"
+              value={doc.daysRemaining <= 0 ? "หมดอายุแล้ว" : `${doc.daysRemaining} วัน`}
+              valueColor={doc.daysRemaining <= 7 ? "#dc2626" : doc.daysRemaining <= 30 ? "#d97706" : "#319754"}
+            />
+          ) : null}
+          <InfoRow label="เงื่อนไขชำระเงิน" value={doc.paymentTerms} valueColor="#d97706" />
+        </Section>
+      ) : (
+        <Section title="ข้อมูลการชำระเงิน / อ้างอิง">
+          <InfoRow label="เงื่อนไขชำระเงิน" value={doc.paymentTerms} valueColor="#d97706" />
+          {doc.needBy ? <InfoRow label={needLabel} value={doc.needBy} /> : null}
+          {doc.shippingMethod ? <InfoRow label="วิธีจัดส่ง" value={doc.shippingMethod} /> : null}
+          {doc.trackingNumber ? <InfoRow label="เลขพัสดุ" value={doc.trackingNumber} /> : null}
+          {doc.refId ? (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}>
+              <Text style={{ fontSize: 13, color: TEXT_MUTED }}>เลข PO ที่ออกแล้ว</Text>
+              <View className="flex-row items-center" style={{ gap: 2 }}>
+                <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#007aff" }}>{doc.refId}</Text>
+                <ChevronRight size={15} color="#007aff" />
+              </View>
             </View>
-          </View>
-        ) : null}
-      </Section>
+          ) : null}
+        </Section>
+      )}
 
       {/* Delivery status timeline — PO only */}
       {kind === "po" ? (
@@ -4139,59 +4223,61 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
         </View>
       </Section>
 
-      {/* Actions */}
-      {(() => {
-        const ActBtn = ({ label, Icon, variant }: { label: string; Icon: typeof BarChart3; variant: "primary" | "outline" | "blue" | "danger" }) => {
-          const s = variant === "primary"
-            ? { bg: BRAND_GREEN, border: BRAND_GREEN, fg: "#fff" }
-            : variant === "blue"
-              ? { bg: "#007aff", border: "#007aff", fg: "#fff" }
-              : variant === "danger"
-                ? { bg: "transparent", border: "#ef4444", fg: "#ef4444" }
-                : { bg: "transparent", border: BRAND_GREEN, fg: BRAND_GREEN };
-          // Primary (filled) buttons get a layered shadow — key + ambient.
-          const filled = variant === "primary" || variant === "blue";
-          const [pressed, setPressed] = useState(false);
-          const btn = (
-            <Pressable
-              onPressIn={() => setPressed(true)}
-              onPressOut={() => setPressed(false)}
-              style={{
-                flexDirection: "row", alignItems: "center", justifyContent: "center",
-                height: 46, borderRadius: 999, backgroundColor: s.bg, borderWidth: 1, borderColor: s.border, gap: 6,
-                // Press feedback — quick scale-down + dim.
-                transform: [{ scale: pressed ? 0.97 : 1 }],
-                opacity: pressed ? 0.9 : 1,
-                // Key shadow — x0 y2 blur4 #000 15% (filled only).
-                ...(filled ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 } : {}),
-              }}
-            >
-              <Icon size={16} color={s.fg} strokeWidth={2.2} />
-              <Text style={{ fontSize: 14, fontWeight: "600", color: s.fg }}>{label}</Text>
-            </Pressable>
-          );
-          // Ambient shadow — x0 y6 blur12 #000 8% on a same-size wrapper (filled only).
-          return filled ? (
-            <View style={{ borderRadius: 999, shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12 }}>
-              {btn}
-            </View>
-          ) : btn;
-        };
-        const canCancel =
-          (kind === "po" && (doc.status === "received" || doc.status === "preparing")) ||
-          (kind === "pr" && doc.status === "received");
-        return (
-          <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 10 }}>
-            <ActBtn label={`โหลดเอกสาร ${DOC_TITLE[kind]}`} Icon={Download} variant="outline" />
-            <ActBtn label="ติดต่อลูกค้า" Icon={MessageCircle} variant="outline" />
-            {kind === "po" && doc.status === "received" ? <ActBtn label="พร้อมจัดส่ง" Icon={ArrowRightCircle} variant="primary" /> : null}
-            {kind === "po" && doc.status === "preparing" ? <ActBtn label="ยืนยันจัดส่ง" Icon={Truck} variant="primary" /> : null}
-            {kind === "pr" && doc.refId ? <ActBtn label={`ดูใบ ${doc.refId}`} Icon={FileText} variant="blue" /> : null}
-            {canCancel ? <ActBtn label="ยกเลิกสินค้า" Icon={X} variant="danger" /> : null}
-          </View>
-        );
-      })()}
+      {/* Cancel — bottom-most action (outline danger) */}
+      {canCancel ? (
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <Pressable
+            className="flex-row items-center justify-center active:opacity-80"
+            style={{ height: 46, borderRadius: 999, borderWidth: 1, borderColor: "#ef4444", gap: 6 }}
+          >
+            <X size={16} color="#ef4444" strokeWidth={2.2} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "#ef4444" }}>ยกเลิกสินค้า</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
     </ScrollView>
+
+      {/* Floating glass action bar — User-page style (circular contact icon +
+          primary pill). Download lives on the top-right of the header now. */}
+      <LinearGradient pointerEvents="none" colors={["transparent", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 90 }} />
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insetsBottom + 8 }}>
+        <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {primaryAction ? (
+              <>
+                {/* Contact — circular icon button (only when a primary pill is shown) */}
+                <Pressable
+                  hitSlop={6}
+                  className="active:opacity-70"
+                  style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(49,151,84,0.1)" }}
+                >
+                  <MessageCircle size={22} color={BRAND_GREEN} />
+                </Pressable>
+                {/* Primary action — green pill */}
+                <Pressable
+                  onPress={primaryAction.onPress}
+                  className="active:opacity-90"
+                  style={{ flex: 1, height: 50, borderRadius: 999, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, backgroundColor: BRAND_GREEN }}
+                >
+                  <primaryAction.Icon size={18} color="#fff" strokeWidth={2.3} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{primaryAction.label}</Text>
+                </Pressable>
+              </>
+            ) : (
+              // No primary action — single full-width "ติดต่อลูกค้า" pill (no duplicate)
+              <Pressable
+                className="active:opacity-90"
+                style={{ flex: 1, height: 50, borderRadius: 999, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, backgroundColor: BRAND_GREEN }}
+              >
+                <MessageCircle size={18} color="#fff" strokeWidth={2.3} />
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>ติดต่อลูกค้า</Text>
+              </Pressable>
+            )}
+          </GlassView>
+        </View>
+      </View>
+    </View>
   );
 }
 

@@ -87,6 +87,7 @@ import { AIHistoryScreen } from "../screens/AIHistoryScreen";
 import { MyShopScreen } from "../screens/MyShopScreen";
 import type { MarketDoc, DocKind } from "../screens/MyShopScreen";
 import { ShopDocDetailScreen } from "../screens/ShopDocDetailScreen";
+import { AddProductScreen } from "../screens/AddProductScreen";
 import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
 import { ShopAccountScreen } from "../screens/ShopAccountScreen";
 import { ShopAddressScreen } from "../screens/ShopAddressScreen";
@@ -115,6 +116,8 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   ProductDetail: { product: Product; preview?: boolean };
+  ProductPreview: { product: Product; preview?: boolean };
+  AddProduct: { mode: "regular" | "material" };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
   OrderDetail: { orderId: string };
@@ -139,6 +142,7 @@ export type RootStackParamList = {
   Account: undefined;
   HerbalMarket: undefined;
   HerbalMarketDetail: { id?: string; preview?: boolean } | undefined;
+  HerbalMarketPreview: { id?: string; preview?: boolean } | undefined;
   HerbalMarketPR: { id?: string; ids?: string[] } | undefined;
   HerbalMarketPurchase: { id?: string; qty?: number } | undefined;
   HerbalMarketQuote: { id?: string; ids?: string[] } | undefined;
@@ -297,6 +301,12 @@ export function RootStack() {
         component={ProductDetailScreen}
         options={{ animation: "slide_from_right" }}
       />
+      {/* Storefront preview — same screen, shown as a swipe-up sheet */}
+      <Stack.Screen
+        name="ProductPreview"
+        component={ProductDetailScreen as React.ComponentType}
+        options={{ headerShown: false, presentation: "pageSheet", sheetGrabberVisible: true, sheetCornerRadius: 24 }}
+      />
       <Stack.Screen
         name="ArticleDetail"
         component={ArticleDetailScreen}
@@ -336,6 +346,7 @@ export function RootStack() {
       <Stack.Screen name="ComplaintStatus" component={ComplaintStatusScreen} options={{ headerShown: true, title: "สถานะการร้องเรียน", animation: "slide_from_right" }} />
       <Stack.Screen name="CouponCollect" component={CouponCollectScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketDetail" component={HerbalMarketDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="HerbalMarketPreview" component={HerbalMarketDetailScreen} options={{ headerShown: false, presentation: "pageSheet", sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
       <Stack.Screen name="HerbalMarketPR" component={HerbalMarketPRScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketPurchase" component={HerbalMarketPurchaseScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketQuote" component={HerbalMarketQuoteScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
@@ -375,6 +386,7 @@ export function RootStack() {
       <Stack.Screen name="AIHistory" component={AIHistoryScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopDocDetail" component={ShopDocDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="MyShopMenu" component={MyShopMenuScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="ShopAccount" component={ShopAccountScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopAddress" component={ShopAddressScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

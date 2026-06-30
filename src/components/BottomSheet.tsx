@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Check, X } from "lucide-react-native";
+import { GlassIconButton } from "./GlassIconButton";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
@@ -25,6 +26,9 @@ type Props = {
   /** When set, the header switches to the iOS filter-sheet style (close-X left,
    *  centered title, green ✓ done button right) and calls this on done. */
   onDone?: () => void;
+  /** Close-X left + centered title + no right action (the detail-sheet header
+   *  style). Ignored when onDone is set. */
+  centerTitle?: boolean;
   /** Min height as ratio of screen (default 0.6). */
   minHeightRatio?: number;
   /** Max height as ratio of screen (default 0.9). */
@@ -45,6 +49,7 @@ export function BottomSheet({
   title,
   children,
   onDone,
+  centerTitle,
   minHeightRatio = 0.6,
   maxHeightRatio = 0.9,
 }: Props) {
@@ -145,17 +150,21 @@ export function BottomSheet({
               transform: [{ translateY }],
             }}
           >
-            {/* Drag handle */}
-            <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 8 }}>
-              <View
-                style={{
-                  width: 40,
-                  height: 5,
-                  backgroundColor: "#d4d4d4",
-                  borderRadius: 3,
-                }}
-              />
-            </View>
+            {/* Drag handle — hidden for the detail-sheet (centerTitle) style */}
+            {centerTitle ? (
+              <View style={{ height: 16 }} />
+            ) : (
+              <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 8 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 5,
+                    backgroundColor: "#d4d4d4",
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+            )}
 
             {/* Header — iOS filter-sheet style (X / title / green ✓) when onDone
                 is set, otherwise the default title + close. */}
@@ -196,6 +205,18 @@ export function BottomSheet({
                   <Check size={22} color="#fff" strokeWidth={3} />
                 </Pressable>
               </View>
+            ) : centerTitle ? (
+              // Detail-sheet style: glass close-X left, centered title, no right action.
+              <View
+                className="flex-row items-center justify-between"
+                style={{ paddingHorizontal: 16, paddingBottom: 12 }}
+              >
+                <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
+                  <X size={22} color="#1a1a1a" strokeWidth={2.6} />
+                </GlassIconButton>
+                <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
+                <View style={{ width: 44 }} />
+              </View>
             ) : (
               <View
                 className="flex-row items-center justify-between"
@@ -227,10 +248,11 @@ export function BottomSheet({
               </View>
             )}
 
-            {/* Content area — caller controls padding/layout */}
+            {/* Content area — caller controls padding/layout. centerTitle sheets
+                hug their content (no flex:1) so the sheet height fits exactly. */}
             <View
               style={{
-                flex: 1,
+                flex: centerTitle ? undefined : 1,
                 paddingBottom: insets.bottom,
               }}
             >

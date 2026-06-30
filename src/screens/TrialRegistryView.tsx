@@ -265,8 +265,10 @@ export function TrialRegistryOwnerSection() {
           "สินค้าทดลอง" title is rendered by OverviewTab. */}
       <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>จัดการสินค้าทดลอง รับสมัคร และติดตามคำตอบจาก Tester</Text>
 
-      {/* Stat cards — 5 metrics, horizontal scroll (web KPI strip parity) */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+      {/* Stat cards — 5 metrics, horizontal scroll (web KPI strip parity).
+          Full-bleed (negative margin cancels the parent's 16px padding) so the
+          next card peeks at the screen edge — a visible "scroll for more" hint. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
         {STAT_CARDS.map((s) => (
           <View key={s.label} style={{ width: 150, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#e5e7eb", padding: 14, gap: 6 }}>
             <View className="flex-row items-center justify-between">
@@ -283,8 +285,8 @@ export function TrialRegistryOwnerSection() {
         ))}
       </ScrollView>
 
-      {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+      {/* Filter chips — full-bleed so the last chip peeks at the screen edge. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
         {FILTERS.map((t) => {
           const active = filter === t.key;
           return (
