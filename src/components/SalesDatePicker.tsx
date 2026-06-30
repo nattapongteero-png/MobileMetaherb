@@ -104,9 +104,9 @@ export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel
 
   return (
     <>
-      <Pressable onPress={openModal} className="flex-row items-center active:opacity-70" style={{ gap: 5, backgroundColor: "#f0f0f0", borderRadius: 999, paddingHorizontal: 12, height: 34 }}>
-        <Calendar size={14} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
-        <Text style={{ fontSize: 12.5, fontWeight: "600", color: "#1a1a1a" }}>{salesDateLabel(period, sel)}</Text>
+      <Pressable onPress={openModal} className="flex-row items-center active:opacity-60" style={{ gap: 5, paddingHorizontal: 6, height: 34 }}>
+        <Calendar size={15} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
+        <Text style={{ fontSize: 12.5, fontWeight: "700", color: BRAND_GREEN_DARK }}>{salesDateLabel(period, sel)}</Text>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close}>

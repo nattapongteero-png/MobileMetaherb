@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,20 @@ import {
   Animated,
   Alert,
   Modal,
+  PanResponder,
   KeyboardAvoidingView,
   Platform,
   useWindowDimensions,
   type TextStyle,
   type ScrollViewProps,
 } from "react-native";
+import { GestureHandlerRootView, GestureDetector, Gesture, ScrollView as GHScrollView } from "react-native-gesture-handler";
+import Reanimated, { runOnJS, useSharedValue, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 
 type ScrollHandler = ScrollViewProps["onScroll"];
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@bottom-tabs/react-navigation";
 import { useBottomTabBarHeight } from "react-native-bottom-tabs";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -56,10 +59,12 @@ import {
   PackageCheck,
   PackageX,
   Pencil,
+  GripVertical,
   PlusCircle,
   ScanSearch,
   Leaf,
   Search,
+  Sparkles,
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
@@ -76,6 +81,7 @@ import {
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { GlassView } from "expo-glass-effect";
 import { BottomSheet } from "../components/BottomSheet";
 import { getImagePicker } from "../utils/imagePicker";
 import { useSeller } from "../context/SellerContext";
@@ -83,8 +89,9 @@ import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
 import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmtSigned, type Settlement, type SettlementStatus } from "../data/financeTransactions";
-import { ShopComplaintsView } from "./ShopComplaintsView";
 import { ShopSalesReportView } from "./ShopSalesReportView";
+import { ShopReportView } from "./ShopReportView";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SalesDatePicker, type DateSel } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -185,7 +192,7 @@ export const SHOP_MENU: MenuNode[] = [
       { id: "report_sales", label: "รายงานผลยอดขาย" },
       { id: "report_customers", label: "รายงานข้อมูลลูกค้า" },
       { id: "report_products", label: "รายงานข้อมูลสินค้า" },
-      { id: "report_market", label: "Market Report" },
+      { id: "report_market", label: "รายงานการตลาด" },
     ],
   },
   { id: "complaints", label: "เรื่องร้องเรียน", Icon: AlertTriangle },
@@ -204,38 +211,231 @@ const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[]
   { id: "trials_products", label: "สินค้าทดลอง", Icon: FlaskConical },
   { id: "trials_tracking", label: "ติดตามทดลอง", Icon: ScanSearch },
   { id: "report_sales", label: "รายงานขาย", Icon: BarChart3 },
-  { id: "report_customers", label: "ข้อมูลลูกค้า", Icon: User },
-  { id: "report_products", label: "ข้อมูลสินค้า", Icon: Package },
-  { id: "report_market", label: "Market", Icon: Beaker },
+  { id: "report_customers", label: "รายงานลูกค้า", Icon: User },
+  { id: "report_products", label: "รายงานสินค้า", Icon: Package },
+  { id: "report_market", label: "รายงานตลาด", Icon: Beaker },
   { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
 ];
 
-/** Paged menu grid (8 per page · 4×2) shown on the overview tab — swipe for more. */
+type MenuItem = (typeof SHOP_MENU_GRID)[number];
+type Cell = { kind: "menu"; m: MenuItem } | { kind: "reorder" };
+const MENU_BY_ID: Record<string, MenuItem> = {};
+SHOP_MENU_GRID.forEach((m) => { MENU_BY_ID[m.id] = m; });
+const DEFAULT_MENU_ORDER = SHOP_MENU_GRID.map((m) => m.id);
+const MENU_ORDER_KEY = "shop_menu_order_v1";
+
+// Report sections open as their own subpage (ShopReport route).
+const REPORT_KIND: Partial<Record<SectionId, "sales" | "customers" | "products" | "market">> = {
+  report_sales: "sales",
+  report_customers: "customers",
+  report_products: "products",
+  report_market: "market",
+};
+
+const META_CHAR = require("../../assets/meta-character.gif");
+
+/** น้องเมต้า — AI shop-manager entry on the overview (placeholder → opens the เมต้า chat). */
+function MetaManagerCard({ onPress }: { onPress: () => void }) {
+  // Replay the character once each time the overview gains focus (gif itself doesn't loop).
+  const [playKey, setPlayKey] = useState(0);
+  useFocusEffect(useCallback(() => { setPlayKey((k) => k + 1); }, []));
+  return (
+    <Pressable onPress={onPress} className="active:opacity-90" style={{ borderRadius: 18, overflow: "hidden" }}>
+      <LinearGradient
+        colors={["#c2410c", "#ea580c", "#fb923c"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ flexDirection: "row", alignItems: "center", minHeight: 116, paddingLeft: 16, paddingVertical: 12, paddingRight: 4 }}
+      >
+        <View style={{ flex: 1, paddingRight: 6 }}>
+          <View className="flex-row items-center" style={{ gap: 6, flexWrap: "wrap" }}>
+            <Text style={{ fontSize: 19, fontWeight: "800", color: "#fff" }}>น้องเมต้า</Text>
+            <View className="flex-row items-center" style={{ gap: 3 }}>
+              <Sparkles size={12} color="rgba(255,255,255,0.9)" strokeWidth={2.4} />
+              <Text style={{ fontSize: 12.5, fontWeight: "700", color: "rgba(255,255,255,0.9)" }}>ผู้จัดการ AI</Text>
+            </View>
+          </View>
+          <Text numberOfLines={2} style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 5, lineHeight: 16 }}>
+            ช่วยจัดการข้อมูลร้านค้า · ถามยอดขาย สรุปออเดอร์ จัดการสินค้า
+          </Text>
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            isInteractive
+            style={{ alignSelf: "flex-start", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingLeft: 16, paddingRight: 13, paddingVertical: 9 }}
+          >
+            <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#fff" }}>เริ่มแชท</Text>
+            <ArrowRightCircle size={16} color="#fff" strokeWidth={2.4} />
+          </GlassView>
+        </View>
+        <Image key={playKey} source={META_CHAR} style={{ width: 110, height: 116 }} resizeMode="contain" />
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+const RROW_H = 56; // reorder row slot height
+
+/** One reorder row — drag handled on the UI thread via reanimated (no re-render → no jank). */
+function ReorderRow({ i, m, n, activeSV, hoverSV, dragSV, onReorder }: {
+  i: number;
+  m: MenuItem;
+  n: number;
+  activeSV: SharedValue<number>;
+  hoverSV: SharedValue<number>;
+  dragSV: SharedValue<number>;
+  onReorder: (from: number, to: number) => void;
+}) {
+  const gesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activateAfterLongPress(160)
+        .onStart(() => { activeSV.value = i; hoverSV.value = i; dragSV.value = 0; })
+        .onUpdate((e) => {
+          dragSV.value = e.translationY;
+          let h = Math.round((i * RROW_H + e.translationY) / RROW_H);
+          if (h < 0) h = 0;
+          if (h > n - 1) h = n - 1;
+          hoverSV.value = h;
+        })
+        .onEnd(() => { runOnJS(onReorder)(activeSV.value, hoverSV.value); })
+        .onFinalize(() => { activeSV.value = -1; hoverSV.value = -1; dragSV.value = 0; }),
+    [i, n, activeSV, hoverSV, dragSV, onReorder],
+  );
+
+  const containerStyle = useAnimatedStyle(() => {
+    const a = activeSV.value, h = hoverSV.value;
+    let ty = 0;
+    if (a === i) ty = dragSV.value;
+    else if (a !== -1) {
+      if (a < h && i > a && i <= h) ty = -RROW_H;
+      else if (a > h && i >= h && i < a) ty = RROW_H;
+    }
+    return { transform: [{ translateY: ty }], zIndex: a === i ? 20 : 1 };
+  });
+  const pillStyle = useAnimatedStyle(() => ({ backgroundColor: activeSV.value === i ? "#e3f3e9" : "#f5f5f5" }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Reanimated.View style={[{ position: "absolute", left: 0, right: 0, top: i * RROW_H, height: RROW_H, justifyContent: "center" }, containerStyle]}>
+        <Reanimated.View className="flex-row items-center" style={[{ gap: 10, borderRadius: 999, padding: 8 }, pillStyle]}>
+          <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+            <m.Icon size={18} color={BRAND_GREEN_DARK} strokeWidth={2} />
+          </View>
+          <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#1a1a1a" }}>{m.label}</Text>
+          <GripVertical size={20} color="#c4c4c4" strokeWidth={2} />
+        </Reanimated.View>
+      </Reanimated.View>
+    </GestureDetector>
+  );
+}
+
+/** Drag-and-drop reorder list — gesture-handler Pan + reanimated (smooth, UI-thread). */
+function MenuReorderList({ initial, onSave, onClose }: { initial: SectionId[]; onSave: (o: SectionId[]) => void; onClose: () => void }) {
+  const [data, setData] = useState<SectionId[]>(initial);
+  const dataRef = useRef(data); dataRef.current = data;
+  const activeSV = useSharedValue(-1);
+  const hoverSV = useSharedValue(-1);
+  const dragSV = useSharedValue(0);
+
+  const applyReorder = (from: number, to: number) => {
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...dataRef.current];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    setData(next);
+  };
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+        <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
+          <X size={22} color="#1a1a1a" strokeWidth={2.6} />
+        </GlassIconButton>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>จัดลำดับเมนู</Text>
+        <GlassIconButton onPress={() => onSave(dataRef.current)} size={44} accessibilityLabel="บันทึก" tintColor="rgba(49,151,84,0.22)">
+          <Check size={22} color={BRAND_GREEN_DARK} strokeWidth={3} />
+        </GlassIconButton>
+      </View>
+      <GHScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+        <Text style={{ fontSize: 12.5, color: TEXT_MUTED, marginBottom: 10 }}>กดแถวค้างแล้วลากเพื่อจัดลำดับ</Text>
+        <View style={{ height: data.length * RROW_H }}>
+          {data.map((id, i) => {
+            const m = MENU_BY_ID[id];
+            if (!m) return null;
+            return <ReorderRow key={id} i={i} m={m} n={data.length} activeSV={activeSV} hoverSV={hoverSV} dragSV={dragSV} onReorder={applyReorder} />;
+          })}
+        </View>
+      </GHScrollView>
+    </GestureHandlerRootView>
+  );
+}
+
+/** Paged menu grid (8 per page · 4×2), swipeable, with a customizable order. */
 function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
   const [w, setW] = useState(0);
   const [page, setPage] = useState(0);
-  const pages: (typeof SHOP_MENU_GRID)[] = [];
-  for (let i = 0; i < SHOP_MENU_GRID.length; i += 8) pages.push(SHOP_MENU_GRID.slice(i, i + 8));
+  const [order, setOrder] = useState<SectionId[]>(DEFAULT_MENU_ORDER);
+  const [editing, setEditing] = useState(false);
+
+  // Restore saved order; reconcile with the current menu (drop removed, append new).
+  useEffect(() => {
+    AsyncStorage.getItem(MENU_ORDER_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const saved = (JSON.parse(raw) as SectionId[]).filter((id) => MENU_BY_ID[id]);
+        setOrder([...saved, ...DEFAULT_MENU_ORDER.filter((id) => !saved.includes(id))]);
+      } catch {
+        /* keep default */
+      }
+    });
+  }, []);
+
+  const items = order.map((id) => MENU_BY_ID[id]).filter(Boolean);
+  // "จัดลำดับ" rides as the last cell — a circular tile like its menu peers.
+  const cells: Cell[] = [...items.map((m) => ({ kind: "menu" as const, m })), { kind: "reorder" as const }];
+  const pages: Cell[][] = [];
+  for (let i = 0; i < cells.length; i += 8) pages.push(cells.slice(i, i + 8));
+
+  const openEdit = () => setEditing(true);
+  const saveOrder = (o: SectionId[]) => {
+    setOrder(o);
+    AsyncStorage.setItem(MENU_ORDER_KEY, JSON.stringify(o)).catch(() => {});
+    setEditing(false);
+  };
+
   return (
-    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ paddingVertical: 2 }}>
-      {w > 0 ? (
-        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / w))}>
-          {pages.map((pg, pi) => (
-            <View key={pi} style={{ width: w, flexDirection: "row", flexWrap: "wrap" }}>
-              {pg.map((m) => (
-                <Pressable key={m.id} onPress={() => onSelect?.(m.id)} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
-                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                    <m.Icon size={22} color={BRAND_GREEN_DARK} strokeWidth={2} />
-                  </View>
-                  <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>{m.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
-      ) : (
-        <View style={{ height: 168 }} />
-      )}
+    <View style={{ paddingVertical: 2 }}>
+      <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+        {w > 0 ? (
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / w))}>
+            {pages.map((pg, pi) => (
+              <View key={pi} style={{ width: w, flexDirection: "row", flexWrap: "wrap" }}>
+                {pg.map((cell) =>
+                  cell.kind === "reorder" ? (
+                    <Pressable key="reorder" onPress={openEdit} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
+                      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                        <Pencil size={20} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
+                      </View>
+                      <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>จัดลำดับ</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable key={cell.m.id} onPress={() => onSelect?.(cell.m.id)} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
+                      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                        <cell.m.Icon size={22} color={BRAND_GREEN_DARK} strokeWidth={2} />
+                      </View>
+                      <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>{cell.m.label}</Text>
+                    </Pressable>
+                  ),
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{ height: 168 }} />
+        )}
+      </View>
+
       {pages.length > 1 ? (
         <View className="flex-row items-center justify-center" style={{ gap: 6, marginTop: 6 }}>
           {pages.map((_, i) => (
@@ -243,6 +443,11 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
           ))}
         </View>
       ) : null}
+
+      {/* Reorder sheet — drag & drop */}
+      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
+        <MenuReorderList initial={order} onSave={saveOrder} onClose={() => setEditing(false)} />
+      </Modal>
     </View>
   );
 }
@@ -263,7 +468,7 @@ const SECTION_LABEL: Record<SectionId, string> = {
   report_sales: "รายงานผลยอดขาย",
   report_customers: "รายงานข้อมูลลูกค้า",
   report_products: "รายงานข้อมูลสินค้า",
-  report_market: "Market Report",
+  report_market: "รายงานการตลาด",
   finance_overview: "ภาพรวมการเงิน",
   finance_tx: "ธุรกรรม",
   complaints: "เรื่องร้องเรียน",
@@ -558,23 +763,23 @@ function OverviewScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [sub, setSub] = useState<SectionId>("dashboard");
-  const openMenu = () => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => setSub(id as SectionId) });
+  // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
+  const selectSection = (id: SectionId) => {
+    if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
+    const rk = REPORT_KIND[id];
+    if (rk) { nav.navigate("ShopReport", { kind: rk }); return; }
+    setSub(id);
+  };
+  const openMenu = () => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => selectSection(id as SectionId) });
   return (
-    <ShopShell
-      headerRight={
-        <GlassIconButton onPress={openMenu} accessibilityLabel="เมนู">
-          <Menu size={22} color="#1a1a1a" strokeWidth={2.4} />
-        </GlassIconButton>
-      }
-    >
+    <ShopShell>
       <OverviewTab
         period={period}
         onPeriodChange={setPeriod}
         insetsBottom={tabBarHeight + 16}
         sub={sub}
         onOpenMenu={openMenu}
-        onSelectSection={setSub}
-        hideMenuButton
+        onSelectSection={selectSection}
       />
     </ShopShell>
   );
@@ -587,6 +792,12 @@ function FinanceScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [sub, setSub] = useState<SectionId>("finance_overview");
+  const selectSection = (id: SectionId) => {
+    if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
+    const rk = REPORT_KIND[id];
+    if (rk) { nav.navigate("ShopReport", { kind: rk }); return; }
+    setSub(id);
+  };
   return (
     <ShopShell
       headerRight={
@@ -600,8 +811,8 @@ function FinanceScreen() {
         onPeriodChange={setPeriod}
         insetsBottom={tabBarHeight + 16}
         sub={sub}
-        onOpenMenu={() => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => setSub(id as SectionId) })}
-        onSelectSection={setSub}
+        onOpenMenu={() => nav.navigate("MyShopMenu", { current: sub, onSelect: (id) => selectSection(id as SectionId) })}
+        onSelectSection={selectSection}
         hideHeader
       />
     </ShopShell>
@@ -1973,6 +2184,7 @@ function OverviewTab({
   // Hide the in-content burger (e.g. it's moved onto the ร้านค้าของฉัน app bar).
   hideMenuButton?: boolean;
 }) {
+  const nav = useNavigation<Nav>();
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
   // Controlled calendar selection — drives every scoped figure below.
   const [cal, setCal] = useState<CalSel>({ month: 0, year: 2026, day: 16 });
@@ -2328,7 +2540,7 @@ function OverviewTab({
           <View style={{ height: 16, backgroundColor: "#fafafa" }} />
         )
       ) : sub === "dashboard" ? (
-        <View style={{ height: 14, backgroundColor: "#fafafa" }} />
+        <View style={{ height: 16, backgroundColor: "#fafafa" }} />
       ) : (
         <View
           className="flex-row items-center justify-between"
@@ -2338,7 +2550,7 @@ function OverviewTab({
             {SECTION_LABEL[sub]}
           </Text>
           <View className="flex-row items-center" style={{ gap: 8 }}>
-            {sub === "report_sales" ? <SalesDatePicker period={salesPeriod} sel={salesDate} onChange={setSalesDate} /> : null}
+            {sub.startsWith("report_") ? <SalesDatePicker period={salesPeriod} sel={salesDate} onChange={setSalesDate} /> : null}
             {hideMenuButton ? null : <AnimatedMenuButton open={false} onPress={onOpenMenu} />}
           </View>
         </View>
@@ -2351,8 +2563,8 @@ function OverviewTab({
       {/* ===== Per-section content (order mirrors the web OverviewTab) ===== */}
       {sub === "dashboard" ? (
         <>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, marginBottom: -6 }}>เมนู</Text>
           <ShopMenuGrid onSelect={onSelectSection} />
+          <MetaManagerCard onPress={() => nav.navigate("ShopManagerChat")} />
           <Text style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, marginTop: 10, marginBottom: -6 }}>ภาพรวม</Text>
           {orderTrackingCard}
           {quotationCard}
@@ -2378,8 +2590,9 @@ function OverviewTab({
 
       {sub === "report_sales" ? <ShopSalesReportView period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
 
-      {sub === "report_customers" ? <>{topCustomersCard}</> : null}
-      {sub === "report_products" ? <>{topProductsCard}</> : null}
+      {sub === "report_customers" ? <ShopReportView kind="customers" period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
+      {sub === "report_products" ? <ShopReportView kind="products" period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
+      {sub === "report_market" ? <ShopReportView kind="market" period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
 
       {sub === "finance_overview" ? <FinanceTransactionsView /> : null}
 
@@ -2389,7 +2602,6 @@ function OverviewTab({
       {sub === "hm_po" ? <DocSection kind="po" /> : null}
 
       {/* เรื่องร้องเรียน — owner view (linked to customer แจ้งปัญหาสินค้า) */}
-      {sub === "complaints" ? <ShopComplaintsView /> : null}
 
       {/* Sections without a dedicated mockup view yet */}
       {sub === "flash_sale" ||
@@ -2397,7 +2609,6 @@ function OverviewTab({
       sub === "coupons" ||
       sub === "trials_products" ||
       sub === "trials_tracking" ||
-      sub === "report_market" ||
       sub === "finance_tx" ? (
         <View
           style={{

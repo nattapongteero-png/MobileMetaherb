@@ -62,6 +62,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 // Recommended products — paged 2-per-page with animated dots, same UX as the
 // home product rails (Jakob's Law).
 function RecommendedPager({ products }: { products: Product[] }) {
+  const nav = useNavigation<Nav>();
   const scrollX = useRef(new Animated.Value(0)).current;
   const cardWidth = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
   const pages: Product[][] = [];
@@ -86,7 +87,7 @@ function RecommendedPager({ products }: { products: Product[] }) {
           >
             {pair.map((p) => (
               <View key={p.id}>
-                <ProductCard product={p} width={cardWidth} />
+                <ProductCard product={p} width={cardWidth} onPress={() => nav.push("ProductDetail", { product: p })} />
               </View>
             ))}
             {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
@@ -883,6 +884,7 @@ export function ProductDetailScreen({ route }: Props) {
                   <Store size={18} color="#319754" />
                 </Pressable>
                 <Pressable
+                  onPress={() => nav.navigate("Chat", { shopName })}
                   className="active:opacity-70"
                   style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
                 >
@@ -1124,7 +1126,7 @@ export function ProductDetailScreen({ route }: Props) {
           }}
         >
           {/* Chat — Liquid Glass circular button */}
-          <Pressable hitSlop={6} className="active:opacity-70">
+          <Pressable hitSlop={6} className="active:opacity-70" onPress={() => nav.navigate("Chat", { shopName })}>
             <GlassView
               glassEffectStyle="regular"
               colorScheme="light"

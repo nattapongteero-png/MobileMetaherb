@@ -1041,7 +1041,7 @@ export function TrialDetailScreen() {
           </View>
           <RelatedTrialPager
             products={relatedTrials}
-            onOpen={(id) => (nav.navigate as (route: string, params?: object) => void)("TrialDetail", { id })}
+            onOpen={(id) => (nav as unknown as { push: (route: string, params?: object) => void }).push("TrialDetail", { id })}
           />
         </View>
       </Animated.ScrollView>
@@ -1085,7 +1085,7 @@ export function TrialDetailScreen() {
             colorScheme="light"
             style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}
           >
-            <Pressable hitSlop={6} className="active:opacity-70">
+            <Pressable hitSlop={6} className="active:opacity-70" onPress={() => (nav.navigate as (route: string, params?: object) => void)("Chat", { shopName: "เมต้าเฮิร์บ" })}>
               <GlassView glassEffectStyle="regular" colorScheme="light" tintColor="rgba(49,151,84,0.1)" isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
                 <MessageCircle size={22} color="#319754" />
               </GlassView>

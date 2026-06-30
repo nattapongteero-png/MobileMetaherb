@@ -12,46 +12,47 @@ export const PERIODS: { id: Period; label: string }[] = [
   { id: "yearly", label: "รายปี" },
 ];
 
-export type Point = { label: string; sales: number; orders: number; topProduct: string };
+export type Point = { label: string; sales: number; orders: number; visits: number; newCust: number; repeat: number; units: number; topProduct: string };
+export type SeriesKey = "sales" | "orders" | "visits" | "newCust" | "repeat" | "units";
 
 const DAILY: Point[] = [
-  { label: "00:00", sales: 0, orders: 0, topProduct: "-" },
-  { label: "04:00", sales: 120, orders: 1, topProduct: "ใบบัวบกแคปซูล" },
-  { label: "08:00", sales: 480, orders: 3, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "12:00", sales: 980, orders: 5, topProduct: "ฟ้าทะลายโจร" },
-  { label: "16:00", sales: 1200, orders: 9, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "20:00", sales: 720, orders: 5, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
+  { label: "00:00", sales: 0, orders: 0, visits: 12, newCust: 0, repeat: 0, units: 0, topProduct: "-" },
+  { label: "04:00", sales: 120, orders: 1, visits: 18, newCust: 1, repeat: 0, units: 2, topProduct: "ใบบัวบกแคปซูล" },
+  { label: "08:00", sales: 480, orders: 3, visits: 65, newCust: 2, repeat: 1, units: 8, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "12:00", sales: 980, orders: 5, visits: 80, newCust: 3, repeat: 2, units: 14, topProduct: "ฟ้าทะลายโจร" },
+  { label: "16:00", sales: 1200, orders: 9, visits: 105, newCust: 2, repeat: 1, units: 22, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "20:00", sales: 720, orders: 5, visits: 60, newCust: 3, repeat: 2, units: 11, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
 ];
 
 const WEEKLY: Point[] = [
-  { label: "สัปดาห์ 1", sales: 6420, orders: 38, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "สัปดาห์ 2", sales: 8950, orders: 54, topProduct: "ฟ้าทะลายโจร" },
-  { label: "สัปดาห์ 3", sales: 11240, orders: 68, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "สัปดาห์ 4", sales: 9780, orders: 59, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
-  { label: "สัปดาห์ 5", sales: 4380, orders: 26, topProduct: "น้ำมันมะพร้าวสกัดเย็น" },
+  { label: "สัปดาห์ 1", sales: 6420, orders: 38, visits: 1180, newCust: 14, repeat: 9, units: 42, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "สัปดาห์ 2", sales: 8950, orders: 54, visits: 1620, newCust: 22, repeat: 16, units: 68, topProduct: "ฟ้าทะลายโจร" },
+  { label: "สัปดาห์ 3", sales: 11240, orders: 68, visits: 1985, newCust: 28, repeat: 21, units: 95, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "สัปดาห์ 4", sales: 9780, orders: 59, visits: 1745, newCust: 19, repeat: 18, units: 81, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
+  { label: "สัปดาห์ 5", sales: 4380, orders: 26, visits: 820, newCust: 8, repeat: 6, units: 28, topProduct: "น้ำมันมะพร้าวสกัดเย็น" },
 ];
 
 const MONTHLY: Point[] = [
-  { label: "ม.ค.", sales: 18200, orders: 124, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "ก.พ.", sales: 16800, orders: 108, topProduct: "ฟ้าทะลายโจร" },
-  { label: "มี.ค.", sales: 22400, orders: 151, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "เม.ย.", sales: 19600, orders: 132, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
-  { label: "พ.ค.", sales: 25800, orders: 173, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "มิ.ย.", sales: 28950, orders: 196, topProduct: "ฟ้าทะลายโจร" },
-  { label: "ก.ค.", sales: 24100, orders: 162, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "ส.ค.", sales: 26700, orders: 181, topProduct: "ชามะรุม" },
-  { label: "ก.ย.", sales: 21300, orders: 144, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "ต.ค.", sales: 23950, orders: 159, topProduct: "ฟ้าทะลายโจร" },
-  { label: "พ.ย.", sales: 30200, orders: 205, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "ธ.ค.", sales: 32600, orders: 221, topProduct: "ชุดของขวัญสมุนไพร" },
+  { label: "ม.ค.", sales: 18200, orders: 124, visits: 868, newCust: 27, repeat: 20, units: 161, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "ก.พ.", sales: 16800, orders: 108, visits: 756, newCust: 24, repeat: 17, units: 140, topProduct: "ฟ้าทะลายโจร" },
+  { label: "มี.ค.", sales: 22400, orders: 151, visits: 1057, newCust: 33, repeat: 24, units: 196, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "เม.ย.", sales: 19600, orders: 132, visits: 924, newCust: 29, repeat: 21, units: 172, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
+  { label: "พ.ค.", sales: 25800, orders: 173, visits: 1211, newCust: 38, repeat: 28, units: 225, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "มิ.ย.", sales: 28950, orders: 196, visits: 1372, newCust: 43, repeat: 31, units: 255, topProduct: "ฟ้าทะลายโจร" },
+  { label: "ก.ค.", sales: 24100, orders: 162, visits: 1134, newCust: 36, repeat: 26, units: 211, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "ส.ค.", sales: 26700, orders: 181, visits: 1267, newCust: 40, repeat: 29, units: 235, topProduct: "ชามะรุม" },
+  { label: "ก.ย.", sales: 21300, orders: 144, visits: 1008, newCust: 32, repeat: 23, units: 187, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "ต.ค.", sales: 23950, orders: 159, visits: 1113, newCust: 35, repeat: 25, units: 207, topProduct: "ฟ้าทะลายโจร" },
+  { label: "พ.ย.", sales: 30200, orders: 205, visits: 1435, newCust: 45, repeat: 33, units: 267, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "ธ.ค.", sales: 32600, orders: 221, visits: 1547, newCust: 49, repeat: 35, units: 287, topProduct: "ชุดของขวัญสมุนไพร" },
 ];
 
 const YEARLY: Point[] = [
-  { label: "2565", sales: 124800, orders: 845, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "2566", sales: 168450, orders: 1124, topProduct: "น้ำผึ้งดอกลำไย" },
-  { label: "2567", sales: 215300, orders: 1486, topProduct: "ฟ้าทะลายโจร" },
-  { label: "2568", sales: 248920, orders: 1672, topProduct: "ขมิ้นชันแคปซูล" },
-  { label: "2569", sales: 86420, orders: 542, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
+  { label: "2565", sales: 124800, orders: 845, visits: 18420, newCust: 285, repeat: 412, units: 685, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "2566", sales: 168450, orders: 1124, visits: 24680, newCust: 342, repeat: 568, units: 924, topProduct: "น้ำผึ้งดอกลำไย" },
+  { label: "2567", sales: 215300, orders: 1486, visits: 32150, newCust: 458, repeat: 742, units: 1248, topProduct: "ฟ้าทะลายโจร" },
+  { label: "2568", sales: 248920, orders: 1672, visits: 38240, newCust: 524, repeat: 868, units: 1492, topProduct: "ขมิ้นชันแคปซูล" },
+  { label: "2569", sales: 86420, orders: 542, visits: 12180, newCust: 184, repeat: 268, units: 542, topProduct: "ชาเก๊กฮวยออร์แกนิก" },
 ];
 
 export const REPORT_DATA: Record<Period, Point[]> = { daily: DAILY, weekly: WEEKLY, monthly: MONTHLY, yearly: YEARLY };
@@ -62,6 +63,13 @@ export const PERIOD_SCOPE: Record<Period, string> = {
   monthly: "ปีนี้",
   yearly: "5 ปีล่าสุด",
 };
+
+/** Yesterday's totals — baseline for the "วันนี้ vs เมื่อวาน" trend deltas. */
+export const PREV_DAY = { sales: 3080, orders: 21 };
+
+/** Signed percentage change vs a prior value (0 when prior is 0). */
+export const pctDelta = (now: number, prev: number) =>
+  prev > 0 ? Math.round(((now - prev) / prev) * 100) : 0;
 
 const COST_RATE = 0.55; // herbal goods cost ≈ 55% of sales
 
@@ -135,3 +143,76 @@ export function sortProducts(list: SalesProduct[], sort: ProductSort): SalesProd
     default: return arr.sort((a, b) => b.sales - a.sales);
   }
 }
+
+export const sumField = (rows: Point[], key: SeriesKey) => rows.reduce((s, r) => s + (r[key] as number), 0);
+
+/* ---------- Customer report ---------- */
+export type Customer = { id: string; name: string; email: string; group: string; initial: string; bg: string; fg: string; orders: number; total: number; lastBuy: string; daysAgo: number; fav: string };
+
+export const CUSTOMERS: Customer[] = [
+  { id: "CST-001", email: "somchai.j@gmail.com", name: "สมชาย ใจดี", group: "VIP", initial: "สม", bg: "#fef3c7", fg: "#b45309", orders: 5, total: 1420, lastBuy: "2 พ.ค.", daysAgo: 2, fav: "ขมิ้นชัน" },
+  { id: "CST-007", email: "malee.s@hotmail.com", name: "มาลี สดใส", group: "VIP", initial: "มล", bg: "#fde68a", fg: "#854d0e", orders: 4, total: 980, lastBuy: "28 เม.ย.", daysAgo: 6, fav: "ฟ้าทะลายโจร" },
+  { id: "CST-008", email: "thanaphol.s@gmail.com", name: "ธนพล ศรีสุข", group: "VIP", initial: "ธน", bg: "#fef3c7", fg: "#b45309", orders: 4, total: 880, lastBuy: "29 เม.ย.", daysAgo: 5, fav: "เห็ดหลินจือ" },
+  { id: "CST-003", email: "warapron.t@gmail.com", name: "วราภรณ์ ทองดี", group: "ประจำ", initial: "วร", bg: "#dcfce7", fg: "#15803d", orders: 3, total: 720, lastBuy: "25 เม.ย.", daysAgo: 9, fav: "น้ำมันมะพร้าว" },
+  { id: "CST-010", email: "phuri.t@gmail.com", name: "ภูริ ทองเนื้อเก้า", group: "ประจำ", initial: "ภร", bg: "#dcfce7", fg: "#15803d", orders: 3, total: 620, lastBuy: "30 เม.ย.", daysAgo: 4, fav: "บาล์มไพล" },
+  { id: "CST-005", email: "pichaya.r@hotmail.com", name: "พิชญา รุ่งเรือง", group: "ประจำ", initial: "พช", bg: "#dcfce7", fg: "#15803d", orders: 3, total: 540, lastBuy: "1 พ.ค.", daysAgo: 3, fav: "ใบบัวบก" },
+  { id: "CST-012", email: "preeya.k@gmail.com", name: "ปรียา แก้วใส", group: "ใหม่", initial: "ปร", bg: "#dbeafe", fg: "#1e40af", orders: 1, total: 580, lastBuy: "3 พ.ค.", daysAgo: 1, fav: "ชาตะไคร้" },
+  { id: "CST-002", email: "adithep.p@yahoo.com", name: "อดิเทพ พงษ์เพชร", group: "เสี่ยงหาย", initial: "อด", bg: "#fee2e2", fg: "#b91c1c", orders: 2, total: 420, lastBuy: "95 วันที่แล้ว", daysAgo: 95, fav: "ยาดมสมุนไพร" },
+  { id: "CST-006", email: "kitti.p@yahoo.com", name: "กิตติ ภักดี", group: "เสี่ยงหาย", initial: "กต", bg: "#fee2e2", fg: "#b91c1c", orders: 2, total: 380, lastBuy: "75 วันที่แล้ว", daysAgo: 75, fav: "สบู่สมุนไพร" },
+  { id: "CST-014", email: "sudarat.m@gmail.com", name: "สุดารัตน์ มีโชค", group: "ใหม่", initial: "สด", bg: "#dbeafe", fg: "#1e40af", orders: 1, total: 280, lastBuy: "2 พ.ค.", daysAgo: 2, fav: "น้ำผึ้งดอกลำไย" },
+  { id: "CST-011", email: "naphaporn.d@gmail.com", name: "นภาพร ดวงดี", group: "ใหม่", initial: "นภ", bg: "#dbeafe", fg: "#1e40af", orders: 1, total: 162, lastBuy: "4 พ.ค.", daysAgo: 0, fav: "รางจืด" },
+  { id: "CST-009", email: "wanwipa.j@hotmail.com", name: "วรรณวิภา จงเจริญ", group: "หายไป", initial: "วว", bg: "#f3f4f6", fg: "#525252", orders: 1, total: 180, lastBuy: "120 วันที่แล้ว", daysAgo: 120, fav: "ขิงผง" },
+];
+
+export const CUSTOMER_GROUP_COLOR: Record<string, { bg: string; fg: string }> = {
+  VIP: { bg: "#fef3c7", fg: "#b45309" },
+  ประจำ: { bg: "#dcfce7", fg: "#15803d" },
+  ใหม่: { bg: "#dbeafe", fg: "#1e40af" },
+  เสี่ยงหาย: { bg: "#fee2e2", fg: "#b91c1c" },
+  หายไป: { bg: "#f3f4f6", fg: "#525252" },
+};
+
+/* ---------- Product report ---------- */
+export type TopProduct = { name: string; category: string; sold: number; revenue: number; rating: number; reviews: number };
+
+export const TOP_PRODUCTS: TopProduct[] = [
+  { name: "พิมเสนน้ำอโรมา ตราเมต้าเฮิร์บ", category: "ผลิตภัณฑ์สมุนไพร", sold: 16, revenue: 1122, rating: 4.8, reviews: 142 },
+  { name: "สบู่สมุนไพรขมิ้น", category: "ของใช้ออร์แกนิก", sold: 12, revenue: 1800, rating: 4.6, reviews: 180 },
+  { name: "ถุงหอมอโรมา MetaHerb Bloom", category: "เครื่องหอม & อโรม่า", sold: 11, revenue: 1069, rating: 4.7, reviews: 98 },
+  { name: "ขมิ้นชันแคปซูล 60 แคป", category: "สมุนไพรแคปซูล", sold: 8, revenue: 1420, rating: 4.9, reviews: 210 },
+  { name: "ใบบัวบกแคปซูล 60 แคป", category: "สมุนไพรแคปซูล", sold: 7, revenue: 1280, rating: 4.6, reviews: 88 },
+  { name: "ชาเก๊กฮวยออร์แกนิก 20 ซอง", category: "ชาสมุนไพร", sold: 6, revenue: 760, rating: 4.5, reviews: 110 },
+  { name: "กาแฟดริป signature อเมริกาโนเย็น", category: "อาหารและเครื่องดื่ม", sold: 5, revenue: 850, rating: 4.6, reviews: 64 },
+  { name: "ฟ้าทะลายโจรผง 100 g", category: "ผงสมุนไพร", sold: 5, revenue: 1150, rating: 4.7, reviews: 156 },
+  { name: "ชามะรุม 30 ซอง", category: "ชาสมุนไพร", sold: 5, revenue: 650, rating: 4.4, reviews: 58 },
+  { name: "เห็ดหลินจือสกัด 60 แคป", category: "สมุนไพรสกัด", sold: 4, revenue: 980, rating: 4.8, reviews: 55 },
+  { name: "ขิงผงออร์แกนิก 100 g", category: "ผงสมุนไพร", sold: 4, revenue: 520, rating: 4.3, reviews: 67 },
+  { name: "น้ำมันมะพร้าวสกัดเย็น", category: "น้ำมันสมุนไพร", sold: 3, revenue: 870, rating: 4.5, reviews: 72 },
+  { name: "น้ำผึ้งดอกลำไย 250 ml", category: "ผลิตภัณฑ์ออร์แกนิก", sold: 3, revenue: 645, rating: 4.9, reviews: 95 },
+  { name: "ชาตะไคร้ใบเตย 30 ซอง", category: "ชาสมุนไพร", sold: 2, revenue: 580, rating: 4.4, reviews: 48 },
+  { name: "บาล์มสมุนไพรไพล", category: "ของใช้ออร์แกนิก", sold: 2, revenue: 380, rating: 4.7, reviews: 42 },
+];
+
+/* ---------- Market report ---------- */
+export type Channel = { name: string; type: string; visits: number; orders: number; revenue: number; cost: number; initial: string; bg: string; fg: string };
+
+export const CHANNELS: Channel[] = [
+  { name: "Google Search", type: "Organic", visits: 1240, orders: 52, revenue: 24800, cost: 0, initial: "G", bg: "#fff", fg: "#4285f4" },
+  { name: "TikTok", type: "Social", visits: 1450, orders: 45, revenue: 19800, cost: 2200, initial: "T", bg: "#0f0f0f", fg: "#fff" },
+  { name: "Facebook", type: "Social", visits: 980, orders: 38, revenue: 18200, cost: 1500, initial: "f", bg: "#1877f2", fg: "#fff" },
+  { name: "Google Ads", type: "Paid", visits: 890, orders: 31, revenue: 16500, cost: 3200, initial: "Ad", bg: "#fef3c7", fg: "#a16207" },
+  { name: "Instagram", type: "Social", visits: 720, orders: 28, revenue: 14600, cost: 1200, initial: "I", bg: "#fce7f3", fg: "#be185d" },
+  { name: "Line OA", type: "Direct", visits: 540, orders: 22, revenue: 12300, cost: 800, initial: "L", bg: "#dcfce7", fg: "#15803d" },
+  { name: "Email Marketing", type: "Direct", visits: 320, orders: 18, revenue: 8400, cost: 200, initial: "@", bg: "#fee2e2", fg: "#b91c1c" },
+  { name: "Direct (URL)", type: "Direct", visits: 280, orders: 12, revenue: 6800, cost: 0, initial: "U", bg: "#f3f4f6", fg: "#525252" },
+  { name: "Affiliate", type: "Partner", visits: 210, orders: 9, revenue: 5400, cost: 540, initial: "Af", bg: "#e0e7ff", fg: "#4338ca" },
+  { name: "YouTube", type: "Social", visits: 180, orders: 6, revenue: 3200, cost: 600, initial: "Y", bg: "#fee2e2", fg: "#b91c1c" },
+];
+
+export const CHANNEL_TYPE_COLOR: Record<string, { bg: string; fg: string }> = {
+  Organic: { bg: "#dcfce7", fg: "#15803d" },
+  Social: { bg: "#fce7f3", fg: "#be185d" },
+  Paid: { bg: "#fef3c7", fg: "#a16207" },
+  Direct: { bg: "#dbeafe", fg: "#1e40af" },
+  Partner: { bg: "#e0e7ff", fg: "#4338ca" },
+};

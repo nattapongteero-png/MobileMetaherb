@@ -31,3 +31,35 @@ export const COUPONS: Coupon[] = [
   { id: "6", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 27% สูงสุด ฿1,000", code: "MH27PCT2", minSpend: "ขั้นต่ำ ฿500", expiry: "หมดอายุ 24.03.2026", bgColor: "#319754", status: "expired" },
   { id: "10", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 17% สูงสุด ฿3,000", code: "MH17PCT", minSpend: "ขั้นต่ำ ฿200", expiry: "หมดอายุ 24.03.2026", bgColor: "#319754", status: "expired" },
 ];
+
+/**
+ * Create a real, active coupon at runtime (used by น้องเมต้า's "สร้างคูปอง" action).
+ * Mutates COUPONS in place and returns the new coupon so the assistant can show it;
+ * it then appears live in the owner's coupon views that read from COUPONS.
+ */
+let _couponSeq = 100;
+export function addCoupon(input: {
+  type: Coupon["type"];
+  title: string;
+  code: string;
+  minSpend: string;
+  expiry: string;
+  bgColor: string;
+}): Coupon {
+  const c: Coupon = {
+    id: `new-${++_couponSeq}`,
+    type: input.type,
+    label: input.type,
+    sublabel: input.type === "FREE" ? "โค้ดส่งฟรี" : "โค้ดส่วนลด",
+    title: input.title,
+    code: input.code,
+    minSpend: input.minSpend,
+    tag: "สร้างใหม่",
+    tagColor: input.bgColor,
+    expiry: input.expiry,
+    bgColor: input.bgColor,
+    status: "active",
+  };
+  COUPONS.unshift(c);
+  return c;
+}

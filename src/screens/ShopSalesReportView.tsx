@@ -51,7 +51,7 @@ function KpiCard({ label, value, sub, accent, Icon, SubIcon, art }: { label: str
 
 // Capsule period switcher with a sliding green pill — same pattern as the
 // Knowledge (สาระความรู้) tab bar.
-function PeriodTabs({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+export function PeriodTabs({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
   const idx = Math.max(0, PERIODS.findIndex((p) => p.id === period));
   const pos = useRef(new Animated.Value(idx)).current;
   const [segW, setSegW] = useState(0);
@@ -62,7 +62,7 @@ function PeriodTabs({ period, onChange }: { period: Period; onChange: (p: Period
   return (
     <View
       onLayout={(e) => setSegW((e.nativeEvent.layout.width - 8) / PERIODS.length)}
-      style={{ height: 42, borderRadius: 999, backgroundColor: "#f0f0f0", padding: 4 }}
+      style={{ height: 42, borderRadius: 999, backgroundColor: "#fff", padding: 4, borderWidth: 1, borderColor: "#ececec" }}
     >
       {segW > 0 ? (
         <Animated.View style={{ position: "absolute", top: 4, left: 4, width: segW, height: 34, borderRadius: 999, backgroundColor: BRAND_GREEN, transform: [{ translateX }] }} />
@@ -132,15 +132,18 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
       {/* Period tabs — capsule switcher (สาระความรู้ style) */}
       <PeriodTabs period={period} onChange={setPeriod} />
 
-      {/* KPI + chart — one card */}
+      {/* KPI cards — white card, separate from the chart */}
       <Card>
-        <View className="flex-row" style={{ flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+        <View className="flex-row" style={{ flexWrap: "wrap", gap: 10 }}>
           <KpiCard label={`รายได้ ${scope}`} value={fmtBaht(kpi.sales)} sub={`เฉลี่ย ${fmtBaht(kpi.avgSales)}/ช่วง`} accent="#10b981" Icon={DollarSign} SubIcon={BarChart3} art={COIN_INCOME} />
           <KpiCard label={`คำสั่งซื้อ ${scope}`} value={`${kpi.orders.toLocaleString()} ออเดอร์`} sub={`เฉลี่ย ฿${kpi.aov.toLocaleString()}/ออเดอร์`} accent="#0ea5e9" Icon={ShoppingCart} SubIcon={BarChart3} art={COIN_ORDERS} />
           <KpiCard label={`ต้นทุน ${scope}`} value={fmtBaht(kpi.cost)} sub={`${kpi.costRatio}% ของรายได้`} accent="#6366f1" Icon={FileText} SubIcon={CheckCircle2} art={COIN_COST} />
           <KpiCard label={`กำไร ${scope}`} value={fmtBaht(kpi.profit)} sub={`มาร์จิ้น ${kpi.margin.toFixed(1)}%`} accent="#f59e0b" Icon={TrendingUp} SubIcon={TrendingUp} art={COIN_PROFIT} />
         </View>
+      </Card>
 
+      {/* Chart */}
+      <Card>
         <View className="flex-row items-center justify-between" style={{ marginBottom: 8 }}>
           <Text style={{ fontSize: 15, fontWeight: "700", color: "#1a1a1a" }}>กราฟยอดขาย</Text>
           <View className="flex-row" style={{ backgroundColor: "#f2f2f2", borderRadius: 999, padding: 3, gap: 2 }}>

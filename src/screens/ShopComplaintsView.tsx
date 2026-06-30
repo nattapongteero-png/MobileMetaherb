@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Inbox } from "lucide-react-native";
+import { SubPageHeader } from "../components/SubPageHeader";
 import { COMPLAINT_TYPES } from "../data/complaintTypes";
 import {
   STATUS_LABEL,
@@ -103,6 +106,21 @@ export function ShopComplaintsView() {
       ) : (
         list.map((c) => <ComplaintRow key={c.id} c={c} onPress={() => nav.navigate("ShopComplaintDetail", { id: c.id })} />)
       )}
+    </View>
+  );
+}
+
+/** เรื่องร้องเรียน — list as a standalone subpage (header + back). */
+export function ShopComplaintsScreen() {
+  const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
+      <StatusBar style="dark" />
+      <SubPageHeader title="เรื่องร้องเรียน" subtitle="คำร้องจากลูกค้า" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}>
+        <ShopComplaintsView />
+      </ScrollView>
     </View>
   );
 }

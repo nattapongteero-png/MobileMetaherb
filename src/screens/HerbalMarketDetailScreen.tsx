@@ -771,7 +771,7 @@ export function HerbalMarketDetailScreen() {
               )}
               {!preview && (
                 <Pressable
-                  onPress={() => (nav.navigate as (route: string) => void)("Chat")}
+                  onPress={() => (nav.navigate as (route: string, params?: object) => void)("Chat", { shopName })}
                   className="active:opacity-70"
                   style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}
                 >
@@ -859,7 +859,7 @@ export function HerbalMarketDetailScreen() {
               <RelatedMaterialPager
                 materials={recommended}
                 onOpen={(mid) =>
-                  (nav.navigate as (route: string, params?: object) => void)("HerbalMarketDetail", { id: mid })
+                  (nav as unknown as { push: (route: string, params?: object) => void }).push("HerbalMarketDetail", { id: mid })
                 }
               />
             </View>
@@ -956,7 +956,7 @@ export function HerbalMarketDetailScreen() {
             }}
           >
             {/* Chat */}
-            <Pressable hitSlop={6} className="active:opacity-70" onPress={() => (nav.navigate as (r: string) => void)("Chat")}>
+            <Pressable hitSlop={6} className="active:opacity-70" onPress={() => (nav.navigate as (r: string, p?: object) => void)("Chat", { shopName })}>
               <GlassView
                 glassEffectStyle="regular"
                 colorScheme="light"
