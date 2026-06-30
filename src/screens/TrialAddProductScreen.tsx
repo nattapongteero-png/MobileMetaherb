@@ -707,59 +707,52 @@ export function TrialAddProductScreen() {
               ].map((item, slot) => {
                 const uploaded = productImages[slot];
                 return (
-                  <Pressable
-                    key={item.label}
-                    onPress={() => pickImage(slot)}
-                    className="active:opacity-80"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      aspectRatio: 1,
-                      borderRadius: 16,
-                      borderWidth: 2,
-                      borderStyle: uploaded ? "solid" : "dashed",
-                      borderColor: uploaded ? BRAND_GREEN : item.primary ? "rgba(49,151,84,0.4)" : "#d1d5db",
-                      backgroundColor: uploaded ? "#fff" : FAFAFA,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {uploaded ? (
-                      <>
-                        <Image source={{ uri: uploaded }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
-                        {item.primary ? (
-                          <View style={{ position: "absolute", bottom: 8, left: 0, right: 0, alignItems: "center" }}>
-                            <View style={{ backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                              <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
-                            </View>
+                  <View key={item.label} style={{ flex: 1, minWidth: 0 }}>
+                    <Pressable
+                      onPress={() => pickImage(slot)}
+                      className="active:opacity-80"
+                      style={{
+                        width: "100%",
+                        aspectRatio: 1,
+                        borderRadius: 16,
+                        borderWidth: 2,
+                        borderStyle: uploaded ? "solid" : "dashed",
+                        borderColor: uploaded ? BRAND_GREEN : item.primary ? "rgba(49,151,84,0.4)" : "#d1d5db",
+                        backgroundColor: uploaded ? "#fff" : FAFAFA,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {uploaded ? (
+                        <>
+                          <Image source={{ uri: uploaded }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+                          <Pressable
+                            onPress={() => removeImage(slot)}
+                            hitSlop={6}
+                            style={{ position: "absolute", top: 8, left: 8, width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <X size={14} color="#fff" strokeWidth={2.4} />
+                          </Pressable>
+                        </>
+                      ) : (
+                        <>
+                          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", alignItems: "center", justifyContent: "center" }}>
+                            <Plus size={16} color="#6b7280" strokeWidth={2.4} />
                           </View>
-                        ) : null}
-                        <Pressable
-                          onPress={() => removeImage(slot)}
-                          hitSlop={6}
-                          style={{ position: "absolute", top: 8, left: 8, width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}
-                        >
-                          <X size={14} color="#fff" strokeWidth={2.4} />
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        {item.primary ? (
-                          <View style={{ position: "absolute", bottom: 8, left: 0, right: 0, alignItems: "center" }}>
-                            <View style={{ backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                              <Text style={{ fontSize: 9, fontWeight: "600", color: "#fff" }}>หลัก</Text>
-                            </View>
-                          </View>
-                        ) : null}
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", alignItems: "center", justifyContent: "center" }}>
-                          <Plus size={16} color="#6b7280" strokeWidth={2.4} />
+                          <Text style={{ fontSize: 12, fontWeight: "500", color: "#000", marginTop: 8 }}>{item.label}</Text>
+                        </>
+                      )}
+                    </Pressable>
+                    {/* "หลัก" chip — straddles the bottom border, above everything */}
+                    {item.primary ? (
+                      <View pointerEvents="none" style={{ position: "absolute", bottom: -9, left: 0, right: 0, alignItems: "center", zIndex: 20 }}>
+                        <View style={{ backgroundColor: BRAND_GREEN, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, elevation: 4, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#fff" }}>หลัก</Text>
                         </View>
-                        <Text style={{ fontSize: 12, fontWeight: "500", color: "#000", marginTop: 8 }}>{item.label}</Text>
-                        <Text style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{item.sub}</Text>
-                      </>
-                    )}
-                  </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
                 );
               })}
             </View>
