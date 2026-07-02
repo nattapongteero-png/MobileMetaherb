@@ -70,10 +70,15 @@ jobs:
               }
             }')
 
-          BODY=$(jq -n --arg to "$LINE_GROUP_ID" --argjson flex "$FLEX" \
-            '{to: $to, messages: [$flex]}')
-
-          curl -sS -X POST https://api.line.me/v2/bot/message/push \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $LINE_TOKEN" \
-            -d "$BODY"
+          # ส่งเข้าทุกกลุ่มใน LINE_GROUP_ID (คั่นด้วย comma) — LINE ไม่มี group multicast
+          echo "$LINE_GROUP_ID" | tr ',' '\n' | while read -r GID; do
+            GID=$(echo "$GID" | xargs)   # trim ช่องว่าง
+            [ -z "$GID" ] && continue
+            BODY=$(jq -n --arg to "$GID" --argjson flex "$FLEX" '{to: $to, messages: [$flex]}')
+            echo "→ push to $GID"
+            curl -sS -X POST https://api.line.me/v2/bot/message/push \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $LINE_TOKEN" \
+              -d "$BODY"
+            echo ""
+          done
