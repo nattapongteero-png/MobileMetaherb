@@ -154,12 +154,13 @@ function PromoCard({ p, width, onMenu }: { p: Promotion; width: number; onMenu: 
       {/* Header — gradient bg + discount + status */}
       <LinearGradient colors={headerGradient(status)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 14, overflow: "hidden" }}>
         {/* Decorative promotion-card watermark (web imgPromoCard) */}
-        <Image
-          source={require("../../assets/promotioncard.png")}
-          pointerEvents="none"
-          resizeMode="contain"
-          style={{ position: "absolute", bottom: -12, right: -12, width: 112, height: 112, opacity: isEnded ? 0.5 : 0.9 }}
-        />
+        <View pointerEvents="none" style={{ position: "absolute", bottom: -12, right: -12 }}>
+          <Image
+            source={require("../../assets/promotioncard.png")}
+            resizeMode="contain"
+            style={{ width: 112, height: 112, opacity: isEnded ? 0.5 : 0.9 }}
+          />
+        </View>
         <View className="flex-row items-start justify-between" style={{ gap: 8 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 10, fontWeight: "600", letterSpacing: 0.5, color: labelText, marginBottom: 2 }}>ส่วนลด</Text>

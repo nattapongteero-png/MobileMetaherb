@@ -25,12 +25,93 @@ import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED } from "../theme/tokens";
 const CAFE_IMG = require("../../assets/caffe.png");
 const DRIP_GIF = require("../../assets/drepcoffee.gif"); // animated "brewing" indicator
 const READY_IMG = require("../../assets/herocafe.png"); // finished cup — shown when the order is ready
+// Extra promo banner images that swipe in the café hero carousel.
+const HERO_SLIDES = [require("../../assets/hero cafe1.png"), require("../../assets/hero cafe2.png"), require("../../assets/hero cafe3.png")];
+// Promo copy shown per hero slide (index-aligned with [CAFE_IMG, ...HERO_SLIDES]).
+const HERO_PROMOS = [
+  { title: "METAHERB Café", desc: "ศิลปะแห่งรสชาติในทุกแก้ว" },
+  { title: "ชาพรีเมียมคัดสรร", desc: "หอมละมุน สดชื่นทุกจิบ" },
+  { title: "กาแฟคั่วพิถีพิถัน", desc: "หอมกรุ่น กลมกล่อมเข้มนุ่ม" },
+  { title: "ขนมอบชั้นเลิศ", desc: "ประณีตหวานละมุน สดใหม่ทุกวัน" },
+];
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
 const fmtTime = (d: Date) =>
   `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_W = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
+const HERO_H = 128;
+const ILLUS_W = 132; // width of the right-side illustration carousel (the only part that swipes)
+
+/** Café hero — the branded green card + text stay FIXED; the right-side
+ *  illustration auto-CROSSFADES between the promo images (soft fade, no slide). */
+function HeroBanner() {
+  const illus = [CAFE_IMG, ...HERO_SLIDES];
+  const opacities = useRef(illus.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
+  const scales = useRef(illus.map((_, i) => new Animated.Value(i === 0 ? 1 : 0.92))).current;
+  const rises = useRef(illus.map((_, i) => new Animated.Value(i === 0 ? 0 : 10))).current;
+  const textOp = useRef(new Animated.Value(1)).current;
+  const textRise = useRef(new Animated.Value(0)).current;
+  const idx = useRef(0);
+  const [active, setActive] = useState(0);
+  const promo = HERO_PROMOS[active] ?? HERO_PROMOS[0];
+  // Auto-advance every 5s with a soft reveal: the next image + its promo text fade
+  // in while gently scaling up + rising (spring), the current fades out.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const cur = idx.current;
+      const next = (cur + 1) % illus.length;
+      idx.current = next;
+      setActive(next);
+      scales[next].setValue(0.92);
+      rises[next].setValue(10);
+      textOp.setValue(0);
+      textRise.setValue(8);
+      Animated.parallel([
+        Animated.timing(opacities[cur], { toValue: 0, duration: 550, useNativeDriver: true }),
+        Animated.timing(opacities[next], { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.spring(scales[next], { toValue: 1, friction: 7, tension: 55, useNativeDriver: true }),
+        Animated.spring(rises[next], { toValue: 0, friction: 7, tension: 55, useNativeDriver: true }),
+        Animated.timing(textOp, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.spring(textRise, { toValue: 0, friction: 7, tension: 55, useNativeDriver: true }),
+      ]).start();
+    }, 5000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
+      <View style={{ borderRadius: 20, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 16, elevation: 7 }}>
+        <View style={{ borderRadius: 20, overflow: "hidden" }}>
+          <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ minHeight: HERO_H, flexDirection: "row", alignItems: "center" }}>
+            {/* Left — promo text that changes (fades in) with the image */}
+            <Animated.View style={{ flex: 1, paddingLeft: 18, paddingVertical: 18, gap: 5, opacity: textOp, transform: [{ translateY: textRise }] }}>
+              <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.2 }}>{promo.title}</Text>
+              <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12.5, lineHeight: 18 }}>{promo.desc}</Text>
+            </Animated.View>
+            {/* Right — crossfading illustration (images stacked, opacity animated) */}
+            <View style={{ width: ILLUS_W, height: HERO_H }}>
+              {illus.map((src, i) => (
+                <Animated.Image
+                  key={i}
+                  source={src}
+                  resizeMode="contain"
+                  style={{ position: "absolute", top: 0, left: 0, width: ILLUS_W, height: HERO_H, opacity: opacities[i], transform: [{ scale: scales[i] }, { translateY: rises[i] }] }}
+                />
+              ))}
+              {/* faint page dots */}
+              <View pointerEvents="none" style={{ position: "absolute", bottom: 6, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 5 }}>
+                {illus.map((_, i) => (
+                  <View key={i} style={{ width: active === i ? 8 : 4, height: 4, borderRadius: 2, backgroundColor: "#fff", opacity: active === i ? 0.5 : 0.18 }} />
+                ))}
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 /** Replaces the café hero while an order is being prepared — same size as the
  *  banner, with a live countdown ring on the left. When the countdown completes
@@ -225,19 +306,7 @@ export function CafeScreen() {
             onDismiss={(o) => completeOrder(o.orderId)}
           />
         ) : (
-          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
-            <View style={{ borderRadius: 20, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 16, elevation: 7 }}>
-              <View style={{ borderRadius: 20, overflow: "hidden" }}>
-                <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 18, minHeight: 128, justifyContent: "center" }}>
-                  <Image source={CAFE_IMG} style={{ position: "absolute", right: -6, bottom: -12, width: 136, height: 136 }} resizeMode="contain" />
-                  <View style={{ width: 196, gap: 5 }}>
-                    <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.2 }}>คาเฟ่ของ METAHERB</Text>
-                    <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12.5, lineHeight: 18 }}>กาแฟ ชา ขนม และอาหารสดใหม่ ส่งตรงจากครัวเรา</Text>
-                  </View>
-                </LinearGradient>
-              </View>
-            </View>
-          </View>
+          <HeroBanner />
         )}
 
         {/* Search bar — below the hero banner */}
