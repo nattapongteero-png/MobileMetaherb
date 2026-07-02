@@ -54,7 +54,7 @@ jobs:
                     { type:"text", text:$repo, color:"#dcefe4", size:"sm" }
                   ]},
                 body:{ type:"box", layout:"vertical", paddingAll:"16px", spacing:"sm",
-                  contents:[
+                  contents:([
                     { type:"box", layout:"baseline", contents:[
                       { type:"text", text:"🌿 branch", size:"sm", color:"#8a8f8a", flex:3 },
                       { type:"text", text:$branch, size:"sm", color:"#111111", weight:"bold", flex:5, wrap:true } ]},
@@ -63,7 +63,7 @@ jobs:
                       { type:"text", text:$pusher, size:"sm", color:"#111111", flex:5, wrap:true } ]},
                     { type:"separator", margin:"md" },
                     { type:"text", text:("✨ สิ่งที่เปลี่ยน (" + $count + ")"), weight:"bold", size:"sm", color:"#319754", margin:"md" }
-                  ] + $commits },
+                  ] + $commits) },
                 footer:{ type:"box", layout:"vertical", contents:[
                   { type:"button", style:"primary", color:"#319754", height:"sm",
                     action:{ type:"uri", label:"👀 ดูบน GitHub", uri:$compare } } ]}
