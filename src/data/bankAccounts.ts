@@ -49,6 +49,9 @@ export const bankLabel = (code: string): string => {
   return `${b.name} (${b.code})`;
 };
 
+/** "•••• 4821" — masks all but the last 4 digits of an account number. */
+export const maskAccountNo = (no: string): string => `•••• ${no.slice(-4)}`;
+
 export type BankAccount = {
   id: string;
   bankCode: string;

@@ -181,7 +181,7 @@ export function ComplaintStatusScreen() {
         <Pressable
           onPress={() => nav.navigate("Orders")}
           className="items-center justify-center active:opacity-80"
-          style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, height: 48, marginTop: 2 }}
+          style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50, marginTop: 2 }}
         >
           <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>กลับไปหน้าคำสั่งซื้อ</Text>
         </Pressable>

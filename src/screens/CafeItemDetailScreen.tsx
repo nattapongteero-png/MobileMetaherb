@@ -13,9 +13,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronLeft, Plus, Minus, Flame, X, Share2 } from "lucide-react-native";
+import { ChevronLeft, Plus, Minus, Flame, X, Share2, Star } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { useCafeCart } from "../context/CafeCartContext";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -41,14 +42,15 @@ const SHOT = [
 export function CafeItemDetailScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { item, onAdd } = useRoute<Rt>().params;
+  const { item, editKey, initial } = useRoute<Rt>().params;
+  const { add, removeKey, toggleFavorite, isFavorite } = useCafeCart();
   const isDrink = item.mainId === "drink";
 
-  const [sweet, setSweet] = useState(SWEET_DEFAULT);
-  const [milk, setMilk] = useState(0);
-  const [shot, setShot] = useState(0);
-  const [note, setNote] = useState("");
-  const [qty, setQty] = useState(1);
+  const [sweet, setSweet] = useState(initial?.sweet ?? SWEET_DEFAULT);
+  const [milk, setMilk] = useState(initial?.milk ?? 0);
+  const [shot, setShot] = useState(initial?.shot ?? 0);
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [qty, setQty] = useState(initial?.qty ?? 1);
   const [viewerOpen, setViewerOpen] = useState(false);
 
   // Stretchy hero — zooms in on pull-down instead of leaving a gap.
@@ -71,7 +73,8 @@ export function CafeItemDetailScreen() {
   const addToCart = () => {
     const n = note.trim();
     const key = [item.id, isDrink ? sweet : "", item.hasMilk ? milk : "", item.hasShot ? shot : "", n].join("|");
-    onAdd?.({ key, itemId: item.id, name: item.name, image: item.image, unitPrice, qty, summary });
+    if (editKey) removeKey(editKey); // editing: drop the old line, re-add with new options
+    add({ key, itemId: item.id, name: item.name, image: item.image, unitPrice, qty, summary, opts: { sweet, milk, shot, note: n } });
     if (nav.canGoBack()) nav.goBack();
   };
 
@@ -165,16 +168,24 @@ export function CafeItemDetailScreen() {
           <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel="ย้อนกลับ">
             <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
           </GlassIconButton>
-          <GlassIconButton onPress={onShare} accessibilityLabel="แชร์">
-            <Share2 size={20} color="#1a1a1a" strokeWidth={2.2} />
-          </GlassIconButton>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <GlassIconButton
+              onPress={() => toggleFavorite({ itemId: item.id, summary, opts: { sweet, milk, shot, note: note.trim() } })}
+              accessibilityLabel="เมนูโปรด"
+            >
+              <Star size={20} color={isFavorite(item.id) ? "#f7931d" : "#1a1a1a"} fill={isFavorite(item.id) ? "#f7931d" : "transparent"} strokeWidth={2.2} />
+            </GlassIconButton>
+            <GlassIconButton onPress={onShare} accessibilityLabel="แชร์">
+              <Share2 size={20} color="#1a1a1a" strokeWidth={2.2} />
+            </GlassIconButton>
+          </View>
         </View>
       </SafeAreaView>
 
       {/* Floating Liquid-Glass action bar */}
       <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingBottom: 24 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 30, overflow: "hidden", padding: 9, gap: 9 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, gap: 9 }}>
             {/* Quantity row — above the button */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, paddingTop: 2 }}>
               <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>จำนวน</Text>
@@ -190,8 +201,8 @@ export function CafeItemDetailScreen() {
             </View>
             {/* Add to cart */}
             <Pressable onPress={addToCart} className="active:opacity-90" style={{ borderRadius: 999, overflow: "hidden" }}>
-              <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 52, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>เพิ่มลงตะกร้า</Text>
+              <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 50, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{editKey ? "บันทึกการแก้ไข" : "เพิ่มลงตะกร้า"}</Text>
                 <Text style={{ color: "rgba(255,255,255,0.95)", fontWeight: "800", fontSize: 15 }}>· {baht(total)}</Text>
               </LinearGradient>
             </Pressable>

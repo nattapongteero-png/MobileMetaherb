@@ -16,7 +16,7 @@ export type PaymentMethod = {
 
 export const PAYMENT_METHODS: PaymentMethod[] = [
   { id: "promptpay", label: "PromptPay", desc: "สแกน QR ผ่านแอปธนาคาร", image: require("../../assets/payment/promptpay.png") },
-  { id: "bank", label: "โอนผ่านธนาคาร", desc: "โอนเข้าบัญชีร้านค้า", Icon: Landmark },
+  { id: "bank", label: "โอนผ่านธนาคาร", desc: "จากบัญชีธนาคารที่ผูกไว้", Icon: Landmark },
   { id: "credit", label: "บัตรเครดิต / เดบิต", desc: "Visa, Mastercard, JCB", Icon: CreditCard },
   { id: "bankapp", label: "แอปธนาคาร", desc: "K PLUS, SCB EASY, Krungthai NEXT, KMA", Icon: Smartphone },
   { id: "truemoney", label: "TrueMoney Wallet", desc: "ชำระผ่าน e-Wallet", image: require("../../assets/payment/truemoney.jpg") },

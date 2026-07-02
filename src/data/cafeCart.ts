@@ -7,4 +7,6 @@ export type CafeCartLine = {
   unitPrice: number;  // base price + add-ons
   qty: number;
   summary: string;    // "หวานปกติ · นมโอ๊ต · เพิ่ม 1 ช็อต"
+  /** Raw option indices — used to pre-fill the detail page when editing the line. */
+  opts?: { sweet: number; milk: number; shot: number; note: string };
 };

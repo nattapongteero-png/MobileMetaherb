@@ -7,6 +7,7 @@ import { Trash2, Plus, Landmark, CreditCard } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { PressableScale } from "../components/PressableScale";
 import { useRefund, TRUEWALLET_ID } from "../context/RefundContext";
+import { usePayment } from "../context/PaymentContext";
 import { SvgXml } from "react-native-svg";
 import { bankByCode, bankLogo, CARD_BRAND } from "../data/bankAccounts";
 import { CARD_SVG, CARD_PNG } from "../data/cardLogos";
@@ -25,6 +26,15 @@ export function PaymentAccountsScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { accounts, removeAccount, cards, removeCard, trueWallet, unlinkTrueWallet, defaultId, setDefault } = useRefund();
+  const { selectedPayment, setSelectedPayment } = usePayment();
+
+  // Removing the bank account that's the active checkout payment would leave
+  // PaymentContext.selectedPayment dangling (blank method + skipped PIN), so
+  // reset it to the default — mirrors PaymentContext.removeAddress reconciliation.
+  const removeBankAccount = (id: string) => {
+    if (selectedPayment === id) setSelectedPayment("promptpay");
+    removeAccount(id);
+  };
 
   const DefaultTag = () => (
     <View style={{ backgroundColor: "rgba(49,151,84,0.12)", paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999 }}>
@@ -85,7 +95,7 @@ export function PaymentAccountsScreen() {
                         </View>
                         <Text style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }} numberOfLines={1}>{a.accountName} · {mask(a.accountNo)}</Text>
                       </View>
-                      <Pressable onPress={() => confirmRemove(`${bank.name} ${mask(a.accountNo)}`, () => removeAccount(a.id))} hitSlop={10} className="active:opacity-60" style={{ padding: 4 }}>
+                      <Pressable onPress={() => confirmRemove(`${bank.name} ${mask(a.accountNo)}`, () => removeBankAccount(a.id))} hitSlop={10} className="active:opacity-60" style={{ padding: 4 }}>
                         <Trash2 size={18} color="#c0392b" strokeWidth={2} />
                       </Pressable>
                     </Pressable>

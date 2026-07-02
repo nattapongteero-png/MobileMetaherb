@@ -705,7 +705,7 @@ export function HerbalMarketQuoteScreen() {
               <Pressable
                 onPress={() => setSubmitted(true)}
                 className="items-center justify-center active:opacity-80"
-                style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 48 }}
+                style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>ส่ง RFQ ใน ERP</Text>
               </Pressable>
@@ -905,7 +905,7 @@ export function HerbalMarketQuoteScreen() {
           <Pressable
             onPress={handlePreview}
             className="items-center justify-center active:opacity-80"
-            style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, height: 48 }}
+            style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50 }}
           >
             <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
               ดูตัวอย่างใบขอเสนอราคา{isBulk ? ` (${quoteItems.length} รายการ)` : ""}

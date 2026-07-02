@@ -1,7 +1,7 @@
 import "./src/styles/global.css";
 import { useEffect, useState } from "react";
 import { Platform, Text, View, TextInput } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, type LinkingOptions } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -11,7 +11,7 @@ import {
   IBMPlexSansThaiLooped_600SemiBold,
   IBMPlexSansThaiLooped_700Bold,
 } from "@expo-google-fonts/ibm-plex-sans-thai-looped";
-import { RootStack } from "./src/navigation/RootStack";
+import { RootStack, type RootStackParamList } from "./src/navigation/RootStack";
 import { ToastHost } from "./src/components/Toast";
 import { SplashScreen } from "./src/components/SplashScreen";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
@@ -28,12 +28,26 @@ import { AIAssistantProvider } from "./src/context/AIAssistantContext";
 import { SecurityProvider } from "./src/context/SecurityContext";
 import { SellerProvider } from "./src/context/SellerContext";
 import { ComplaintProvider } from "./src/context/ComplaintContext";
+import { CafeCartProvider } from "./src/context/CafeCartContext";
+import { CafeCelebrationHost } from "./src/components/CafeCelebrationHost";
 
 // Keep the branded splash up at least this long so a fast font load doesn't
 // flash it for a single frame.
 const MIN_SPLASH_MS = 1200;
 
 const MOBILE_MAX_WIDTH = 430;
+
+// Deep links from the café Live Activity (Lock Screen / Dynamic Island tap) open
+// the matching order's detail screen: com.metaherb.mobile://cafe-order/<orderId>.
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ["com.metaherb.mobile://"],
+  config: {
+    initialRouteName: "Main",
+    screens: {
+      CafeOrderDetail: "cafe-order/:orderId",
+    },
+  },
+};
 
 // Map fontWeight values to the loaded Thai font family — RN doesn't auto-pick
 // a weight variant from a base family, so we resolve via fontWeight at render.
@@ -110,7 +124,7 @@ export default function App() {
   const tree = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
           <ErrorBoundary>
             <LanguageProvider>
             <ChatProvider>
@@ -125,7 +139,10 @@ export default function App() {
                             <SecurityProvider>
                               <SellerProvider>
                                 <ComplaintProvider>
-                                  <RootStack />
+                                  <CafeCartProvider>
+                                    <RootStack />
+                                    <CafeCelebrationHost />
+                                  </CafeCartProvider>
                                 </ComplaintProvider>
                               </SellerProvider>
                             </SecurityProvider>

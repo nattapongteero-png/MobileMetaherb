@@ -3,14 +3,16 @@ import { View, Text, Pressable, ScrollView, StyleSheet, Image } from "react-nati
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ChevronDown, ChevronUp, PlusCircle, X } from "lucide-react-native";
+import { ChevronDown, ChevronUp, PlusCircle, X, Landmark } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { CardBrandIcon } from "../components/CardBrandIcon";
 import { BRAND_GREEN } from "../theme/tokens";
 import { PAYMENT_METHODS, BANK_APPS, type PaymentMethod } from "../data/paymentMethods";
 import { SAVED_CARDS } from "../data/savedCards";
+import { bankByCode, bankLogo, maskAccountNo } from "../data/bankAccounts";
 import { maskPhone } from "./TrueMoneyLinkScreen";
 import { usePayment } from "../context/PaymentContext";
+import { useRefund } from "../context/RefundContext";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const GROUPED_BG = "#f2f2f7"; // iOS systemGroupedBackground
@@ -27,10 +29,13 @@ export function PaymentMethodScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { selectedPayment: selected, setSelectedPayment, trueMoneyPhone } = usePayment();
+  // The user's OWN linked bank accounts (shared with refunds / PaymentAccounts).
+  const { accounts } = useRefund();
 
   // Open each accordion by default when one of its children is the current choice.
   const [creditOpen, setCreditOpen] = useState(SAVED_CARDS.some((c) => c.id === selected));
   const [bankOpen, setBankOpen] = useState(BANK_APPS.some((a) => a.id === selected));
+  const [bankTxOpen, setBankTxOpen] = useState(accounts.some((a) => a.id === selected));
 
   const choose = (id: string) => {
     setSelectedPayment(id);
@@ -69,6 +74,86 @@ export function PaymentMethodScreen() {
               {g.items.map((m, i) => {
                 const divider =
                   i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: SEP } : null;
+
+                // Bank transfer expands inline to the user's OWN linked bank
+                // accounts (from RefundContext) + "ผูกบัญชีธนาคาร" — money is sent
+                // from the account the user linked, NOT into the shop's account.
+                if (m.id === "bank") {
+                  return (
+                    <View key={m.id}>
+                      <Pressable
+                        onPress={() => setBankTxOpen((o) => !o)}
+                        className="flex-row items-center active:opacity-70"
+                        style={[styles.row, divider]}
+                      >
+                        <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
+                          {m.Icon ? <m.Icon size={22} color="#9ca3af" /> : null}
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ fontSize: 16, color: LABEL }}>{m.label}</Text>
+                          <Text style={{ fontSize: 12, color: VALUE, marginTop: 1 }}>{m.desc}</Text>
+                        </View>
+                        {bankTxOpen ? (
+                          <ChevronUp size={20} color="#9ca3af" />
+                        ) : (
+                          <ChevronDown size={20} color="#9ca3af" />
+                        )}
+                      </Pressable>
+                      {bankTxOpen ? (
+                        <>
+                          {accounts.map((acc) => {
+                            const aActive = selected === acc.id;
+                            const bank = bankByCode(acc.bankCode);
+                            const logo = bankLogo(acc.bankCode);
+                            return (
+                              <Pressable
+                                key={acc.id}
+                                onPress={() => choose(acc.id)}
+                                className="flex-row items-center active:opacity-70"
+                                style={[styles.row, { paddingLeft: 56, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: SEP }]}
+                              >
+                                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: logo ? "#fff" : bank.color + "1a", borderWidth: logo ? 1 : 0, borderColor: "#eee", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                                  {logo ? (
+                                    <Image source={logo} style={{ width: 24, height: 24 }} resizeMode="contain" />
+                                  ) : (
+                                    <Landmark size={17} color={bank.color} strokeWidth={2.2} />
+                                  )}
+                                </View>
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                  <Text style={{ fontSize: 16, color: LABEL, fontWeight: aActive ? "600" : "400" }}>{bank.name}</Text>
+                                  <Text style={{ fontSize: 12, color: VALUE, marginTop: 1 }}>บัญชี {maskAccountNo(acc.accountNo)}</Text>
+                                </View>
+                                <View
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 11,
+                                    borderWidth: 2,
+                                    borderColor: aActive ? BRAND_GREEN : "#cbd0cb",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  {aActive ? <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: BRAND_GREEN }} /> : null}
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                          <Pressable
+                            onPress={() => nav.navigate("AddBankAccount", { selectForPayment: true })}
+                            className="flex-row items-center active:opacity-70"
+                            style={[styles.row, { paddingLeft: 56, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: SEP }]}
+                          >
+                            <PlusCircle size={26} color={BRAND_GREEN} strokeWidth={1.8} />
+                            <Text style={{ marginLeft: 12, fontSize: 16, color: BRAND_GREEN, fontWeight: "500" }}>
+                              ผูกบัญชีธนาคาร
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : null}
+                    </View>
+                  );
+                }
 
                 // Credit / debit expands inline to the linked cards + "เพิ่มบัตร".
                 if (m.id === "credit") {

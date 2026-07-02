@@ -10,9 +10,11 @@ import {
 } from "react-native";
 import { PAYMENT_METHODS, BANK_APPS } from "../data/paymentMethods";
 import { SAVED_CARDS } from "../data/savedCards";
+import { bankByCode, bankLogo, maskAccountNo } from "../data/bankAccounts";
 import { CardBrandIcon } from "../components/CardBrandIcon";
 import { maskPhone } from "./TrueMoneyLinkScreen";
 import { usePayment } from "../context/PaymentContext";
+import { useRefund } from "../context/RefundContext";
 import { useSecurity } from "../context/SecurityContext";
 import { SHIPPING_METHODS } from "../data/shippingMethods";
 import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
@@ -29,6 +31,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Coins,
   CreditCard,
+  Landmark,
   MapPin,
   ShieldCheck,
   Store,
@@ -71,6 +74,7 @@ export function PaymentScreen() {
     selectedAddressId,
   } = usePayment();
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
+  const { accounts } = useRefund();
 
   const selectedShippingMethod =
     SHIPPING_METHODS.find((s) => s.id === selectedShipping) ?? SHIPPING_METHODS[0];
@@ -90,8 +94,16 @@ export function PaymentScreen() {
     PAYMENT_METHODS.find((m) => m.id === selectedPayment) ??
     BANK_APPS.find((a) => a.id === selectedPayment);
   const selectedCard = SAVED_CARDS.find((c) => c.id === selectedPayment);
-  const selLabel = selectedCard ? selectedCard.name : selectedMethod?.label;
-  const selDesc = selectedCard
+  // A bank-transfer selection is one of the user's OWN linked bank accounts.
+  const selectedBankAcc = accounts.find((a) => a.id === selectedPayment);
+  const selLabel = selectedBankAcc
+    ? bankByCode(selectedBankAcc.bankCode).name
+    : selectedCard
+    ? selectedCard.name
+    : selectedMethod?.label;
+  const selDesc = selectedBankAcc
+    ? `โอนผ่านธนาคาร • บัญชี ${maskAccountNo(selectedBankAcc.accountNo)}`
+    : selectedCard
     ? `บัตรเครดิต/เดบิต •••• ${selectedCard.last4}`
     : selectedPayment === "truemoney" && trueMoneyPhone
     ? `ผูกบัญชีแล้ว • ${maskPhone(trueMoneyPhone)}`
@@ -101,8 +113,10 @@ export function PaymentScreen() {
   const openShippingSheet = () => nav.navigate("ShippingMethod");
   const openCouponSheet = () => nav.navigate("CouponSelect");
 
-  // Card / bank payments must be confirmed with the security PIN (if set).
-  const needsPin = !!selectedCard || !!BANK_APPS.find((a) => a.id === selectedPayment);
+  // Card / bank payments must be confirmed with the security PIN (if set) —
+  // including transfers from a linked bank account.
+  const needsPin =
+    !!selectedCard || !!selectedBankAcc || !!BANK_APPS.find((a) => a.id === selectedPayment);
 
   const placeOrder = async () => {
     if (needsPin) {
@@ -403,7 +417,13 @@ export function PaymentScreen() {
                 overflow: "hidden",
               }}
             >
-              {selectedCard ? (
+              {selectedBankAcc ? (
+                bankLogo(selectedBankAcc.bankCode) ? (
+                  <Image source={bankLogo(selectedBankAcc.bankCode)!} style={{ width: 30, height: 30 }} resizeMode="contain" />
+                ) : (
+                  <Landmark size={22} color={bankByCode(selectedBankAcc.bankCode).color} />
+                )
+              ) : selectedCard ? (
                 <CardBrandIcon brand={selectedCard.brand} size={30} />
               ) : selectedMethod?.image ? (
                 <Image source={selectedMethod.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />

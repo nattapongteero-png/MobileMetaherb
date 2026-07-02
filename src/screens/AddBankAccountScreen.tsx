@@ -13,12 +13,14 @@ import {
   Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { X, Search, ChevronDown, Landmark } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { useRefund } from "../context/RefundContext";
+import { usePayment } from "../context/PaymentContext";
 import { THAI_BANKS, bankByCode, bankLogo } from "../data/bankAccounts";
 import { BRAND_GREEN } from "../theme/tokens";
+import type { RootStackParamList } from "../navigation/RootStack";
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
@@ -47,8 +49,10 @@ const hintStyle = { fontSize: 12, color: "#9ca3af", marginTop: 2, marginLeft: 6 
 
 export function AddBankAccountScreen() {
   const nav = useNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, "AddBankAccount">>();
   const insets = useSafeAreaInsets();
   const { addAccount, setSelectedId } = useRefund();
+  const { setSelectedPayment } = usePayment();
 
   const [bankCode, setBankCode] = useState("KTB");
   const [name, setName] = useState("");
@@ -70,6 +74,10 @@ export function AddBankAccountScreen() {
     if (!canSave) return;
     const acc = addAccount({ bankCode, accountName: name.trim(), accountNo: digits, isDefault });
     setSelectedId(acc.id);
+    // Only when opened from the checkout payment picker: make the freshly linked
+    // account the active payment method. Refund / account-management entry points
+    // pass no flag, so they never hijack the checkout selection.
+    if (route.params?.selectForPayment) setSelectedPayment(acc.id);
     nav.goBack();
   };
 

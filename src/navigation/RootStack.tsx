@@ -100,8 +100,16 @@ import { ShopReportScreen } from "../screens/ShopReportView";
 import { ShopManagerChatScreen } from "../screens/ShopManagerChatScreen";
 import { CafeScreen } from "../screens/CafeScreen";
 import { CafeItemDetailScreen } from "../screens/CafeItemDetailScreen";
+import { CafeCartScreen } from "../screens/CafeCartScreen";
+import { CafeCheckoutScreen } from "../screens/CafeCheckoutScreen";
+import { CafePaymentMethodScreen } from "../screens/CafePaymentMethodScreen";
+import { CafeSuccessScreen } from "../screens/CafeSuccessScreen";
+import { CafeOrderDetailScreen } from "../screens/CafeOrderDetailScreen";
+import { CafeHistoryScreen } from "../screens/CafeHistoryScreen";
+import { CafeReviewScreen } from "../screens/CafeReviewScreen";
+import { CafeFavoritesScreen } from "../screens/CafeFavoritesScreen";
 import type { CafeItem } from "../data/cafeMenu";
-import type { CafeCartLine } from "../data/cafeCart";
+import type { CafeOrderItem } from "../data/cafePayment";
 import { SupplierInfoScreen } from "../screens/SupplierInfoScreen";
 import { BrandInfoScreen } from "../screens/BrandInfoScreen";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -132,7 +140,7 @@ export type RootStackParamList = {
   ComplaintForm: { orderId?: string; type?: "damaged" | "wrong_item" | "return" | "refund" } | undefined;
   ComplaintTypeSelect: { orderId?: string; current?: "damaged" | "wrong_item" | "return" | "refund" } | undefined;
   RefundChannelSelect: undefined;
-  AddBankAccount: undefined;
+  AddBankAccount: { selectForPayment?: boolean } | undefined;
   ComplaintStatus: undefined;
   CouponCollect: undefined;
   // Pushed from Home "ดูทั้งหมด" (no longer bottom-tab screens).
@@ -194,12 +202,20 @@ export type RootStackParamList = {
   ShopReport: { kind: "sales" | "customers" | "products" | "market" };
   ShopManagerChat: undefined;
   Cafe: undefined;
-  CafeItemDetail: { item: CafeItem; onAdd?: (line: CafeCartLine) => void };
+  CafeItemDetail: { item: CafeItem; editKey?: string; initial?: { sweet: number; milk: number; shot: number; note: string; qty: number } };
+  CafeCart: undefined;
+  CafeCheckout: undefined;
+  CafePaymentMethod: undefined;
+  CafeSuccess: { orderId?: string } | undefined;
+  CafeOrderDetail: { orderId: string };
+  CafeHistory: undefined;
+  CafeReview: { orderId: string };
+  CafeFavorites: undefined;
   SupplierInfo: undefined;
   BrandInfo: undefined;
   Cart: undefined;
   Payment: undefined;
-  PromptPayQR: { total: number; orderId: string };
+  PromptPayQR: { total: number; orderId: string; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[] };
   PaymentSuccess: { orderId: string; total: number; methodLabel: string; methodDesc?: string };
   PaymentMethod: undefined;
   ShippingMethod: undefined;
@@ -399,6 +415,14 @@ export function RootStack() {
       <Stack.Screen name="ShopManagerChat" component={ShopManagerChatScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cafe" component={CafeScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="CafeItemDetail" component={CafeItemDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeCart" component={CafeCartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeCheckout" component={CafeCheckoutScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafePaymentMethod" component={CafePaymentMethodScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="CafeSuccess" component={CafeSuccessScreen} options={{ headerShown: false, gestureEnabled: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeOrderDetail" component={CafeOrderDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeHistory" component={CafeHistoryScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeReview" component={CafeReviewScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="CafeFavorites" component={CafeFavoritesScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="SupplierInfo" component={SupplierInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="BrandInfo" component={BrandInfoScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

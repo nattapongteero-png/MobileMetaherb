@@ -9,6 +9,8 @@ import { Clock, Download } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import { promptPayPayload, MERCHANT_PROMPTPAY, MERCHANT_NAME } from "../utils/promptpay";
+import { useCafeCart } from "../context/CafeCartContext";
+import { buildCafeOrder } from "../data/cafePayment";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -23,7 +25,8 @@ const fmtPhone = (p: string) => p.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 export function PromptPayQRScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { total, orderId } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
+  const { total, orderId, cafe, receiveLabel, cafeItems } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
+  const { placeOrder } = useCafeCart();
 
   const payload = useMemo(() => promptPayPayload(MERCHANT_PROMPTPAY, total), [total]);
   const [left, setLeft] = useState(EXPIRE_SECONDS);
@@ -35,6 +38,7 @@ export function PromptPayQRScreen() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const qrRef = useRef<any>(null);
+  const confirming = useRef(false); // guards against a double-tap placing two orders
   const [saving, setSaving] = useState(false);
 
   const saveQR = () => {
@@ -54,6 +58,24 @@ export function PromptPayQRScreen() {
       } finally {
         setSaving(false);
       }
+    });
+  };
+
+  // Café orders clear the café cart and return to the café landing; product
+  // orders continue to the shared success screen.
+  const confirmPaid = () => {
+    if (cafe) {
+      if (confirming.current) return;
+      confirming.current = true;
+      placeOrder(buildCafeOrder({ orderId, total, payLabel: "พร้อมเพย์ PromptPay", receiveLabel: receiveLabel ?? "", items: cafeItems ?? [] }));
+      nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
+      return;
+    }
+    nav.navigate("PaymentSuccess", {
+      orderId,
+      total,
+      methodLabel: "พร้อมเพย์ PromptPay",
+      methodDesc: "ชำระผ่าน QR Code",
     });
   };
 
@@ -150,14 +172,7 @@ export function PromptPayQRScreen() {
       {/* Bottom actions */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 12, gap: 6, backgroundColor: "#fafafa" }}>
         <Pressable
-          onPress={() =>
-            nav.navigate("PaymentSuccess", {
-              orderId,
-              total,
-              methodLabel: "พร้อมเพย์ PromptPay",
-              methodDesc: "ชำระผ่าน QR Code",
-            })
-          }
+          onPress={confirmPaid}
           className="active:opacity-80 items-center justify-center"
           style={{ height: 52, borderRadius: 999, backgroundColor: BRAND_GREEN }}
         >

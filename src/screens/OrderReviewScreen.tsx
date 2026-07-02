@@ -286,7 +286,7 @@ export function OrderReviewScreen() {
             <Pressable
               onPress={submit}
               className="flex-row items-center justify-center active:opacity-80"
-              style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 48, gap: 6 }}
+              style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50, gap: 6 }}
             >
               <CheckCircle2 size={18} color="#fff" />
               <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>ส่งรีวิว</Text>

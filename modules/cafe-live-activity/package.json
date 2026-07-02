@@ -1,0 +1,6 @@
+{
+  "name": "cafe-live-activity",
+  "version": "1.0.0",
+  "description": "iOS Live Activity control for META Caffe orders",
+  "main": "index.ts"
+}

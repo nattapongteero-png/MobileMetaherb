@@ -5,60 +5,159 @@
  * assets/menu caffe/. Search filters across all items; a floating cart bar +
  * appbar cart/history/search buttons. Ordering itself is a mockup.
  */
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable, Image, Alert, Dimensions, TextInput } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { View, Text, ScrollView, Pressable, Image, Dimensions, TextInput, Animated } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Plus, Minus, Flame, ShoppingBag, Receipt, Search, X } from "lucide-react-native";
+import { Plus, Minus, Flame, ShoppingBag, Receipt, Search, X, Clock, ListOrdered, Check, Star } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { GlassView } from "expo-glass-effect";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { CAFE_SUBS, CAFE_MENU, type CafeItem, type CafeSub } from "../data/cafeMenu";
-import type { CafeCartLine } from "../data/cafeCart";
+import { useCafeCart } from "../context/CafeCartContext";
+import type { CafeOrder } from "../data/cafePayment";
+import { CountdownRing } from "../components/CountdownRing";
 import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED } from "../theme/tokens";
 
 const CAFE_IMG = require("../../assets/caffe.png");
+const DRIP_GIF = require("../../assets/drepcoffee.gif"); // animated "brewing" indicator
+const READY_IMG = require("../../assets/herocafe.png"); // finished cup — shown when the order is ready
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
+const fmtTime = (d: Date) =>
+  `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_W = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
 
+/** Replaces the café hero while an order is being prepared — same size as the
+ *  banner, with a live countdown ring on the left. When the countdown completes
+ *  the background crossfades from dark green to the home appbar green (#319754). */
+function QueueBanner({ order, onPress, onDismiss, width }: { order: CafeOrder; onPress: () => void; onDismiss: () => void; width?: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const totalMs = Math.max(1, order.waitMinutes * 60000);
+  const remainMs = Math.max(0, order.readyAt - now);
+  const frac = Math.min(1, remainMs / totalMs); // 1 → full ring, 0 → empty
+  const totalSec = Math.ceil(remainMs / 1000);
+  const clock = `${Math.floor(totalSec / 60)}:${(totalSec % 60).toString().padStart(2, "0")}`;
+  const done = remainMs <= 0;
+  const ready = fmtTime(new Date(order.readyAt));
+
+  // Animate the background colour from dark green to the appbar green when done.
+  const anim = useRef(new Animated.Value(done ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: done ? 1 : 0, duration: 650, useNativeDriver: true }).start();
+  }, [done, anim]);
+  const prepOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  return (
+    <View style={width != null ? { width, paddingTop: 16, paddingBottom: 28 } : { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
+      <View style={{ borderRadius: 20, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 16, elevation: 7 }}>
+        <Pressable onPress={onPress} className="active:opacity-90" style={{ borderRadius: 20, overflow: "hidden" }}>
+          {/* background: dark "preparing" green crossfades to the appbar green */}
+          <Animated.View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: prepOpacity }}>
+            <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
+          </Animated.View>
+          <Animated.View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: anim }}>
+            <LinearGradient colors={["#37a35f", "#319754", "#2c8a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
+          </Animated.View>
+
+          {/* corner art — brewing drip while preparing, finished cup when ready */}
+          <Animated.View pointerEvents="none" style={{ position: "absolute", right: -6, bottom: -12, opacity: prepOpacity }}>
+            <Image source={DRIP_GIF} style={{ width: 136, height: 136 }} resizeMode="contain" />
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={{ position: "absolute", right: -4, bottom: -8, opacity: anim }}>
+            <Image source={READY_IMG} style={{ width: 122, height: 122 }} resizeMode="contain" />
+          </Animated.View>
+
+          {/* content (in flow — sets the card height); ring stays on the left */}
+          <View style={{ padding: 18, minHeight: 128, justifyContent: "center" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+              <CountdownRing frac={frac} clock={clock} done={done} />
+              <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>{done ? "ออเดอร์พร้อมแล้ว! ☕" : "กำลังเตรียมออเดอร์ ☕"}</Text>
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 7 }}>
+                  <Text style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "700" }}>คิว</Text>
+                  <Text style={{ color: "#fff", fontSize: 26, fontWeight: "900", lineHeight: 28 }}>#{order.queueNo}</Text>
+                </View>
+                {done ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <Check size={14} color="#eafff2" strokeWidth={2.6} />
+                    <Text style={{ color: "rgba(255,255,255,0.95)", fontSize: 12.5 }}>รับได้ที่เคาน์เตอร์</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <ListOrdered size={14} color="#c8f0d6" strokeWidth={2.4} />
+                      <Text style={{ color: "rgba(255,255,255,0.92)", fontSize: 12.5 }}>รออีก {order.queueAhead} คิว</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Clock size={14} color="#c8f0d6" strokeWidth={2.4} />
+                      <Text style={{ color: "rgba(255,255,255,0.92)", fontSize: 12.5 }}>~{ready} น.</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* dismiss — only once the order is ready to be picked up */}
+          {done ? (
+            <Pressable
+              onPress={onDismiss}
+              hitSlop={10}
+              className="active:opacity-70"
+              style={{ position: "absolute", top: 12, right: 12, width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.22)", alignItems: "center", justifyContent: "center" }}
+            >
+              <X size={15} color="#fff" strokeWidth={2.6} />
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/** Renders the active order banner(s). One order fills the width; multiple orders
+ *  become a free horizontal side-scroll (cards sit next to each other, the next
+ *  one peeks) — not a paged carousel. */
+function QueueBannerArea({ orders, onOpen, onDismiss }: { orders: CafeOrder[]; onOpen: (o: CafeOrder) => void; onDismiss: (o: CafeOrder) => void }) {
+  if (orders.length === 1) {
+    const o = orders[0];
+    return <QueueBanner order={o} onPress={() => onOpen(o)} onDismiss={() => onDismiss(o)} />;
+  }
+  const cardW = SCREEN_WIDTH - 64; // leaves the next card peeking on the right
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+    >
+      {orders.map((o) => (
+        <QueueBanner key={o.orderId} order={o} width={cardW} onPress={() => onOpen(o)} onDismiss={() => onDismiss(o)} />
+      ))}
+    </ScrollView>
+  );
+}
+
 export function CafeScreen() {
   const nav = useNavigation<Nav>();
-  const [cart, setCart] = useState<CafeCartLine[]>([]);
   const [q, setQ] = useState("");
+  const { add, decItem, qtyOfItem, totalQty, totalPrice, activeOrders, completeOrder } = useCafeCart();
 
-  // Add a customised line from the detail screen (identical lines merge).
-  const addLine = (line: CafeCartLine) =>
-    setCart((prev) => {
-      const i = prev.findIndex((l) => l.key === line.key);
-      if (i >= 0) { const next = [...prev]; next[i] = { ...next[i], qty: next[i].qty + line.qty }; return next; }
-      return [...prev, line];
-    });
-  const openDetail = (item: CafeItem) => nav.navigate("CafeItemDetail", { item, onAdd: addLine });
-
-  // Per-card quick controls: total qty of an item across its option variants.
-  const qtyOfItem = (id: string) => cart.reduce((s, l) => (l.itemId === id ? s + l.qty : s), 0);
+  const openDetail = (item: CafeItem) => nav.navigate("CafeItemDetail", { item });
+  const openCart = () => nav.navigate("CafeCart");
   const quickAdd = (item: CafeItem) =>
-    addLine({ key: `${item.id}|base`, itemId: item.id, name: item.name, image: item.image, unitPrice: item.price, qty: 1, summary: "" });
-  const decItem = (id: string) =>
-    setCart((prev) => {
-      let i = -1;
-      for (let k = prev.length - 1; k >= 0; k--) { if (prev[k].itemId === id) { i = k; break; } }
-      if (i < 0) return prev;
-      const next = [...prev];
-      if (next[i].qty <= 1) next.splice(i, 1);
-      else next[i] = { ...next[i], qty: next[i].qty - 1 };
-      return next;
-    });
-
-  const totalQty = cart.reduce((s, l) => s + l.qty, 0);
-  const totalPrice = cart.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-
-  const showCheckout = () => Alert.alert("META Caffe", "ระบบตะกร้า/สั่งซื้อคาเฟ่กำลังพัฒนา เปิดให้บริการเร็ว ๆ นี้ครับ");
-  const showHistory = () => Alert.alert("ประวัติคำสั่งซื้อ", "ประวัติการสั่งซื้อคาเฟ่กำลังพัฒนา เปิดให้บริการเร็ว ๆ นี้ครับ");
+    add({ key: `${item.id}|base`, itemId: item.id, name: item.name, image: item.image, unitPrice: item.price, qty: 1, summary: "", opts: { sweet: 2, milk: 0, shot: 0, note: "" } });
+  const showHistory = () => nav.navigate("CafeHistory");
+  const openFavorites = () => nav.navigate("CafeFavorites");
 
   const query = q.trim().toLowerCase();
   const searching = query.length > 0;
@@ -96,11 +195,14 @@ export function CafeScreen() {
         showSearch={false}
         rightSlot={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <GlassIconButton onPress={openFavorites} accessibilityLabel="เมนูโปรด">
+              <Star size={19} color="#1a1a1a" strokeWidth={2.2} />
+            </GlassIconButton>
             <GlassIconButton onPress={showHistory} accessibilityLabel="ประวัติคำสั่งซื้อ">
               <Receipt size={19} color="#1a1a1a" strokeWidth={2.2} />
             </GlassIconButton>
             <View>
-              <GlassIconButton onPress={showCheckout} accessibilityLabel="ตะกร้า">
+              <GlassIconButton onPress={openCart} accessibilityLabel="ตะกร้า">
                 <ShoppingBag size={19} color="#1a1a1a" strokeWidth={2.2} />
               </GlassIconButton>
               {totalQty > 0 ? (
@@ -113,21 +215,30 @@ export function CafeScreen() {
         }
       />
 
+      <View style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: totalQty > 0 ? 120 : 28 }}>
-        {/* Hero */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
-          <View style={{ borderRadius: 20, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 16, elevation: 7 }}>
-            <View style={{ borderRadius: 20, overflow: "hidden" }}>
-              <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 18, minHeight: 128, justifyContent: "center" }}>
-                <Image source={CAFE_IMG} style={{ position: "absolute", right: -6, bottom: -12, width: 136, height: 136 }} resizeMode="contain" />
-                <View style={{ width: 196, gap: 5 }}>
-                  <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.2 }}>คาเฟ่ของ METAHERB</Text>
-                  <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12.5, lineHeight: 18 }}>กาแฟ ชา ขนม และอาหารสดใหม่ ส่งตรงจากครัวเรา</Text>
-                </View>
-              </LinearGradient>
+        {/* Hero — swaps to the queue banner(s) while orders are being prepared */}
+        {activeOrders.length > 0 ? (
+          <QueueBannerArea
+            orders={activeOrders}
+            onOpen={(o) => nav.navigate("CafeOrderDetail", { orderId: o.orderId })}
+            onDismiss={(o) => completeOrder(o.orderId)}
+          />
+        ) : (
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
+            <View style={{ borderRadius: 20, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.26, shadowRadius: 16, elevation: 7 }}>
+              <View style={{ borderRadius: 20, overflow: "hidden" }}>
+                <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 18, minHeight: 128, justifyContent: "center" }}>
+                  <Image source={CAFE_IMG} style={{ position: "absolute", right: -6, bottom: -12, width: 136, height: 136 }} resizeMode="contain" />
+                  <View style={{ width: 196, gap: 5 }}>
+                    <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.2 }}>คาเฟ่ของ METAHERB</Text>
+                    <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12.5, lineHeight: 18 }}>กาแฟ ชา ขนม และอาหารสดใหม่ ส่งตรงจากครัวเรา</Text>
+                  </View>
+                </LinearGradient>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Search bar — below the hero banner */}
         <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
@@ -183,24 +294,27 @@ export function CafeScreen() {
         )}
       </ScrollView>
 
-      {/* Floating cart bar */}
+        {/* Edge fades — content dissolves at the top/bottom while scrolling */}
+        <LinearGradient pointerEvents="none" colors={["#fafafa", "rgba(250,250,250,0)"]} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 20 }} />
+        <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 36 }} />
+      </View>
+
+      {/* Floating cart bar — glass, matching the cart/checkout screens */}
       {totalQty > 0 ? (
-        <View style={{ position: "absolute", left: 16, right: 16, bottom: 24 }}>
-          <Pressable
-            onPress={showCheckout}
-            className="active:opacity-90"
-            style={{ borderRadius: 999, shadowColor: "#0b3d2e", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 }}
-          >
-            <View style={{ borderRadius: 999, overflow: "hidden" }}>
-              <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingRight: 16, height: 54, gap: 11 }}>
-                <View style={{ minWidth: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>{totalQty}</Text>
-                </View>
-                <Text style={{ flex: 1, color: "#fff", fontWeight: "700", fontSize: 14 }}>ดูตะกร้า · สั่งซื้อ</Text>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{baht(totalPrice)}</Text>
-              </LinearGradient>
-            </View>
-          </Pressable>
+        <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
+          <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+              <Pressable onPress={openCart} className="active:opacity-80" style={{ flex: 1, height: 50, borderRadius: 999, overflow: "hidden" }}>
+                <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 10 }}>
+                  <View style={{ minWidth: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
+                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>{totalQty}</Text>
+                  </View>
+                  <Text style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 15 }}>ดูตะกร้า</Text>
+                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{baht(totalPrice)}</Text>
+                </LinearGradient>
+              </Pressable>
+            </GlassView>
+          </View>
         </View>
       ) : null}
     </View>

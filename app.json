@@ -9,6 +9,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.metaherb.mobile",
+      "infoPlist": {
+        "NSSupportsLiveActivities": true
+      },
       "icon": {
         "light": "./assets/app-icon.png",
         "dark": "./assets/ios-icon-dark.png",

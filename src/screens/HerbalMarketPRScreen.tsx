@@ -632,7 +632,7 @@ export function HerbalMarketPRScreen() {
             <Pressable
               onPress={handleSubmit}
               className="items-center justify-center active:opacity-80"
-              style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 48 }}
+              style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50 }}
             >
               <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>ส่งเพื่อขออนุมัติ</Text>
             </Pressable>
