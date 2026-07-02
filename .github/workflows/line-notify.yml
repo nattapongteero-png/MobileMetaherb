@@ -1,0 +1,41 @@
+name: LINE notify on push
+
+# แจ้งเตือน LINE group ทุกครั้งที่มีการ push เข้า main.
+# ต้องตั้ง repo secrets: LINE_TOKEN (Channel access token), LINE_GROUP_ID (groupId)
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send LINE message
+        env:
+          LINE_TOKEN: ${{ secrets.LINE_TOKEN }}
+          LINE_GROUP_ID: ${{ secrets.LINE_GROUP_ID }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          PUSHER: ${{ github.actor }}
+          COMPARE: ${{ github.event.compare }}
+          COMMITS_JSON: ${{ toJSON(github.event.commits) }}
+        run: |
+          if [ -z "$LINE_TOKEN" ] || [ -z "$LINE_GROUP_ID" ]; then
+            echo "LINE_TOKEN / LINE_GROUP_ID not set — skipping."; exit 0
+          fi
+
+          # รวมข้อความ commit (บรรทัดแรกของแต่ละ commit, สูงสุด 10 อัน)
+          COMMIT_LINES=$(echo "$COMMITS_JSON" | jq -r '.[:10][] | "• " + (.message | split("\n")[0])')
+          COUNT=$(echo "$COMMITS_JSON" | jq 'length')
+
+          TEXT=$(printf "🚀 Push → %s (%s)\n👤 %s\n📝 %s commits:\n%s\n🔗 %s" \
+            "$REPO" "$BRANCH" "$PUSHER" "$COUNT" "$COMMIT_LINES" "$COMPARE")
+
+          # สร้าง JSON body ปลอดภัยด้วย jq
+          BODY=$(jq -n --arg to "$LINE_GROUP_ID" --arg text "$TEXT" \
+            '{to: $to, messages: [{type: "text", text: $text}]}')
+
+          curl -sS -X POST https://api.line.me/v2/bot/message/push \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $LINE_TOKEN" \
+            -d "$BODY"
