@@ -111,6 +111,8 @@ import { ShopReportView } from "./ShopReportView";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { TrialRegistryOwnerSection } from "./TrialRegistryView";
 import { TrialTrackingOwnerSection } from "./TrialTrackingView";
+import { PromotionsOwnerSection } from "./PromotionsView";
+import { CouponsOwnerSection } from "./CouponsView";
 import { SalesDatePicker, type DateSel } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -2772,10 +2774,14 @@ function OverviewTab({
       {/* สินค้าทดลอง — ติดตามสินค้าทดลอง (registration roster, ported from web) */}
       {sub === "trials_tracking" ? <TrialTrackingOwnerSection /> : null}
 
+      {/* โปรโมชั่น — list/manage view (ported from web PromotionsTab) */}
+      {sub === "promotions" ? <PromotionsOwnerSection /> : null}
+
+      {/* คูปอง — list/manage view (ported from web CouponsTab) */}
+      {sub === "coupons" ? <CouponsOwnerSection /> : null}
+
       {/* Sections without a dedicated mockup view yet */}
       {sub === "flash_sale" ||
-      sub === "promotions" ||
-      sub === "coupons" ||
       sub === "report_market" ||
       sub === "finance_tx" ? (
         <View
@@ -2810,6 +2816,56 @@ function OverviewTab({
       <Pressable
         onPress={() => nav.navigate("TrialAddProduct")}
         accessibilityLabel="เพิ่มสินค้าทดลอง"
+        className="items-center justify-center active:opacity-90"
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: 24,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: BRAND_GREEN,
+          shadowColor: "#000",
+          shadowOpacity: 0.22,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+        }}
+      >
+        <Plus size={26} color="#fff" strokeWidth={2.6} />
+      </Pressable>
+    ) : null}
+
+    {/* Floating "สร้างโปรโมชั่น" FAB — only on the โปรโมชั่น section. */}
+    {sub === "promotions" ? (
+      <Pressable
+        onPress={() => nav.navigate("PromotionCreate")}
+        accessibilityLabel="สร้างโปรโมชั่น"
+        className="items-center justify-center active:opacity-90"
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: 24,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: BRAND_GREEN,
+          shadowColor: "#000",
+          shadowOpacity: 0.22,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+        }}
+      >
+        <Plus size={26} color="#fff" strokeWidth={2.6} />
+      </Pressable>
+    ) : null}
+
+    {/* Floating "สร้างคูปอง" FAB — only on the คูปอง section. */}
+    {sub === "coupons" ? (
+      <Pressable
+        onPress={() => nav.navigate("CouponCreate")}
+        accessibilityLabel="สร้างคูปอง"
         className="items-center justify-center active:opacity-90"
         style={{
           position: "absolute",
