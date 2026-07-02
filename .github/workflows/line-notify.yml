@@ -30,9 +30,14 @@ jobs:
           # commit เป็น text node (สูงสุด 10) + บรรทัด "…และอีก N" ถ้าเกิน
           COMMIT_ITEMS=$(echo "$COMMITS_JSON" | jq '
             [ .[:10] | to_entries[]
+              | ( .value.message
+                  | split("\n")
+                  | map(select(test("^\\s*Co-Authored-By:";"i") | not))
+                  | join("\n")
+                  | sub("\\s+$";"") ) as $msg
               | { type:"text",
-                  text: ("\(.key + 1). " + (.value.message | split("\n")[0])),
-                  wrap:true, size:"sm", color:"#374151", margin:"sm" } ]
+                  text: ("\(.key + 1). " + $msg),
+                  wrap:true, size:"sm", color:"#374151", margin:"md" } ]
             + (if (length > 10)
                then [{ type:"text", text:("…และอีก \(length - 10) รายการ"),
                        size:"xs", color:"#9ca3af", margin:"sm" }]
