@@ -24,20 +24,54 @@ jobs:
             echo "LINE_TOKEN / LINE_GROUP_ID not set — skipping."; exit 0
           fi
 
-          # ชื่อ repo แบบสั้น (ตัด owner/ ออก)
           REPO_SHORT="${REPO##*/}"
-          # รายการ commit เป็นข้อ ๆ (บรรทัดแรกของแต่ละ commit, สูงสุด 10)
-          COMMIT_LINES=$(echo "$COMMITS_JSON" | jq -r '.[:10] | to_entries[] | "\(.key + 1). \(.value.message | split("\n")[0])"')
           COUNT=$(echo "$COMMITS_JSON" | jq 'length')
-          MORE=""
-          if [ "$COUNT" -gt 10 ]; then MORE=$(printf "\n…และอีก %s รายการ" "$((COUNT - 10))"); fi
 
-          TEXT=$(printf "🎉 มีอัปเดตใหม่บน %s !\n\n🙋 โดย: %s\n🌿 branch: %s\n\n✨ สิ่งที่เปลี่ยน (%s):\n%s%s\n\n👀 ดูรายละเอียด:\n%s" \
-            "$REPO_SHORT" "$PUSHER" "$BRANCH" "$COUNT" "$COMMIT_LINES" "$MORE" "$COMPARE")
+          # commit เป็น text node (สูงสุด 10) + บรรทัด "…และอีก N" ถ้าเกิน
+          COMMIT_ITEMS=$(echo "$COMMITS_JSON" | jq '
+            [ .[:10] | to_entries[]
+              | { type:"text",
+                  text: ("\(.key + 1). " + (.value.message | split("\n")[0])),
+                  wrap:true, size:"sm", color:"#374151", margin:"sm" } ]
+            + (if (length > 10)
+               then [{ type:"text", text:("…และอีก \(length - 10) รายการ"),
+                       size:"xs", color:"#9ca3af", margin:"sm" }]
+               else [] end)')
 
-          # สร้าง JSON body ปลอดภัยด้วย jq
-          BODY=$(jq -n --arg to "$LINE_GROUP_ID" --arg text "$TEXT" \
-            '{to: $to, messages: [{type: "text", text: $text}]}')
+          # ประกอบ Flex bubble
+          FLEX=$(jq -n \
+            --arg repo "$REPO_SHORT" --arg branch "$BRANCH" --arg pusher "$PUSHER" \
+            --arg count "$COUNT" --arg compare "$COMPARE" \
+            --argjson commits "$COMMIT_ITEMS" \
+            '{
+              type:"flex",
+              altText: ("🎉 อัปเดตใหม่บน " + $repo + " โดย " + $pusher),
+              contents: {
+                type:"bubble",
+                header:{ type:"box", layout:"vertical", backgroundColor:"#319754", paddingAll:"16px", spacing:"xs",
+                  contents:[
+                    { type:"text", text:"🎉 มีอัปเดตใหม่", color:"#ffffff", weight:"bold", size:"lg" },
+                    { type:"text", text:$repo, color:"#dcefe4", size:"sm" }
+                  ]},
+                body:{ type:"box", layout:"vertical", paddingAll:"16px", spacing:"sm",
+                  contents:[
+                    { type:"box", layout:"baseline", contents:[
+                      { type:"text", text:"🌿 branch", size:"sm", color:"#8a8f8a", flex:3 },
+                      { type:"text", text:$branch, size:"sm", color:"#111111", weight:"bold", flex:5, wrap:true } ]},
+                    { type:"box", layout:"baseline", contents:[
+                      { type:"text", text:"🙋 โดย", size:"sm", color:"#8a8f8a", flex:3 },
+                      { type:"text", text:$pusher, size:"sm", color:"#111111", flex:5, wrap:true } ]},
+                    { type:"separator", margin:"md" },
+                    { type:"text", text:("✨ สิ่งที่เปลี่ยน (" + $count + ")"), weight:"bold", size:"sm", color:"#319754", margin:"md" }
+                  ] + $commits },
+                footer:{ type:"box", layout:"vertical", contents:[
+                  { type:"button", style:"primary", color:"#319754", height:"sm",
+                    action:{ type:"uri", label:"👀 ดูบน GitHub", uri:$compare } } ]}
+              }
+            }')
+
+          BODY=$(jq -n --arg to "$LINE_GROUP_ID" --argjson flex "$FLEX" \
+            '{to: $to, messages: [$flex]}')
 
           curl -sS -X POST https://api.line.me/v2/bot/message/push \
             -H "Content-Type: application/json" \
