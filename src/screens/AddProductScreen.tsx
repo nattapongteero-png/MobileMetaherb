@@ -9,21 +9,34 @@ import {
   Check, Star, Zap, Eye, AlertCircle, ChevronDown, Boxes,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { getImagePicker } from "../utils/imagePicker";
+import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_MUTED, TEXT_SECONDARY } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const GRAY = "#8e8e93";
+
+// Thousands separators for number fields — display commas, store raw digits.
+const withCommas = (s: string) => {
+  if (!s) return s;
+  const [int, dec] = s.split(".");
+  const i = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return dec !== undefined ? `${i}.${dec}` : i;
+};
+const stripCommas = (s: string) => s.replace(/,/g, "");
 const INPUT = { backgroundColor: "#fafafa", borderRadius: 999, paddingHorizontal: 20, height: 48, fontSize: 14, color: "#0a0a0a" } as const;
 const AFFIX = { flexDirection: "row", alignItems: "center", backgroundColor: "#fafafa", borderRadius: 999, paddingHorizontal: 18, height: 48, gap: 8 } as const;
 
 const REGULAR_CATEGORIES = ["ผลิตภัณฑ์สมุนไพร", "เครื่องหอม & อโรม่า", "อาหารและเครื่องดื่ม", "ผลิตภัณฑ์สุขภาพ", "ชุดของชำร่วย/ของขวัญ"];
 const MATERIAL_CATEGORIES = ["ราก/หัว", "ใบ", "ดอก", "เปลือก", "ผล/เมล็ด", "เห็ด", "สมุนไพรรวม"];
 const UNITS = ["ชิ้น", "กล่อง", "ซอง", "ขวด"];
+const FORMATS = ["ผง", "แคปซูล", "เม็ด", "ชา / ชงดื่ม", "น้ำมันหอมระเหย", "ครีม / เจล", "ของเหลว", "แห้ง (ทั้งใบ/ชิ้น)", "อื่นๆ"];
 const PROCESSING = ["อบแห้ง", "สับ / ฝาน", "บด (ผง)", "คั่ว", "สกัด", "น้ำมันหอมระเหย", "อื่นๆ"];
 const PACKAGING = ["ถุงสุญญากาศ 1 กก.", "ถุง 5 กก.", "ถุง 10 กก.", "กระสอบ 25 กก.", "ตามที่ลูกค้ากำหนด"];
 const GRADES = ["พรีเมียม", "คัดสรร", "มาตรฐาน", "ทั่วไป", "ประหยัด"];
@@ -42,7 +55,7 @@ function FieldLabel({ children, required }: { children: ReactNode; required?: bo
 function Section({ Icon, title, subtitle, right, children }: { Icon: typeof Package; title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <View style={{ backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 18 }}>
-      <View className="flex-row items-start" style={{ gap: 12 }}>
+      <View className="flex-row" style={{ gap: 12, alignItems: subtitle ? "flex-start" : "center" }}>
         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
           <Icon size={20} color={BRAND_GREEN} strokeWidth={2.2} />
         </View>
@@ -65,20 +78,38 @@ function Section({ Icon, title, subtitle, right, children }: { Icon: typeof Pack
 
 // Number field with − / + steppers (pill). prefix (฿) / suffix (g, กก.) optional.
 function Stepper({ value, onChange, prefix, suffix, placeholder = "0", step = 1 }: { value: string; onChange: (v: string) => void; prefix?: string; suffix?: string; placeholder?: string; step?: number }) {
-  const bump = (d: number) => { const n = Math.max(0, (parseFloat(value) || 0) + d); onChange(String(n)); };
+  const bump = (d: number) => {
+    const n = Math.max(0, (parseFloat(value) || 0) + d);
+    onChange(String(n));
+    Haptics.selectionAsync().catch(() => {}); // tactile tick on each step
+  };
+  // Fitts's Law — a wide, tall touch target (44px, Apple HIG min) + generous
+  // hitSlop makes the steppers easy to hit. Pressed → circle highlight + scale.
+  const StepBtn = ({ onPress, children }: { onPress: () => void; children: ReactNode }) => {
+    const [pressed, setPressed] = useState(false);
+    return (
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        hitSlop={10}
+        style={{ width: 46, height: 44, alignItems: "center", justifyContent: "center" }}
+      >
+        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? "rgba(0,0,0,0.10)" : "transparent", transform: [{ scale: pressed ? 0.86 : 1 }] }}>
+          {children}
+        </View>
+      </Pressable>
+    );
+  };
   return (
-    <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingLeft: 16, paddingRight: 4, gap: 6 }}>
+    <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingLeft: 16, paddingRight: 2, gap: 6 }}>
       {prefix ? <Text style={{ fontSize: 14, color: GRAY }}>{prefix}</Text> : null}
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a", minWidth: 0 }} />
+      <TextInput value={withCommas(value)} onChangeText={(t) => onChange(stripCommas(t))} placeholder={placeholder} placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a", minWidth: 0 }} />
       {suffix ? <Text style={{ fontSize: 12, color: GRAY }}>{suffix}</Text> : null}
-      <View className="flex-row items-center" style={{ gap: 2 }}>
-        <Pressable onPress={() => bump(-step)} hitSlop={4} className="active:opacity-60" style={{ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" }}>
-          <Minus size={16} color="#6b7280" strokeWidth={2.4} />
-        </Pressable>
-        <View style={{ width: 1, height: 16, backgroundColor: "#e0e0e0" }} />
-        <Pressable onPress={() => bump(step)} hitSlop={4} className="active:opacity-60" style={{ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" }}>
-          <Plus size={16} color={BRAND_GREEN} strokeWidth={2.6} />
-        </Pressable>
+      <View className="flex-row items-center" style={{ backgroundColor: "#eceeeb", borderRadius: 999, height: 44, paddingHorizontal: 2 }}>
+        <StepBtn onPress={() => bump(-step)}><Minus size={16} color="#6b7280" strokeWidth={2.4} /></StepBtn>
+        <View style={{ width: 1, height: 18, backgroundColor: "#d3d6d1" }} />
+        <StepBtn onPress={() => bump(step)}><Plus size={16} color={BRAND_GREEN} strokeWidth={2.6} /></StepBtn>
       </View>
     </View>
   );
@@ -128,12 +159,16 @@ function MultiChip({ options, values, onToggle }: { options: string[]; values: s
   );
 }
 
-// Settings card — gradient + icon circle + toggle (web parity).
-function SettingCard({ Icon, label, subtitle, value, onValueChange, accent }: { Icon: typeof Package; label: string; subtitle: string; value: boolean; onValueChange: (v: boolean) => void; accent: string }) {
+// Settings card — gradient + icon circle + toggle + decorative image (web parity).
+function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, image }: { Icon: typeof Package; label: string; subtitle: string; value: boolean; onValueChange: (v: boolean) => void; accent: string; image?: number }) {
   return (
     <View style={{ borderRadius: 20, padding: 18, overflow: "hidden", borderWidth: 1, borderColor: value ? accent + "33" : "#f0f0f0", backgroundColor: value ? undefined : "#fafafa" }}>
       {value ? (
         <LinearGradient colors={[accent + "16", accent + "08"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} />
+      ) : null}
+      {/* Decorative illustration — bottom-right */}
+      {image ? (
+        <Image source={image} style={{ position: "absolute", right: -6, bottom: -8, width: 82, height: 82, opacity: value ? 0.92 : 0.42 }} resizeMode="contain" />
       ) : null}
       <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
         <View className="flex-row items-center" style={{ gap: 10, flex: 1 }}>
@@ -142,15 +177,18 @@ function SettingCard({ Icon, label, subtitle, value, onValueChange, accent }: { 
           </View>
           <Text style={{ fontSize: 15, fontWeight: "600", color: "#0a0a0a" }}>{label}</Text>
         </View>
-        <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#d4d4d4", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#d4d4d4" />
+        <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#e9e9ea", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#e9e9ea" />
       </View>
-      <View className="flex-row items-start" style={{ gap: 5, marginTop: 10 }}>
+      <View className="flex-row items-start" style={{ gap: 5, marginTop: 10, paddingRight: 78 }}>
         <AlertCircle size={13} color="#bdbdbd" strokeWidth={2.2} style={{ marginTop: 1 }} />
         <Text style={{ flex: 1, fontSize: 12, color: GRAY, lineHeight: 17 }}>{subtitle}</Text>
       </View>
     </View>
   );
 }
+
+const IMG_SELL = require("../../assets/shop-open.png");
+const IMG_RECOMMEND = require("../../assets/test-product.png");
 
 export function AddProductScreen() {
   const nav = useNavigation<Nav>();
@@ -233,9 +271,8 @@ export function AddProductScreen() {
     } else if (!price.trim() || !stock.trim()) {
       return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกราคาและสต็อก");
     }
-    Alert.alert("บันทึกสำเร็จ", `${title} "${name}" เรียบร้อย (ตัวอย่าง — ยังไม่เชื่อมระบบจริง)`, [
-      { text: "ตกลง", onPress: () => nav.canGoBack() && nav.goBack() },
-    ]);
+    showToast(`${title} "${name}" เรียบร้อย`);
+    if (nav.canGoBack()) nav.goBack();
   };
 
   const previewPrice = Number(basePrice) || 0;
@@ -284,16 +321,18 @@ export function AddProductScreen() {
             <FieldLabel required>ชื่อสินค้า</FieldLabel>
             <TextInput value={name} onChangeText={setName} placeholder={isMaterial ? "เช่น: ขมิ้นชันผง" : "เช่น: ยาดมสมุนไพร"} placeholderTextColor="#a3a3a3" style={INPUT} />
           </View>
-          <View>
-            <FieldLabel required>หมวดหมู่</FieldLabel>
-            <SelectField value={category} placeholder="เลือกหมวดหมู่" onPress={() => openPicker("เลือกหมวดหมู่", isMaterial ? MATERIAL_CATEGORIES : REGULAR_CATEGORIES, category, setCategory)} />
-          </View>
-          {!isMaterial ? (
-            <View>
-              <FieldLabel>หน่วย</FieldLabel>
-              <SelectField value={unit} placeholder="เลือกหน่วย" onPress={() => openPicker("เลือกหน่วย", UNITS, unit, setUnit)} />
+          <View className="flex-row" style={{ gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <FieldLabel required>หมวดหมู่</FieldLabel>
+              <SelectField value={category} placeholder="เลือกหมวดหมู่" onPress={() => openPicker("เลือกหมวดหมู่", isMaterial ? MATERIAL_CATEGORIES : REGULAR_CATEGORIES, category, setCategory)} />
             </View>
-          ) : null}
+            {!isMaterial ? (
+              <View style={{ flex: 1 }}>
+                <FieldLabel>หน่วย</FieldLabel>
+                <SelectField value={unit} placeholder="เลือกหน่วย" onPress={() => openPicker("เลือกหน่วย", UNITS, unit, setUnit)} />
+              </View>
+            ) : null}
+          </View>
           <View>
             <FieldLabel>รหัสสินค้า (SKU)</FieldLabel>
             <View style={[INPUT, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
@@ -303,7 +342,7 @@ export function AddProductScreen() {
           </View>
           <View>
             <FieldLabel>รูปแบบสินค้า</FieldLabel>
-            <TextInput value={format} onChangeText={setFormat} placeholder="เช่น: ผง, แคปซูล, ใบชาอบแห้ง" placeholderTextColor="#a3a3a3" style={INPUT} />
+            <SelectField value={format} placeholder="เลือกรูปแบบสินค้า" onPress={() => openPicker("รูปแบบสินค้า", FORMATS, format, setFormat)} />
           </View>
           <View>
             <FieldLabel>ยี่ห้อ / แบรนด์</FieldLabel>
@@ -336,10 +375,7 @@ export function AddProductScreen() {
             <View><FieldLabel>บรรจุภัณฑ์เริ่มต้น</FieldLabel><SelectField value={packaging} placeholder="เลือกบรรจุภัณฑ์" onPress={() => openPicker("บรรจุภัณฑ์เริ่มต้น", PACKAGING, packaging, setPackaging)} /></View>
             <View>
               <FieldLabel>อายุการเก็บรักษา (เดือน)</FieldLabel>
-              <View style={AFFIX}>
-                <TextInput value={shelfLife} onChangeText={setShelfLife} placeholder="12" placeholderTextColor="#a3a3a3" keyboardType="number-pad" style={{ flex: 1, fontSize: 14, color: "#0a0a0a" }} />
-                <Text style={{ fontSize: 12, color: GRAY }}>เดือน</Text>
-              </View>
+              <Stepper value={shelfLife} onChange={setShelfLife} suffix="เดือน" placeholder="12" />
             </View>
             <View><FieldLabel>ใบรับรองมาตรฐาน</FieldLabel><MultiChip options={CERTS} values={certs} onToggle={toggleCert} /></View>
           </Section>
@@ -349,53 +385,43 @@ export function AddProductScreen() {
         {isMaterial ? (
         <Section Icon={Banknote} title="ตั้งราคา" subtitle="ราคาฐานต่อ กก. + MOQ — ซื้อมากขึ้นราคาต่อ กก. ลดลงได้">
           <>
-              <View className="flex-row" style={{ gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <FieldLabel required>ราคาฐาน / กก.</FieldLabel>
-                  <View style={AFFIX}>
-                    <Text style={{ fontSize: 14, color: GRAY }}>฿</Text>
-                    <TextInput value={basePrice} onChangeText={setBasePrice} placeholder="200" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a" }} />
-                    <Text style={{ fontSize: 12, color: GRAY }}>/ กก.</Text>
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <FieldLabel required>MOQ ขั้นต่ำ</FieldLabel>
-                  <View style={AFFIX}>
-                    <TextInput value={moq} onChangeText={setMoq} placeholder="1" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a" }} />
-                    <Text style={{ fontSize: 12, color: GRAY }}>กก.</Text>
-                  </View>
-                </View>
+              <View>
+                <FieldLabel required>ราคาฐาน / กก.</FieldLabel>
+                <Stepper value={basePrice} onChange={setBasePrice} prefix="฿" suffix="/ กก." placeholder="200" />
+              </View>
+              <View>
+                <FieldLabel required>MOQ ขั้นต่ำ</FieldLabel>
+                <Stepper value={moq} onChange={setMoq} suffix="กก." placeholder="1" />
               </View>
               <View>
                 <FieldLabel required>คงเหลือ</FieldLabel>
-                <View style={AFFIX}>
-                  <TextInput value={matStock} onChangeText={setMatStock} placeholder="500" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a" }} />
-                  <Text style={{ fontSize: 12, color: GRAY }}>กก.</Text>
-                </View>
+                <Stepper value={matStock} onChange={setMatStock} suffix="กก." placeholder="500" />
               </View>
               <View>
                 <FieldLabel>ราคาขายส่ง (ส่วนลดตามปริมาณ)</FieldLabel>
                 <View style={{ gap: 8 }}>
                   {tiers.map((t, i) => (
-                    <View key={i} className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 16, padding: 10, gap: 8, flexWrap: "wrap" }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(49,151,84,0.12)", alignItems: "center", justifyContent: "center" }}>
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: BRAND_GREEN }}>{i + 1}</Text>
+                    <View key={i} style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#ececec", borderRadius: 16, padding: 12, gap: 10 }}>
+                      <View className="flex-row items-center justify-between">
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(49,151,84,0.12)", alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: BRAND_GREEN }}>{i + 1}</Text>
+                        </View>
+                        {tiers.length > 1 ? (
+                          <Pressable onPress={() => removeTier(i)} hitSlop={6} className="active:opacity-70" style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" }}>
+                            <Trash2 size={16} color="#ef4444" strokeWidth={2.2} />
+                          </Pressable>
+                        ) : null}
                       </View>
-                      <Text style={{ fontSize: 12.5, color: GRAY }}>ตั้งแต่</Text>
-                      <View className="flex-row items-center" style={{ backgroundColor: "#fff", borderRadius: 999, height: 38, paddingHorizontal: 12, gap: 4 }}>
-                        <TextInput value={t.minQty} onChangeText={(v) => setTier(i, "minQty", v)} placeholder="0" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ width: 44, fontSize: 14, color: "#0a0a0a", textAlign: "right" }} />
-                        <Text style={{ fontSize: 11.5, color: GRAY }}>กก.</Text>
+                      <View style={{ gap: 10 }}>
+                        <View>
+                          <Text style={{ fontSize: 12.5, color: GRAY, marginBottom: 6 }}>ตั้งแต่ (กก.)</Text>
+                          <Stepper value={t.minQty} onChange={(v) => setTier(i, "minQty", v)} suffix="กก." placeholder="0" />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 12.5, color: GRAY, marginBottom: 6 }}>ราคา / กก.</Text>
+                          <Stepper value={t.price} onChange={(v) => setTier(i, "price", v)} prefix="฿" placeholder="0" />
+                        </View>
                       </View>
-                      <Text style={{ fontSize: 12.5, color: GRAY }}>ราคา</Text>
-                      <View className="flex-row items-center" style={{ backgroundColor: "#fff", borderRadius: 999, height: 38, paddingHorizontal: 12, gap: 4 }}>
-                        <Text style={{ fontSize: 12.5, color: GRAY }}>฿</Text>
-                        <TextInput value={t.price} onChangeText={(v) => setTier(i, "price", v)} placeholder="0" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ width: 52, fontSize: 14, color: "#0a0a0a", textAlign: "right" }} />
-                      </View>
-                      {tiers.length > 1 ? (
-                        <Pressable onPress={() => removeTier(i)} hitSlop={6} className="active:opacity-70" style={{ marginLeft: "auto", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" }}>
-                          <Trash2 size={15} color="#ef4444" strokeWidth={2.2} />
-                        </Pressable>
-                      ) : null}
                     </View>
                   ))}
                   <Pressable onPress={addTier} className="flex-row items-center justify-center active:opacity-70"
@@ -423,7 +449,7 @@ export function AddProductScreen() {
           Icon={Boxes}
           title="ตัวเลือกสินค้า"
           subtitle="เปิดใช้งานหากสินค้ามีหลายตัวเลือก เช่น ขนาด, สี"
-          right={<Switch value={hasVariants} onValueChange={setHasVariants} trackColor={{ false: "#d4d4d4", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#d4d4d4" />}
+          right={<Switch value={hasVariants} onValueChange={setHasVariants} trackColor={{ false: "#e9e9ea", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#e9e9ea" />}
         >
           {!hasVariants ? (
             <>
@@ -432,7 +458,7 @@ export function AddProductScreen() {
                 <Stepper value={price} onChange={setPrice} prefix="฿" placeholder="0.00" />
               </View>
               <View>
-                <FieldLabel required>จำนวนสินค้าคงเหลือ</FieldLabel>
+                <FieldLabel required>สินค้าคงเหลือ</FieldLabel>
                 <Stepper value={stock} onChange={setStock} placeholder="0" />
               </View>
               <View>
@@ -473,15 +499,13 @@ export function AddProductScreen() {
                     <FieldLabel required>ราคา</FieldLabel>
                     <Stepper value={v.price} onChange={(t) => setVar(i, "price", t)} prefix="฿" placeholder="0.00" />
                   </View>
-                  <View className="flex-row" style={{ gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <FieldLabel required>คงเหลือ</FieldLabel>
-                      <Stepper value={v.stock} onChange={(t) => setVar(i, "stock", t)} placeholder="0" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <FieldLabel required>น้ำหนัก</FieldLabel>
-                      <Stepper value={v.weight} onChange={(t) => setVar(i, "weight", t)} suffix="g" placeholder="0" />
-                    </View>
+                  <View>
+                    <FieldLabel required>คงเหลือ</FieldLabel>
+                    <Stepper value={v.stock} onChange={(t) => setVar(i, "stock", t)} placeholder="0" />
+                  </View>
+                  <View>
+                    <FieldLabel required>น้ำหนัก (กรัม)</FieldLabel>
+                    <Stepper value={v.weight} onChange={(t) => setVar(i, "weight", t)} suffix="g" placeholder="0" />
                   </View>
                 </View>
               ))}
@@ -497,27 +521,31 @@ export function AddProductScreen() {
 
         {/* ตั้งค่าสินค้า */}
         <Section Icon={Settings2} title="ตั้งค่าสินค้า">
-          <SettingCard Icon={Eye} label="เปิดขาย" subtitle="แสดงสินค้านี้บนหน้าร้านให้ลูกค้ามองเห็นและสั่งซื้อได้" value={active} onValueChange={setActive} accent={BRAND_GREEN} />
+          <SettingCard Icon={Eye} label="เปิดขาย" subtitle="แสดงสินค้านี้บนหน้าร้านให้ลูกค้ามองเห็นและสั่งซื้อได้" value={active} onValueChange={setActive} accent={BRAND_GREEN} image={IMG_SELL} />
           {!isMaterial ? (
-            <>
-              <SettingCard Icon={Star} label="สินค้าแนะนำ" subtitle="ปักหมุดสินค้านี้ในส่วนแนะนำบนหน้าร้าน" value={recommended} onValueChange={setRecommended} accent="#f7931d" />
-              <SettingCard Icon={Zap} label="Flash Sale" subtitle="เข้าร่วมแคมเปญลดราคาแบบจำกัดเวลา" value={flash} onValueChange={setFlash} accent="#e62e05" />
-            </>
+            <SettingCard Icon={Star} label="สินค้าแนะนำ" subtitle="ปักหมุดสินค้านี้ในส่วนแนะนำบนหน้าร้าน" value={recommended} onValueChange={setRecommended} accent="#f7931d" image={IMG_RECOMMEND} />
           ) : null}
         </Section>
       </ScrollView>
 
-      {/* Save bar */}
-      <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: insets.bottom + 10, backgroundColor: "rgba(250,250,250,0.97)", borderTopWidth: 1, borderTopColor: "#ececec", gap: 8 }}>
-        <Pressable onPress={onSave} className="flex-row items-center justify-center active:opacity-90"
-          style={{ height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8, shadowColor: BRAND_GREEN, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10 }}>
-          <Check size={20} color="#fff" strokeWidth={2.6} />
-          <Text style={{ fontSize: 15.5, fontWeight: "700", color: "#fff" }}>{title}</Text>
-        </Pressable>
-        <Pressable onPress={() => nav.canGoBack() && nav.goBack()} className="items-center justify-center active:opacity-70"
-          style={{ height: 46, borderRadius: 999, borderWidth: 1, borderColor: "#ff3b30" }}>
-          <Text style={{ fontSize: 14.5, fontWeight: "600", color: "#ff3b30" }}>ยกเลิก</Text>
-        </Pressable>
+      {/* Footer — floating Liquid Glass bar (same style as the ProductDetail buy bar) */}
+      <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 130 }} />
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insets.bottom + 10 }}>
+        <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
+            {/* Cancel — circular glass button */}
+            <Pressable hitSlop={6} className="active:opacity-70" onPress={() => nav.canGoBack() && nav.goBack()}>
+              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor="rgba(255,59,48,0.1)" isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
+                <X size={22} color="#ff3b30" strokeWidth={2.4} />
+              </GlassView>
+            </Pressable>
+            {/* Save — primary pill */}
+            <Pressable onPress={onSave} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}>
+              <Check size={20} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>{title}</Text>
+            </Pressable>
+          </GlassView>
+        </View>
       </View>
 
       {/* Option picker sheet — radio rows in a white card (matches Sort/Filter sheets) */}

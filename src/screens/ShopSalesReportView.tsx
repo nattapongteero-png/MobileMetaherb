@@ -56,7 +56,7 @@ export function PeriodTabs({ period, onChange }: { period: Period; onChange: (p:
   const pos = useRef(new Animated.Value(idx)).current;
   const [segW, setSegW] = useState(0);
   useEffect(() => {
-    Animated.spring(pos, { toValue: idx, useNativeDriver: true, friction: 9, tension: 90 }).start();
+    Animated.timing(pos, { toValue: idx, duration: 100, useNativeDriver: true }).start();
   }, [idx, pos]);
   const translateX = pos.interpolate({ inputRange: [0, PERIODS.length - 1], outputRange: [0, segW * (PERIODS.length - 1)] });
   return (

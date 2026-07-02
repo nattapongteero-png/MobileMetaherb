@@ -156,7 +156,6 @@ function PromoCard({ p, width, onMenu }: { p: Promotion; width: number; onMenu: 
         {/* Decorative promotion-card watermark (web imgPromoCard) */}
         <Image
           source={require("../../assets/promotioncard.png")}
-          pointerEvents="none"
           resizeMode="contain"
           style={{ position: "absolute", bottom: -12, right: -12, width: 112, height: 112, opacity: isEnded ? 0.5 : 0.9 }}
         />

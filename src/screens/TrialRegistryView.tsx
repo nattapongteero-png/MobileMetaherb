@@ -344,7 +344,7 @@ export function TrialRegistryOwnerSection() {
       )}
 
       {/* Per-product action sheet (replaces the web row "⋯" popover) */}
-      <BottomSheet visible={!!sheetFor} onClose={() => setSheetFor(null)} title={sheetFor?.name ?? ""} minHeightRatio={0.42} maxHeightRatio={0.6}>
+      <BottomSheet visible={!!sheetFor} onClose={() => setSheetFor(null)} centerTitle title={sheetFor?.name ?? ""} minHeightRatio={0.1} maxHeightRatio={0.6}>
         {sheetFor ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 4 }}>
             {/* เปิดรับสมัคร toggle */}
@@ -353,8 +353,9 @@ export function TrialRegistryOwnerSection() {
               <Switch
                 value={!isClosed(sheetFor)}
                 onValueChange={(on) => setManualClosed((m) => ({ ...m, [sheetFor.id]: !on }))}
-                trackColor={{ false: "#d4d4d4", true: BRAND_GREEN }}
+                trackColor={{ false: "#e9e9ea", true: BRAND_GREEN }}
                 thumbColor="#fff"
+                ios_backgroundColor="#e9e9ea"
               />
             </View>
             <View style={{ height: 1, backgroundColor: DIVIDER_GRAY }} />

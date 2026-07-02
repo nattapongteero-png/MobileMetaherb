@@ -1069,6 +1069,7 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
 
       {/* Read-only evaluation sheet */}
       <BottomSheet
+        centerTitle
         visible={!!evalReg}
         onClose={() => setEvalReg(null)}
         title="แบบประเมินจากผู้ทดสอบ"
