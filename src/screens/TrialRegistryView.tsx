@@ -128,7 +128,7 @@ function ProductCard({
   return (
     <Pressable
       onPress={onOpen}
-      className="active:opacity-90"
+      className="active:opacity-80"
       style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14, gap: 12 }}
     >
       {/* Product identity + action menu */}

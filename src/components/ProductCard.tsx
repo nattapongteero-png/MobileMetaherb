@@ -117,7 +117,7 @@ export function ProductCard({ product, width, preview, onPress }: { product: Pro
         shadowRadius: 10,
         elevation: 3,
       }}
-      className="bg-white rounded-2xl border border-[#d4d4d4] overflow-hidden active:opacity-90 active:scale-95"
+      className="bg-white rounded-2xl border border-[#d4d4d4] overflow-hidden active:opacity-80"
     >
       {/* Image area */}
       <View className="flex-1 relative bg-gray-100">

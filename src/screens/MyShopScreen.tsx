@@ -3739,7 +3739,7 @@ function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; on
       {/* Front: main white product card (stacks above the gray pill tray) */}
       <Pressable
         onPress={onPreview}
-        className="flex-row active:bg-neutral-50"
+        className="flex-row active:opacity-80"
         style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: "#ececed", padding: 12, gap: 12, zIndex: 2 }}
       >
         {/* Thumbnail */}

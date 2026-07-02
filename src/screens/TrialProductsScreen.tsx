@@ -493,6 +493,7 @@ function TrialCard({ p, onOpen, width }: { p: TrialProduct; onOpen: () => void; 
   return (
     <Pressable
       onPress={onOpen}
+      className="active:opacity-80"
       style={{
         width,
         backgroundColor: "#fff",

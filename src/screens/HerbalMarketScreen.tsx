@@ -207,6 +207,7 @@ export function MaterialCard({
   return (
     <Pressable
       onPress={onPress}
+      className="active:opacity-80"
       style={{
         width,
         backgroundColor: "#fff",

@@ -298,7 +298,7 @@ function RelatedTrialCard({ p, onPress, width }: { p: TrialCard; onPress: () => 
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-90"
+      className="active:opacity-80"
       style={{ width: width ?? 188, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden", opacity: isClosed ? 0.7 : 1 }}
     >
       <View style={{ width: "100%", height: 130, backgroundColor: palette.bg, borderTopLeftRadius: 15, borderTopRightRadius: 15, overflow: "hidden" }}>

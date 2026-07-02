@@ -332,7 +332,7 @@ function MarketCard({ m, width, onPress }: { m: HerbalMaterial; width: number; o
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-90"
+      className="active:opacity-80"
       style={{ width, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" }}
     >
       {/* Image — 4:3 like the web market card */}
@@ -409,7 +409,7 @@ function TrialMiniCard({ p, width, onPress }: { p: TrialProduct; width: number; 
   return (
     <Pressable
       onPress={onPress}
-      className="active:opacity-90"
+      className="active:opacity-80"
       style={{ width, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden", opacity: isClosed ? 0.7 : 1 }}
     >
       {/* Hero — tier-colored bg + image (own top radius so the image clips on iOS) */}

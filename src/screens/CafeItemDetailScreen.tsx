@@ -18,6 +18,7 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { CAFE_MENU } from "../data/cafeMenu";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Rt = RouteProp<RootStackParamList, "CafeItemDetail">;
@@ -45,6 +46,8 @@ export function CafeItemDetailScreen() {
   const { item, editKey, initial } = useRoute<Rt>().params;
   const { add, removeKey, toggleFavorite, isFavorite } = useCafeCart();
   const isDrink = item.mainId === "drink";
+  // Same top-6 ranking as the café list — show "อันดับ N" only for the best sellers.
+  const hitRank = CAFE_MENU.filter((m) => m.popular).slice(0, 6).findIndex((m) => m.id === item.id) + 1;
 
   const [sweet, setSweet] = useState(initial?.sweet ?? SWEET_DEFAULT);
   const [milk, setMilk] = useState(initial?.milk ?? 0);
@@ -88,7 +91,7 @@ export function CafeItemDetailScreen() {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 130 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
         scrollEventThrottle={16}
       >
@@ -97,10 +100,10 @@ export function CafeItemDetailScreen() {
           <Pressable onPress={() => setViewerOpen(true)} style={{ width: "100%", height: "100%" }}>
             <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
           </Pressable>
-          {item.popular ? (
+          {hitRank > 0 ? (
             <View style={{ position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(234,88,12,0.95)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
               <Flame size={12} color="#fff" strokeWidth={2.6} />
-              <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>เมนูฮิต</Text>
+              <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>อันดับ {hitRank}</Text>
             </View>
           ) : null}
         </Animated.View>

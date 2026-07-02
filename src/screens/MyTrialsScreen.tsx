@@ -175,7 +175,7 @@ function TrialItemCard({
   })();
 
   return (
-    <Pressable onPress={onView} className="active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececed", padding: 16, gap: 12 }}>
+    <Pressable onPress={onView} className="active:opacity-80" style={{ backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececed", padding: 16, gap: 12 }}>
       {/* Shop logo + name + stage badge */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>

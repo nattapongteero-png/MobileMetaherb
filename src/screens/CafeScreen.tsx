@@ -323,18 +323,13 @@ export function CafeScreen() {
 
 function CafeCard({ it, rank, qty, onOpen, onInc, onDec }: { it: CafeItem; rank?: number; qty: number; onOpen: () => void; onInc: () => void; onDec: () => void }) {
   return (
-    <Pressable onPress={onOpen} className="active:opacity-90" style={{ width: CARD_W, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#f0f0f0", overflow: "hidden" }}>
+    <Pressable onPress={onOpen} className="active:opacity-80" style={{ width: CARD_W, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#f0f0f0", overflow: "hidden" }}>
       <View style={{ width: "100%", height: CARD_W, backgroundColor: "#f5f5f5" }}>
         <Image source={it.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
         {rank ? (
           <View style={{ position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(234,88,12,0.95)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
             <Flame size={10} color="#fff" strokeWidth={2.6} />
             <Text style={{ fontSize: 9.5, fontWeight: "800", color: "#fff" }}>อันดับ {rank}</Text>
-          </View>
-        ) : it.popular ? (
-          <View style={{ position: "absolute", top: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(234,88,12,0.92)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Flame size={10} color="#fff" strokeWidth={2.6} />
-            <Text style={{ fontSize: 9.5, fontWeight: "800", color: "#fff" }}>ฮิต</Text>
           </View>
         ) : null}
       </View>
