@@ -79,7 +79,7 @@ export function ShopComplaintsView() {
 
   return (
     <View style={{ gap: 12 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2, paddingRight: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingVertical: 2, paddingHorizontal: 16 }}>
         {chips.map((ch) => {
           const active = filter === ch.key;
           return (

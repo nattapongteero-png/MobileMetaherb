@@ -29,13 +29,20 @@ type Props = {
   /** Close-X left + centered title + no right action (the detail-sheet header
    *  style). Ignored when onDone is set. */
   centerTitle?: boolean;
+  /** Optional line under the title (centerTitle header only) — e.g. a summary. */
+  centerSubtitle?: ReactNode;
   /** Min height as ratio of screen (default 0.6). */
   minHeightRatio?: number;
   /** Max height as ratio of screen (default 0.9). */
   maxHeightRatio?: number;
   /** Force a flex:1 content area (so a scrollable child fills + scrolls) even
-   *  with centerTitle. Use for search+list picker sheets. */
+   *  with centerTitle. Use for search+list picker sheets. (`fillContent` is an alias.) */
   fill?: boolean;
+  /** Alias of `fill` — flex:1 content area so a footer can pin to the bottom. */
+  fillContent?: boolean;
+  /** Hide the drag handle + header entirely so children can render a full-bleed
+   *  hero at the very top (children own the top rounded corners + close button). */
+  noHeader?: boolean;
 };
 
 /**
@@ -53,9 +60,12 @@ export function BottomSheet({
   children,
   onDone,
   centerTitle,
+  centerSubtitle,
   minHeightRatio = 0.6,
   maxHeightRatio = 0.9,
   fill,
+  fillContent,
+  noHeader,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(false);
@@ -155,7 +165,7 @@ export function BottomSheet({
             }}
           >
             {/* Drag handle — hidden for the detail-sheet (centerTitle) style */}
-            {centerTitle ? (
+            {noHeader ? null : centerTitle ? (
               <View style={{ height: 16 }} />
             ) : (
               <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 8 }}>
@@ -171,8 +181,8 @@ export function BottomSheet({
             )}
 
             {/* Header — iOS filter-sheet style (X / title / green ✓) when onDone
-                is set, otherwise the default title + close. */}
-            {onDone ? (
+                is set, otherwise the default title + close. Skipped for noHeader. */}
+            {noHeader ? null : onDone ? (
               <View
                 className="flex-row items-center justify-between"
                 style={{ paddingHorizontal: 16, paddingBottom: 12 }}
@@ -218,7 +228,10 @@ export function BottomSheet({
                 <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
                   <X size={22} color="#1a1a1a" strokeWidth={2.6} />
                 </GlassIconButton>
-                <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
+                <View style={{ flex: 1, alignItems: "center", paddingHorizontal: 4 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
+                  {centerSubtitle ? <View style={{ marginTop: 8 }}>{centerSubtitle}</View> : null}
+                </View>
                 <View style={{ width: 44 }} />
               </View>
             ) : (
@@ -256,7 +269,7 @@ export function BottomSheet({
                 hug their content (no flex:1) so the sheet height fits exactly. */}
             <View
               style={{
-                flex: fill || !centerTitle ? 1 : undefined,
+                flex: fill || fillContent || !centerTitle ? 1 : undefined,
                 paddingBottom: insets.bottom,
               }}
             >

@@ -1,0 +1,38 @@
+name: LINE daily reminder
+
+# เตือนทุกวัน 17:15 น. (เวลาไทย) → LINE group
+# 17:15 ICT (UTC+7) = 10:15 UTC
+# หมายเหตุ: GitHub cron อาจดีเลย์ 5–15 นาที และจะหยุดถ้า repo ไม่มี activity 60 วัน
+on:
+  schedule:
+    - cron: "15 10 * * *"
+  workflow_dispatch: {}   # กดรันเองได้จากแท็บ Actions (ไว้ทดสอบ)
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send LINE reminder
+        env:
+          LINE_TOKEN: ${{ secrets.LINE_TOKEN }}
+          LINE_GROUP_ID: ${{ secrets.LINE_GROUP_ID }}
+        run: |
+          if [ -z "$LINE_TOKEN" ] || [ -z "$LINE_GROUP_ID" ]; then
+            echo "LINE_TOKEN / LINE_GROUP_ID not set — skipping."; exit 0
+          fi
+
+          TEXT="⏰ เตือนความจำประจำวัน
+          อย่าลืมอัปเดต Blog และ Taiga วันนี้ด้วยนะ 📝✅"
+
+          echo "$LINE_GROUP_ID" | tr ',' '\n' | while read -r GID; do
+            GID=$(echo "$GID" | xargs)
+            [ -z "$GID" ] && continue
+            BODY=$(jq -n --arg to "$GID" --arg text "$TEXT" \
+              '{to: $to, messages: [{type: "text", text: $text}]}')
+            echo "→ reminder to $GID"
+            curl -sS -X POST https://api.line.me/v2/bot/message/push \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $LINE_TOKEN" \
+              -d "$BODY"
+            echo ""
+          done

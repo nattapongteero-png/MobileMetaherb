@@ -351,7 +351,8 @@ Button, Input, Card (Product/Order/etc.), Modal/BottomSheet, Toast, Avatar, Badg
 | Need to... | Reach for... |
 |---|---|
 | Reduce options on screen | Hick's Law, Choice Overload |
-| Make tap target reliable | Fitts's Law |
+| Make tap target reliable | Fitts's Law (≥44/48, hitSlop) |
+| Space / size an element | 8-Point Grid — spacing only (4 / 8 / 16 / 24 / 48); fonts use Type Scale |
 | Make app feel responsive | Doherty Threshold, Aesthetic-Usability |
 | Pick an animation duration | Animation Timing — 100 ms (feedback) / 300 ms (transition) / 500 ms+ (major) |
 | Group related content | Proximity, Common Region, Uniform Connectedness |
@@ -428,6 +429,27 @@ Always set `lineHeight` ~1.2× of `fontSize` on RN Text + `includeFontPadding: f
 | `2xl` | 16 | Section cards, product cards, banner |
 | `pill` | 9999 | Discount pill, CTA button, input, social button |
 
+### Spacing System — 8-Point Grid (spacing & size ONLY, not font-size)
+
+> Governs **spacing & dimensions**: padding, margin, gap, box width/height, touch targets.
+> **Font-size is exempt** — it follows the Type Scale under [Typography]. Never snap fonts to 8.
+
+**Rule:** every spacing/size value is a multiple of **4** — default to **8**, use **4** only for fine detail. Never eyeball `10 / 13 / 15` for spacing.
+
+| Step | px | Use |
+|---|---|---|
+| xs | **4** | icon ↔ text gap, tiny detail, small-pill padding |
+| sm | **8** | in-button padding, title → content gap, **min gap between buttons** |
+| md | **16** | screen-edge padding, card padding |
+| lg | **24 / 32** | section / category separation |
+| xl | **48 / 64** | hero / page header |
+
+- 12 (= 4×3) is allowed as a 4-step (e.g. grid gaps); avoid 10 / 14 / 18 — round to 8 / 12 / 16 / 20.
+- **Touch target**: min **44×44 pt (iOS)** / **48×48 dp (Android)**. Smaller visual → extend with `hitSlop` (RN) / padding (web), don't bloat the box.
+- **Button height (mobile)**: 42–72; project default **48** (primary). Legacy `49` tolerated — snap to 48 when you touch the file.
+- **Min gap between adjacent buttons**: 8 (prevents mis-taps, Fitts's Law).
+- **Web-parity exception:** when porting from web, keep a value only if changing it would break visual parity; otherwise **snap spacing to the grid** (10→8, 14→16, 6→8). Parity applies to the *look*, not to odd numbers.
+
 ### Spacing & Layout
 
 - **Section horizontal padding**: 16px (mobile) / 24 (sm) / 48 (lg).
@@ -454,6 +476,7 @@ Always set `lineHeight` ~1.2× of `fontSize` on RN Text + `includeFontPadding: f
 ### Component Patterns
 
 #### Button
+- Touch target ≥ 44 (iOS) / 48 (Android); height range 42–72; **≥ 8px gap** between adjacent buttons. Spacing snaps to the 8-Point Grid.
 - **Primary**: bg `#008c45` (hover `#007a3b`), white text, height 49px, `rounded-full`, 14px font-medium.
 - **Outline / Social**: border `#d4d4d4`, gray-700 text, height 40, `rounded-full`, 11–12px font-medium.
 - **Chip / Pill button**: bg `${primary}/10`, primary text, px-4 py-1.5, 12px font.

@@ -234,7 +234,7 @@ function GenderSection({ applicants, genderStats }: { applicants: Registration[]
         </View>
       )}
 
-      <BottomSheet visible={!!sel} onClose={() => setSel(null)} title={sel?.label ?? ""} minHeightRatio={0.4} maxHeightRatio={0.5}>
+      <BottomSheet centerTitle visible={!!sel} onClose={() => setSel(null)} title={sel?.label ?? ""} minHeightRatio={0.4} maxHeightRatio={0.5}>
         {sel && d ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
             <View className="flex-row items-center" style={{ gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
@@ -360,7 +360,7 @@ function AgeSection({ applicants, ageStats }: { applicants: Registration[]; ageS
         </>
       )}
 
-      <BottomSheet visible={!!sel} onClose={() => setSel(null)} title={`ช่วงอายุ ${sel ?? ""}`} minHeightRatio={0.4} maxHeightRatio={0.5}>
+      <BottomSheet centerTitle visible={!!sel} onClose={() => setSel(null)} title={`ช่วงอายุ ${sel ?? ""}`} minHeightRatio={0.4} maxHeightRatio={0.5}>
         {sel && d ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
             <View className="flex-row items-center" style={{ gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
@@ -525,7 +525,7 @@ function SatisfactionSection({ evaluated }: { evaluated: Registration[] }) {
         })}
       </View>
 
-      <BottomSheet visible={selStar != null} onClose={() => setSelStar(null)} title={`${selStar ?? ""} ดาว`} minHeightRatio={0.4} maxHeightRatio={0.55}>
+      <BottomSheet centerTitle visible={selStar != null} onClose={() => setSelStar(null)} title={`${selStar ?? ""} ดาว`} minHeightRatio={0.4} maxHeightRatio={0.55}>
         {selStar != null && sd ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
             <View className="flex-row items-center" style={{ gap: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
@@ -632,7 +632,7 @@ function NpsSection({ evaluated }: { evaluated: Registration[] }) {
         </>
       )}
 
-      <BottomSheet visible={!!selBucket} onClose={() => setSelBucket(null)} title={selBucket?.label ?? ""} minHeightRatio={0.45} maxHeightRatio={0.65}>
+      <BottomSheet centerTitle visible={!!selBucket} onClose={() => setSelBucket(null)} title={selBucket?.label ?? ""} minHeightRatio={0.45} maxHeightRatio={0.65}>
         {selBucket && bd ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
             <View className="flex-row items-center" style={{ gap: 8, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
@@ -910,7 +910,7 @@ function CondBody({ stat }: { stat: PerQuestionStat }) {
       ) : null}
 
       {/* ต้องตรวจสอบ modal — testers who reported symptoms */}
-      <BottomSheet visible={checkOpen} onClose={() => setCheckOpen(false)} title="รายการต้องตรวจสอบ" minHeightRatio={0.5} maxHeightRatio={0.8}>
+      <BottomSheet centerTitle visible={checkOpen} onClose={() => setCheckOpen(false)} title="รายการต้องตรวจสอบ" minHeightRatio={0.5} maxHeightRatio={0.8}>
         <View className="flex-row items-center" style={{ paddingHorizontal: 16, paddingTop: 2, paddingBottom: 8, gap: 14 }}>
           <View className="flex-row items-center" style={{ gap: 5 }}>
             <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#dc2626" }} />
@@ -1121,7 +1121,7 @@ function LeftExtraCard({ stat }: { stat: PerQuestionStat }) {
         </View>
         <QuestionCardBody stat={stat} accentColor={recipe.color} />
       </Pressable>
-      <BottomSheet visible={open} onClose={() => setOpen(false)} title={stat.q.label} minHeightRatio={0.45} maxHeightRatio={0.8}>
+      <BottomSheet centerTitle visible={open} onClose={() => setOpen(false)} title={stat.q.label} minHeightRatio={0.45} maxHeightRatio={0.8}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           <ExtraDetailBody stat={stat} accent={recipe.color} />
         </ScrollView>
@@ -1159,7 +1159,7 @@ function AbChoiceCard({ stat }: { stat: PerQuestionStat }) {
         </View>
         <QuestionCardBody stat={stat} accentColor="#8b5cf6" />
       </Pressable>
-      <BottomSheet visible={open} onClose={() => setOpen(false)} title="สูตร A กับ B" minHeightRatio={0.5} maxHeightRatio={0.8}>
+      <BottomSheet centerTitle visible={open} onClose={() => setOpen(false)} title="สูตร A กับ B" minHeightRatio={0.5} maxHeightRatio={0.8}>
         {ab ? (
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
             <View className="flex-row" style={{ gap: 12, paddingTop: 2, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
@@ -1508,6 +1508,7 @@ export function TrialDetailOverview({ product }: { product: TrialProduct }) {
 
       {/* ===== ความแตกต่างทั้งหมด — BottomSheet listing every ab_diff answer ===== */}
       <BottomSheet
+        centerTitle
         visible={abDiffModalOpen}
         onClose={() => setAbDiffModalOpen(false)}
         title={`ความแตกต่างทั้งหมด · ${diffEntries.length} คำตอบ`}
@@ -1532,6 +1533,7 @@ export function TrialDetailOverview({ product }: { product: TrialProduct }) {
 
       {/* ===== คำแนะนำเพิ่มเติมทั้งหมด — BottomSheet listing every comment ===== */}
       <BottomSheet
+        centerTitle
         visible={commentsModalOpen}
         onClose={() => setCommentsModalOpen(false)}
         title={`คำแนะนำเพิ่มเติมทั้งหมด · ${commentedEvals.length} ความคิดเห็น`}

@@ -1409,7 +1409,7 @@ export function TrialAddProductScreen() {
         </View>
       </View>
 
-      <BottomSheet visible={evalOpen} onClose={() => setEvalOpen(false)} title="สร้างแบบประเมินอัตโนมัติ" maxHeightRatio={0.92} minHeightRatio={0.7}>
+      <BottomSheet centerTitle visible={evalOpen} onClose={() => setEvalOpen(false)} title="สร้างแบบประเมินอัตโนมัติ" maxHeightRatio={0.92} minHeightRatio={0.7}>
         {renderEvalSheet()}
       </BottomSheet>
     </View>

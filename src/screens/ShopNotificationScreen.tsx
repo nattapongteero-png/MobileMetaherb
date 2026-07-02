@@ -27,7 +27,7 @@ export function ShopNotificationScreen() {
   const markAllRead = () => setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
 
   const filterBar = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -14 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>
       {SHOP_FILTER_TABS.map((tab) => (
         <NotifChip key={tab.key} label={tab.label} active={filter === tab.key} onPress={() => setFilter(tab.key)} />
       ))}
