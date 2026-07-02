@@ -19,10 +19,11 @@
  */
 
 import { useMemo, useState } from "react";
-import { View, Text, TextInput, ScrollView, Alert } from "react-native";
-import { FlaskConical, CircleAlert, Clock, Check, Ban, Search } from "lucide-react-native";
+import { View, Text, ScrollView, Alert } from "react-native";
+import { FlaskConical, CircleAlert, Clock, Check, Ban } from "lucide-react-native";
 
 import { BottomSheet } from "../components/BottomSheet";
+import { SearchBar } from "../components/SearchBar";
 import {
   RegistrationCard,
   EvalSummary,
@@ -154,38 +155,8 @@ export function TrialTrackingOwnerSection() {
         </ScrollView>
       </View>
 
-      {/* Search box */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: "#f5f5f5",
-          borderRadius: 999,
-          paddingLeft: 16,
-          paddingRight: 4,
-          height: 36,
-        }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: "#171717", paddingVertical: 0 }}
-          placeholder="ค้นหาชื่อ, เบอร์, สินค้า..."
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-        />
-        <View
-          style={{
-            backgroundColor: BRAND_GREEN,
-            width: 28,
-            height: 28,
-            borderRadius: 999,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Search size={16} color="#fff" />
-        </View>
-      </View>
+      {/* Search box (shared) */}
+      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
 
       {/* Card list / empty state */}
       {filtered.length === 0 ? (

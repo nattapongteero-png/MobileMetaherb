@@ -26,6 +26,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { BottomSheet } from "../components/BottomSheet";
+import { SearchBar } from "../components/SearchBar";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useAddedTrials } from "../data/trialDrafts";
 import { MOCK_REGISTRATIONS, getRegistrationStatus } from "../data/ownerTrialRegistrations";
@@ -308,19 +309,8 @@ export function TrialRegistryOwnerSection() {
         })}
       </ScrollView>
 
-      {/* Search */}
-      <View className="flex-row items-center" style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}>
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-          placeholder="ค้นหาชื่อสินค้า, หมวดหมู่..."
-          placeholderTextColor={TEXT_DISABLED}
-          value={search}
-          onChangeText={setSearch}
-        />
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="white" />
-        </View>
-      </View>
+      {/* Search (shared) */}
+      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อสินค้า, หมวดหมู่..." />
 
       {/* Card list / empty state */}
       {filtered.length === 0 ? (
