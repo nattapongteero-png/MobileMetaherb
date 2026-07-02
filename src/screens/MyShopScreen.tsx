@@ -103,8 +103,6 @@ import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { Skeleton } from "../components/Skeleton";
-import { showToast } from "../components/Toast";
-import { GlassDatePicker } from "../components/GlassDatePicker";
 import { getImagePicker } from "../utils/imagePicker";
 import { useSeller } from "../context/SellerContext";
 import { BottomFade } from "../components/BottomFade";
@@ -644,7 +642,7 @@ const FLASH_EVENTS: FlashEvent[] = [
 ];
 
 type FlashStatus = "active" | "scheduled" | "soldout";
-type FlashProduct = {
+export type FlashProduct = {
   id: string; name: string; image: number;
   normalPrice: number; flashPrice: number; discount: number;
   total: number; sold: number; remaining: number; revenue: number;
@@ -662,7 +660,7 @@ const FLASH_META = [
   { discount: 20, total: 200, sold: 0, status: "scheduled" as FlashStatus, startText: "28 ธ.ค. 69 - 20:00", endText: "28 ธ.ค. 69 - 23:59" },
   { discount: 35, total: 150, sold: 96, status: "active" as FlashStatus, startText: "12 ธ.ค. 69 - 09:00", endText: "12 ธ.ค. 69 - 23:59" },
 ];
-const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.slice(0, 5).map((p, i) => {
+export const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.slice(0, 5).map((p, i) => {
   const m = FLASH_META[i];
   const flashPrice = Math.round(p.price * (1 - m.discount / 100));
   const remaining = Math.max(0, m.total - m.sold);
@@ -920,8 +918,6 @@ function OverviewScreen() {
   const [sub, setSub] = useState<SectionId>("dashboard");
   // Product-management active tab (lifted so the add FAB adds the right type).
   const [pmType, setPmType] = useState<"regular" | "material">("regular");
-  // Flash Sale "add product" bottom-sheet flow.
-  const [flashAddOpen, setFlashAddOpen] = useState(false);
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
@@ -960,9 +956,8 @@ function OverviewScreen() {
           />
         ) : null}
         {sub === "flash_sale" ? (
-          <PMAddFab bottom={tabBarHeight + 16} onPress={() => setFlashAddOpen(true)} />
+          <PMAddFab bottom={tabBarHeight + 16} onPress={() => nav.navigate("FlashAddProduct")} />
         ) : null}
-        <FlashAddSheet visible={flashAddOpen} onClose={() => setFlashAddOpen(false)} />
       </View>
     );
   }
@@ -2724,6 +2719,9 @@ function OverviewTab({
     </TopListCard>
   );
 
+  // Flash Sale has its own scroll layout (sticky filter) — render it directly.
+  if (sub === "flash_sale") return <FlashSaleSection insetsBottom={insetsBottom} />;
+
   return (
     <View style={{ flex: 1 }}>
     <ScrollView
@@ -2807,7 +2805,6 @@ function OverviewTab({
 
       {sub === "products_manage" ? <ProductsManageSection type={pmType ?? "regular"} setType={onPmType ?? (() => {})} /> : null}
 
-      {sub === "flash_sale" ? <FlashSaleSection /> : null}
 
       {sub === "report_sales" ? <ShopSalesReportView period={salesPeriod} setPeriod={setSalesPeriod} dateSel={salesDate} /> : null}
 
@@ -3673,11 +3670,12 @@ const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[
 // Skeleton placeholder mirroring a product card while the list loads.
 function PMCardSkeleton() {
   return (
-    <View style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: "#ececed", padding: 12 }}>
-      <View className="flex-row" style={{ gap: 12 }}>
-        <Skeleton width={84} height={84} radius={16} />
+    <View style={{ borderRadius: 24, overflow: "hidden", backgroundColor: "#eef0ee" }}>
+      {/* White header */}
+      <View className="flex-row" style={{ backgroundColor: "white", borderRadius: 24, padding: 12, gap: 12 }}>
+        <Skeleton width={56} height={56} radius={14} />
         <View style={{ flex: 1, justifyContent: "center", gap: 8 }}>
-          <Skeleton width="80%" height={15} />
+          <Skeleton width="80%" height={16} />
           <Skeleton width="50%" height={12} />
           <View className="flex-row items-center justify-between">
             <Skeleton width={70} height={16} />
@@ -3685,7 +3683,8 @@ function PMCardSkeleton() {
           </View>
         </View>
       </View>
-      <View className="flex-row" style={{ gap: 6, marginTop: 14 }}>
+      {/* Gray base — pills */}
+      <View className="flex-row" style={{ gap: 6, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}>
         <Skeleton width={72} height={22} radius={999} />
         <Skeleton width={90} height={22} radius={999} />
       </View>
@@ -3696,6 +3695,7 @@ function PMCardSkeleton() {
 // ===================== FLASH SALE SECTION =====================
 const FLASH_RED = "#e62e05";
 const FLASH_ICON = require("../../assets/flash/flash.png");
+const FLASH_COIN = require("../../assets/wallet-illust.png");
 const FLASH_TERMS_IMG = require("../../assets/flash/terms.png");
 
 // Platform event card — red (or gray if ended) gradient + status + item count.
@@ -3799,17 +3799,19 @@ function FSHeaderPill({ children, color }: { children: ReactNode; color: string 
   );
 }
 
-// One stat column in the white footer (label + value + unit).
-function FSStat({ dot, label, value, unit, onLayout }: { dot?: string; label: string; value: string; unit: string; onLayout?: (e: LayoutChangeEvent) => void }) {
+// One stat column (label + value + unit). `light` = white text for dark/colored bg.
+function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; label: string; value: string; unit: string; onLayout?: (e: LayoutChangeEvent) => void; light?: boolean }) {
+  const muted = light ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.5)";
+  const strong = light ? "#ffffff" : "#0a0a0a";
   return (
     <View style={{ gap: 8 }} onLayout={onLayout}>
       <View className="flex-row items-center" style={{ gap: 8 }}>
         {dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} /> : null}
-        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{label}</Text>
+        <Text style={{ fontSize: 14, color: muted }}>{label}</Text>
       </View>
       <View className="flex-row items-baseline" style={{ gap: 8 }}>
-        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{value}</Text>
-        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{unit}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "700", color: strong }}>{value}</Text>
+        <Text style={{ fontSize: 14, color: muted }}>{unit}</Text>
       </View>
     </View>
   );
@@ -3817,64 +3819,107 @@ function FSStat({ dot, label, value, unit, onLayout }: { dot?: string; label: st
 
 // Flash product card — ported from Figma: green header (image + name + price/
 // discount/date pills) over a white footer (progress ring + sold/remaining/revenue).
-function FlashProductCard({ p, onMenu }: { p: FlashProduct; onMenu: () => void }) {
-  const [statH, setStatH] = useState(48); // ring diameter = height of one stat block
+export function FlashProductCard({ p, onMenu }: { p: FlashProduct; onMenu: () => void }) {
+  // Full date + time, web-style (e.g. "08 พ.ค. 69 00:00 - 09 พ.ค. 69 23:59").
+  const clean = (s: string) => s.replace(" - ", " ").trim();
+  const sd = clean(p.startText);
+  const ed = clean(p.endText);
+  const dateRange = !ed || sd === ed ? sd : `${sd} - ${ed}`;
+  const st = FLASH_STATUS_CFG[p.status]; // base tint + date color follow the status
+  const statusLabel = p.status === "active" ? "กำลังขาย" : p.status === "soldout" ? "สินค้าหมด" : "ล่วงหน้า";
+  // Measure the widest status label so every card's status block is the same, snug width.
+  const [labelW, setLabelW] = useState(0);
+  const measureLabel = (e: LayoutChangeEvent) => {
+    const w = Math.ceil(e.nativeEvent.layout.width);
+    setLabelW((prev) => Math.max(prev, w));
+  };
   return (
+    <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <LinearGradient colors={[st.color + "26", st.color + "12"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
     <Pressable
       onPress={onMenu}
       className="active:opacity-95"
-      style={{ borderRadius: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 3 }}
+      style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}
     >
-      {/* Light-gray base (bottom layer), overlapped by the white header on top.
-          Left stays the light #f7f8f7; right darkens enough to not blend with the page. */}
-      <LinearGradient
-        colors={["#f7f8f7", "#e3e7e3"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ borderRadius: 24 }}
-      >
-        {/* White header — its own r24 rect on top; rounded bottom corners reveal the green below. */}
-        <View className="flex-row" style={{ backgroundColor: "white", borderRadius: 24, padding: 12, gap: 12 }}>
-          <Image source={p.image} style={{ width: 54, height: 54, borderRadius: 12, backgroundColor: SURFACE_GRAY }} resizeMode="cover" />
-          <View style={{ flex: 1, gap: 8 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
-            <View className="flex-row items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-              <View className="flex-row items-baseline" style={{ gap: 8 }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: FS_DISCOUNT_RED }}>฿{p.flashPrice.toLocaleString()}</Text>
-                <Text style={{ fontSize: 14, color: TEXT_DISABLED, textDecorationLine: "line-through" }}>฿{p.normalPrice.toLocaleString()}</Text>
-              </View>
-              {/* -X% pill — two-layer shadow copied from Figma node 8129:11706 (key + ambient). */}
-              <View style={{ backgroundColor: "white", borderRadius: 999, paddingHorizontal: 12, height: 24, justifyContent: "center", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)" }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: FS_DISCOUNT_RED }}>-{p.discount}%</Text>
-              </View>
+      {/* Header — image + name + price/-% + 3-dot */}
+      <View className="flex-row" style={{ gap: 12 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: SURFACE_GRAY }}>
+          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: p.status === "soldout" ? 0.55 : 1 }} resizeMode="cover" />
+          {p.status === "soldout" ? (
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
+              <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>หมด</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={{ flex: 1, gap: 6 }}>
+          <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 16, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
+            <Pressable onPress={onMenu} hitSlop={8} className="items-center justify-center active:opacity-70" style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}>
+              <MoreHorizontal size={16} color={TEXT_SECONDARY} />
+            </Pressable>
+          </View>
+          <View className="flex-row items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+            <View className="flex-row items-baseline" style={{ gap: 8 }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: FS_DISCOUNT_RED }}>฿{p.flashPrice.toLocaleString()}</Text>
+              <Text style={{ fontSize: 14, color: TEXT_DISABLED, textDecorationLine: "line-through" }}>฿{p.normalPrice.toLocaleString()}</Text>
+            </View>
+            <View style={{ backgroundColor: "rgba(230,46,5,0.1)", borderRadius: 999, paddingHorizontal: 8, height: 22, justifyContent: "center" }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: FS_DISCOUNT_RED }}>-{p.discount}%</Text>
             </View>
           </View>
-          <Pressable onPress={onMenu} hitSlop={8} className="items-center justify-center active:opacity-70" style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)", alignSelf: "flex-start" }}>
-            <MoreHorizontal size={16} color={TEXT_SECONDARY} />
-          </Pressable>
         </View>
+      </View>
 
-        {/* Stats sit directly on the green base */}
-        <View className="flex-row items-center" style={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, gap: 12 }}>
-          <FlashRing pct={p.total > 0 ? p.sold / p.total : 0} size={statH} />
-          <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
-            <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={p.sold.toLocaleString()} unit="ชิ้น" onLayout={(e) => setStatH(e.nativeEvent.layout.height)} />
-            <FSStat dot="#c9cdc9" label="คงเหลือ" value={`${p.remaining.toLocaleString()}/${p.total.toLocaleString()}`} unit="ชิ้น" />
-            <FSStat label="ยอดขาย" value={p.revenue.toLocaleString()} unit="บาท" />
+      <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+
+      {/* Stats */}
+      <View className="flex-row items-start justify-between">
+        <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={p.sold.toLocaleString()} unit="ชิ้น" />
+        {/* คงเหลือ — with a smaller/gray "/total" behind */}
+        <View style={{ gap: 8 }}>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
+            <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
+          </View>
+          <View className="flex-row items-baseline" style={{ gap: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{p.remaining.toLocaleString()}</Text>
+            <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{p.total.toLocaleString()}</Text>
+            <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
           </View>
         </View>
-      </LinearGradient>
+        <FSStat label="ยอดขาย" value={p.revenue.toLocaleString()} unit="บาท" />
+      </View>
     </Pressable>
+
+    {/* Hidden measurers — widest status label sets the block width */}
+    <View style={{ position: "absolute", opacity: 0 }} pointerEvents="none">
+      {["กำลังขาย", "สินค้าหมด", "ล่วงหน้า"].map((l) => (
+        <Text key={l} onLayout={measureLabel} style={{ fontSize: 12, fontWeight: "700" }}>{l}</Text>
+      ))}
+    </View>
+
+    {/* Base peek — status (fixed width = widest label) + Flash Sale date range, left-aligned */}
+    <View className="flex-row items-center" style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, gap: 8 }}>
+      <View className="flex-row items-center" style={{ gap: 5, width: labelW ? labelW + 18 : undefined, flexShrink: 0 }}>
+        <Package size={13} color={st.color} strokeWidth={2.4} />
+        <Text style={{ fontSize: 12, fontWeight: "700", color: st.color }} numberOfLines={1}>{statusLabel}</Text>
+      </View>
+      <View className="flex-row items-center" style={{ gap: 5, flexShrink: 1 }}>
+        <Calendar size={13} color={st.color} strokeWidth={2.2} />
+        <Text style={{ fontSize: 12, fontWeight: "600", color: st.color }} numberOfLines={1}>{dateRange}</Text>
+      </View>
+    </View>
+    </LinearGradient>
+    </View>
   );
 }
 
-function FlashSaleSection() {
+function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number }) {
+  const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | FlashStatus>("all");
   const [query, setQuery] = useState("");
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
   const [termsFor, setTermsFor] = useState<FlashEvent | null>(null); // join terms sheet
-  const [eventFor, setEventFor] = useState<FlashEvent | null>(null); // join-event (empty state) sheet
-  const [addOpen, setAddOpen] = useState(false); // add-product sheet (from event join)
   const filters: { id: "all" | FlashStatus; label: string; Icon: typeof Package }[] = [
     { id: "all", label: "ทั้งหมด", Icon: Package },
     { id: "active", label: "กำลังขาย", Icon: Zap },
@@ -3884,78 +3929,123 @@ function FlashSaleSection() {
   const count = (id: "all" | FlashStatus) => (id === "all" ? FLASH_PRODUCTS.length : FLASH_PRODUCTS.filter((p) => p.status === id).length);
   const q = query.trim().toLowerCase();
   const visible = FLASH_PRODUCTS.filter((p) => (filter === "all" || p.status === filter) && (!q || p.name.toLowerCase().includes(q)));
+  const sumSold = visible.reduce((s, p) => s + p.sold, 0);
+  const sumRemaining = visible.reduce((s, p) => s + p.remaining, 0);
+  const sumRevenue = visible.reduce((s, p) => s + p.revenue, 0);
+  const sumTotal = sumSold + sumRemaining;
 
   return (
-    <View style={{ gap: 16 }}>
-      {/* Platform events strip */}
-      <View style={{ gap: 8 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
-          {FLASH_EVENTS.map((ev) => <FlashEventCard key={ev.id} ev={ev} onPress={ev.status === "join" ? () => setTermsFor(ev) : undefined} />)}
-        </ScrollView>
-      </View>
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
+        contentContainerStyle={{ paddingBottom: insetsBottom }}
+      >
+        {/* [0] Events strip + search (scrolls away) */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 16 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
+            {FLASH_EVENTS.map((ev) => (
+              <FlashEventCard
+                key={ev.id}
+                ev={ev}
+                onPress={ev.status === "join"
+                  ? () => setTermsFor(ev)
+                  : () => nav.navigate("FlashEventDetail", { name: ev.name, dateRange: ev.dateRange, joined: true })}
+              />
+            ))}
+          </ScrollView>
 
-      {/* Store heading */}
-      <View className="flex-row items-center" style={{ gap: 8, marginTop: 4 }}>
-        <Store size={16} color={BRAND_GREEN} strokeWidth={2.2} />
-        <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY }}>สินค้าที่เข้าร่วม</Text>
-      </View>
-
-      {/* Search */}
-      <View className="flex-row items-center" style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 8, gap: 8 }}>
-        <TextInput style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }} placeholder="ค้นหาสินค้า Flash Sale" placeholderTextColor={TEXT_DISABLED} value={query} onChangeText={setQuery} />
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="white" />
+          <View className="flex-row items-center" style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 8, gap: 8 }}>
+            <TextInput style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }} placeholder="ค้นหาสินค้า Flash Sale" placeholderTextColor={TEXT_DISABLED} value={query} onChangeText={setQuery} />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+              <Search size={16} color="white" />
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Filter pills — full-bleed */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {filters.map(({ id, label, Icon }) => {
-          const active = filter === id;
-          return (
-            <Pressable key={id} onPress={() => setFilter(id)} className="flex-row items-center active:opacity-80"
-              style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, gap: 8, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}>
-              <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
-              <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
-              <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count(id)}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
+        {/* [1] Filter pills — STICKY (bg so content scrolls under it) */}
+        <View style={{ backgroundColor: "#fafafa", paddingTop: 12, paddingBottom: 12 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+            {filters.map(({ id, label, Icon }) => {
+              const active = filter === id;
+              return (
+                <Pressable key={id} onPress={() => setFilter(id)} className="flex-row items-center active:opacity-80"
+                  style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, gap: 8, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}>
+                  <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
+                  <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
+                  <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count(id)}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* [2] Summary + product list (scrolls under the sticky filter) */}
+        <View style={{ paddingHorizontal: 16, gap: 16 }}>
+          {/* Summary card — 2-layer style (flash header over gray base + ring + totals) */}
+          {visible.length > 0 ? (
+            <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+              <LinearGradient colors={["#ffffff", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
+                <LinearGradient colors={["#e62e05", "rgba(230,46,5,0.82)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
+                  <Image source={FLASH_COIN} style={{ position: "absolute", right: 4, bottom: 4, width: 120, height: 120, opacity: 0.95 }} resizeMode="contain" />
+                  <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>ยอดขาย</Text>
+                  <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>฿{sumRevenue.toLocaleString()}</Text>
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>สินค้าในร้านที่เข้าร่วม Flash Sale</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "800", color: "rgba(255,255,255,0.9)" }}>{visible.length} รายการ</Text>
+                  </View>
+                </LinearGradient>
+
+                <View className="flex-row items-center" style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+                  <FlashRing pct={sumTotal > 0 ? sumSold / sumTotal : 0} size={40} />
+                  <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
+                    <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={sumSold.toLocaleString()} unit="ชิ้น" />
+                    {/* คงเหลือ — with a smaller/gray "/total" behind */}
+                    <View style={{ gap: 8 }}>
+                      <View className="flex-row items-center" style={{ gap: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
+                      </View>
+                      <View className="flex-row items-baseline" style={{ gap: 2 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{sumRemaining.toLocaleString()}</Text>
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{sumTotal.toLocaleString()}</Text>
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </LinearGradient>
+            </View>
+          ) : null}
+
+          {visible.length === 0 ? (
+            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 8 }}>
+              <Zap size={40} color={BORDER_GRAY} strokeWidth={1.5} />
+              <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า Flash Sale</Text>
+            </View>
+          ) : (
+            visible.map((p) => <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
+          )}
+        </View>
       </ScrollView>
-
-      {/* Product list */}
-      {visible.length === 0 ? (
-        <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 8 }}>
-          <Zap size={40} color={BORDER_GRAY} strokeWidth={1.5} />
-          <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า Flash Sale</Text>
-        </View>
-      ) : (
-        visible.map((p) => <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
-      )}
 
       {/* Action sheet */}
       <FlashActionSheet product={menuFor} onClose={() => setMenuFor(null)} />
 
-      {/* Join flow: terms → เข้าร่วม → empty-state → เพิ่มสินค้า → add sheet */}
+      {/* Join flow: terms sheet → เข้าร่วม → FlashEventDetail page → เพิ่มสินค้า page */}
       <FlashTermsSheet
         event={termsFor}
         onClose={() => setTermsFor(null)}
-        onJoin={() => { const ev = termsFor; setTermsFor(null); setTimeout(() => setEventFor(ev), 280); }}
+        onJoin={() => { const ev = termsFor; setTermsFor(null); if (ev) nav.navigate("FlashEventDetail", { name: ev.name, dateRange: ev.dateRange }); }}
       />
-      <FlashEventSheet
-        event={eventFor}
-        onClose={() => setEventFor(null)}
-        onAddProduct={() => { setEventFor(null); setTimeout(() => setAddOpen(true), 280); }}
-      />
-      <FlashAddSheet visible={addOpen} onClose={() => setAddOpen(false)} />
     </View>
   );
 }
 
 // Flash product action sheet (edit discount/qty, stats, remove).
-function FlashActionSheet({ product, onClose }: { product: FlashProduct | null; onClose: () => void }) {
+export function FlashActionSheet({ product, onClose, onRemove }: { product: FlashProduct | null; onClose: () => void; onRemove?: (p: FlashProduct) => void }) {
   const p = product;
   const Row = ({ Icon, label, color = "#0a0a0a", divider, onPress }: { Icon: typeof Package; label: string; color?: string; divider?: boolean; onPress: () => void }) => (
     <Pressable onPress={onPress} className="flex-row items-center active:bg-neutral-50" style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 16, borderTopWidth: divider ? 0.5 : 0, borderTopColor: "#ececec" }}>
@@ -3982,7 +4072,7 @@ function FlashActionSheet({ product, onClose }: { product: FlashProduct | null; 
         <View style={{ paddingTop: 4 }}>
           <Row Icon={Pencil} label="แก้ไขส่วนลด / จำนวน" onPress={() => { onClose(); Alert.alert("แก้ไข Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
           <Row divider Icon={BarChart3} label="ดูสถิติการขาย" onPress={() => { onClose(); Alert.alert("สถิติการขาย", `${p.name}\nขาย ${p.sold} · รายได้ ฿${p.revenue.toLocaleString()}`); }} />
-          <Row divider Icon={Trash2} label="นำออกจาก Flash Sale" color="#ff3b30" onPress={() => { onClose(); Alert.alert("นำออก", `นำ "${p.name}" ออกจาก Flash Sale? (กำลังพัฒนา)`); }} />
+          <Row divider Icon={Trash2} label="นำออกจาก Flash Sale" color="#ff3b30" onPress={() => { onClose(); if (onRemove) onRemove(p); else Alert.alert("นำออก", `นำ "${p.name}" ออกจาก Flash Sale? (กำลังพัฒนา)`); }} />
         </View>
       ) : null}
     </BottomSheet>
@@ -4055,253 +4145,6 @@ function FlashTermsSheet({ event, onClose, onJoin }: { event: FlashEvent | null;
   );
 }
 
-// Event "join" sheet — ported from web FlashEventDetail (isNewJoin empty state).
-function FlashEventSheet({ event, onClose, onAddProduct }: { event: FlashEvent | null; onClose: () => void; onAddProduct: () => void }) {
-  const ev = event;
-  const cd = ev && ev.status === "active" && ev.hms ? ev.hms : [0, 0, 0];
-  return (
-    <BottomSheet
-      visible={!!ev}
-      onClose={onClose}
-      centerTitle
-      title={ev?.name ?? ""}
-      centerSubtitle={ev ? (
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          <Calendar size={13} color={TEXT_MUTED} strokeWidth={2} />
-          <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{ev.dateRange}</Text>
-        </View>
-      ) : undefined}
-      minHeightRatio={0.5}
-      maxHeightRatio={0.8}
-    >
-      {ev ? (
-        <View style={{ paddingHorizontal: 16, gap: 16 }}>
-          {/* Countdown (00:00:00 unless the event is live) */}
-          <View className="flex-row items-center justify-center" style={{ gap: 4 }}>
-            {cd.map((n, i) => (
-              <View key={i} className="flex-row items-center" style={{ gap: 4 }}>
-                <LinearGradient colors={["#e62e05", "#bc1b06"]} style={{ width: 40, paddingVertical: 6, borderRadius: 9, alignItems: "center" }}>
-                  <Text style={{ fontSize: 17, fontWeight: "700", color: "white" }}>{String(n).padStart(2, "0")}</Text>
-                </LinearGradient>
-                {i < 2 ? <Text style={{ fontSize: 17, fontWeight: "500", color: "#0a0a0a" }}>:</Text> : null}
-              </View>
-            ))}
-          </View>
-
-          {/* Empty state — เข้าร่วมใหม่ ยังไม่มีสินค้า */}
-          <View style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 32, paddingHorizontal: 20, alignItems: "center", gap: 8 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
-              <Package size={40} color={BRAND_GREEN} strokeWidth={1.6} />
-            </View>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>ยังไม่มีสินค้าเข้าร่วม Flash Sale</Text>
-            <Text style={{ fontSize: 13, color: "#8e8e93", textAlign: "center", lineHeight: 20, marginBottom: 8 }}>เลือกสินค้าจากร้านของคุณเข้าร่วมกิจกรรม{"\n"}พร้อมตั้งราคาส่วนลดและจำนวนที่ต้องการขาย</Text>
-            <Pressable onPress={onAddProduct} className="flex-row items-center active:opacity-90" style={{ backgroundColor: BRAND_GREEN, height: 44, paddingLeft: 8, paddingRight: 16, borderRadius: 999, gap: 8 }}>
-              <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center" }}>
-                <Plus size={15} color="white" strokeWidth={2.6} />
-              </View>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>เพิ่มสินค้าเข้าร่วม Flash Sale</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-    </BottomSheet>
-  );
-}
-
-// ---- Flash Sale "add product" bottom-sheet flow (2 steps) — ported from web ----
-function FSLabel({ children, required }: { children: ReactNode; required?: boolean }) {
-  return (
-    <View className="flex-row items-center" style={{ gap: 4 }}>
-      <Text style={{ fontSize: 14, fontWeight: "500", color: "#0a0a0a" }}>{children}</Text>
-      {required ? <Text style={{ fontSize: 14, color: "#ff3b30" }}>*</Text> : null}
-    </View>
-  );
-}
-
-// Selected-product header (image + name + flash/original price + stock) — web ProductHeaderCard.
-function FSProductHeader({ image, name, originalPrice, flashPrice, stock }: { image: number; name: string; originalPrice: number; flashPrice: number; stock: string }) {
-  return (
-    <View className="flex-row items-start" style={{ gap: 16 }}>
-      <Image source={image} style={{ width: 72, height: 72, borderRadius: 16, backgroundColor: "#d4d4d8" }} resizeMode="cover" />
-      <View style={{ flex: 1, justifyContent: "space-between", alignSelf: "stretch", gap: 8 }}>
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }} numberOfLines={1}>{name}</Text>
-        <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
-          <View className="flex-row items-baseline" style={{ gap: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "500", color: "#bc1b06" }}>฿ {flashPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-            <Text style={{ fontSize: 12, color: "#a3a3a3", textDecorationLine: "line-through" }}>฿ {originalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
-          </View>
-          <View className="flex-row items-center" style={{ gap: 4 }}>
-            <Boxes size={14} color="#0a0a0a" strokeWidth={2} />
-            <Text style={{ fontSize: 12, color: "#0a0a0a" }}>{stock} ชิ้น</Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// 2-sided % / ฿ switch inside the discount field — tap a side to pick it.
-function FSDiscountType({ value, onChange }: { value: "percent" | "baht"; onChange: (t: "percent" | "baht") => void }) {
-  return (
-    <View className="flex-row" style={{ backgroundColor: "rgba(118,118,128,0.12)", borderRadius: 999, padding: 4, gap: 4 }}>
-      {(["percent", "baht"] as const).map((t) => {
-        const active = value === t;
-        return (
-          <Pressable
-            key={t}
-            onPress={() => { Haptics.selectionAsync(); onChange(t); }}
-            className="items-center justify-center active:opacity-80"
-            style={{ minWidth: 40, height: 28, paddingHorizontal: 10, borderRadius: 999, backgroundColor: active ? "white" : "transparent" }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: "700", color: active ? BRAND_GREEN : "#8e8e93" }}>{t === "percent" ? "%" : "฿"}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-// Inline +/- stepper (92×32 pill, divider) — web InlineStepper.
-function FSInlineStepper({ value, onChange, min = 1, max, step = 1 }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
-  const atMin = value <= min;
-  const atMax = max != null && value >= max;
-  return (
-    <View className="flex-row items-center" style={{ height: 32, width: 92, borderRadius: 999, backgroundColor: "rgba(116,116,128,0.08)", overflow: "hidden" }}>
-      <Pressable disabled={atMin} onPress={() => { Haptics.selectionAsync(); onChange(Math.max(min, value - step)); }} className="items-center justify-center active:opacity-60" style={{ flex: 1, height: "100%" }}>
-        <Text style={{ fontSize: 18, fontWeight: "600", color: atMin ? "#d4d4d4" : "#0a0a0a" }}>−</Text>
-      </Pressable>
-      <View style={{ width: 1, height: 14, backgroundColor: "rgba(0,0,0,0.15)" }} />
-      <Pressable disabled={atMax} onPress={() => { Haptics.selectionAsync(); onChange(max != null ? Math.min(max, value + step) : value + step); }} className="items-center justify-center active:opacity-60" style={{ flex: 1, height: "100%" }}>
-        <Text style={{ fontSize: 18, fontWeight: "600", color: atMax ? "#d4d4d4" : "#0a0a0a" }}>+</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function FlashAddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(null);
-  const [query, setQuery] = useState("");
-  const [discType, setDiscType] = useState<"percent" | "baht">("percent");
-  const [discVal, setDiscVal] = useState(20);
-  const [qty, setQty] = useState(100);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  // Reset shortly after the sheet finishes closing (so it doesn't flash mid-animation).
-  useEffect(() => {
-    if (!visible) {
-      const t = setTimeout(() => { setStep(1); setPicked(null); setQuery(""); setDiscType("percent"); setDiscVal(20); setQty(100); setStartDate(""); setEndDate(""); }, 280);
-      return () => clearTimeout(t);
-    }
-  }, [visible]);
-
-  const q = query.trim().toLowerCase();
-  const list = SHOP_PRODUCTS.filter((p) => !q || p.name.toLowerCase().includes(q));
-
-  const flashPrice = picked ? (discType === "percent" ? Math.round(picked.price * (1 - discVal / 100)) : Math.max(0, picked.price - discVal)) : 0;
-  const maxStock = picked ? (parseInt((PM_REGULAR.find((x) => x.id === picked.id)?.stockText ?? "").replace(/[^0-9]/g, "")) || 500) : 500;
-
-  const confirm = () => {
-    if (!picked) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    showToast(`เพิ่ม "${picked.name}" เข้า Flash Sale เรียบร้อย`);
-    onClose();
-  };
-
-  return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      centerTitle
-      title={step === 1 ? "เลือกสินค้า" : "กำหนดส่วนลด"}
-      centerSubtitle={<Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>ขั้นที่ {step} / 2 · เพิ่มสินค้า Flash Sale</Text>}
-      minHeightRatio={0.94}
-      maxHeightRatio={0.94}
-      fillContent
-    >
-      {step === 1 ? (
-        <View style={{ flex: 1, paddingHorizontal: 16 }}>
-          <View className="flex-row items-center" style={{ backgroundColor: SURFACE_GRAY, borderRadius: 999, height: 44, paddingHorizontal: 16, gap: 8, marginBottom: 12 }}>
-            <Search size={18} color={TEXT_MUTED} />
-            <TextInput style={{ flex: 1, fontSize: 14, color: TEXT_PRIMARY, padding: 0 }} placeholder="ค้นหาสินค้าในร้าน" placeholderTextColor={TEXT_DISABLED} value={query} onChangeText={setQuery} />
-          </View>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
-            {list.map((prod) => (
-              <Pressable key={prod.id} onPress={() => { Haptics.selectionAsync(); setPicked(prod); setStep(2); }} className="flex-row items-center active:bg-neutral-50" style={{ borderWidth: 1, borderColor: "#ececed", borderRadius: 16, padding: 12, gap: 12 }}>
-                <Image source={prod.image as number} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: SURFACE_GRAY }} resizeMode="cover" />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: TEXT_PRIMARY }} numberOfLines={1}>{prod.name}</Text>
-                  <Text style={{ fontSize: 12.5, color: TEXT_MUTED }} numberOfLines={1}>{prod.category}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: BRAND_GREEN }}>฿{prod.price.toLocaleString()}</Text>
-                </View>
-                <ChevronRight size={20} color={TEXT_DISABLED} />
-              </Pressable>
-            ))}
-            {list.length === 0 ? <Text style={{ textAlign: "center", color: TEXT_DISABLED, paddingVertical: 24 }}>ไม่พบสินค้า</Text> : null}
-          </ScrollView>
-        </View>
-      ) : picked ? (
-        <View style={{ flex: 1, paddingHorizontal: 16 }}>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
-            {/* Selected product header (web ProductHeaderCard) */}
-            <FSProductHeader image={picked.image as number} name={picked.name} originalPrice={picked.price} flashPrice={flashPrice} stock={maxStock.toLocaleString()} />
-
-            {/* Date row — เริ่มต้น / สิ้นสุด (reuse GlassDatePicker) */}
-            <View className="flex-row" style={{ gap: 12, zIndex: 10 }}>
-              <View style={{ flex: 1, gap: 8 }}>
-                <FSLabel>เริ่มต้น</FSLabel>
-                <GlassDatePicker value={startDate} onChange={setStartDate} placeholder="เลือกวันที่" />
-              </View>
-              <View style={{ flex: 1, gap: 8 }}>
-                <FSLabel>สิ้นสุด</FSLabel>
-                <GlassDatePicker value={endDate} onChange={setEndDate} placeholder="เลือกวันที่" />
-              </View>
-            </View>
-
-            {/* Discount + Quantity */}
-            <View style={{ gap: 8 }}>
-              <FSLabel required>ส่วนลด ({discType === "percent" ? "%" : "฿"})</FSLabel>
-              <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingLeft: 20, paddingRight: 8, gap: 8 }}>
-                <TextInput
-                  style={{ flex: 1, fontSize: 14, color: "#0a0a0a", padding: 0 }}
-                  keyboardType="number-pad"
-                  value={String(discVal)}
-                  onChangeText={(t) => { const n = parseInt(t.replace(/[^0-9]/g, "")) || 0; setDiscVal(discType === "percent" ? Math.min(100, n) : n); }}
-                />
-                <FSDiscountType value={discType} onChange={setDiscType} />
-              </View>
-            </View>
-
-            <View style={{ gap: 8 }}>
-              <FSLabel>จำนวน Flash Sale</FSLabel>
-              <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingLeft: 20, paddingRight: 8, gap: 8 }}>
-                <TextInput
-                  style={{ flex: 1, fontSize: 14, color: "#0a0a0a", padding: 0 }}
-                  keyboardType="number-pad"
-                  value={String(qty)}
-                  onChangeText={(t) => { const n = parseInt(t.replace(/[^0-9]/g, "")) || 0; setQty(Math.max(1, Math.min(maxStock, n))); }}
-                />
-                <FSInlineStepper value={qty} onChange={setQty} min={1} max={maxStock} />
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Sticky footer — same pattern as the eval sheet (border-top, pt10/pb16, white). */}
-          <View className="flex-row items-center" style={{ gap: 12, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: "#f1f1f1", backgroundColor: "#fff" }}>
-            <Pressable onPress={() => setStep(1)} className="flex-row items-center justify-center active:opacity-80" style={{ height: 48, paddingHorizontal: 20, borderRadius: 999, backgroundColor: "#f0f1ef", gap: 4 }}>
-              <ChevronLeft size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
-              <Text style={{ fontSize: 13, fontWeight: "500", color: TEXT_SECONDARY }}>ย้อนกลับ</Text>
-            </Pressable>
-            <Pressable onPress={confirm} className="items-center justify-center active:opacity-90" style={{ flex: 1, height: 48, borderRadius: 999, backgroundColor: "#008c45" }}>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "white" }}>เพิ่มสินค้า Flash Sale</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-    </BottomSheet>
-  );
-}
 
 // Product-type segmented control with a sliding pill (same motion as PeriodTabs).
 function TypeTabs({ type, onChange, regularN, materialN }: { type: "regular" | "material"; onChange: (t: "regular" | "material") => void; regularN: number; materialN: number }) {
@@ -4504,69 +4347,60 @@ function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; on
   );
 
   return (
-    <View>
-      {/* Front: main white product card (stacks above the gray pill tray) */}
-      <Pressable
-        onPress={onPreview}
-        className="flex-row active:opacity-80"
-        style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: "#ececed", padding: 12, gap: 12, zIndex: 2 }}
-      >
-        {/* Thumbnail */}
-        <View style={{ width: 84, height: 84, borderRadius: 16, overflow: "hidden", backgroundColor: SURFACE_GRAY, borderWidth: 1, borderColor: BORDER_GRAY }}>
-          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
-          {overlay ? (
-            <View style={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
-              <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>{overlay}</Text>
+    // Flash-card style: white header on top of a light-gray gradient base that
+    // peeks below (holding the status/type pills). Data unchanged from before.
+    <Pressable
+      onPress={onPreview}
+      className="active:opacity-95"
+      style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.08), 0px 6px 12px rgba(0,0,0,0.06)", elevation: 3 }}
+    >
+      <LinearGradient colors={["#f7f8f7", "#e3e7e3"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
+        {/* White header — image + name/category/price + 3-dot */}
+        <View className="flex-row" style={{ backgroundColor: "white", borderRadius: 24, padding: 12, gap: 12 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", backgroundColor: SURFACE_GRAY }}>
+            <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
+            {overlay ? (
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
+                <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>{overlay}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
+            <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
+              <Text style={{ flex: 1, fontSize: 16, fontWeight: "700", color: "#0a0a0a", lineHeight: 21 }} numberOfLines={1}>{p.name}</Text>
+              <Pressable
+                onPress={onMenu}
+                hitSlop={8}
+                className="items-center justify-center active:opacity-70"
+                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}
+              >
+                <MoreHorizontal size={16} color={TEXT_SECONDARY} />
+              </Pressable>
             </View>
-          ) : null}
-        </View>
 
-        {/* Info */}
-        <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
-          <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
-            <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }} numberOfLines={1}>{p.name}</Text>
-            <Pressable
-              onPress={onMenu}
-              hitSlop={8}
-              className="items-center justify-center active:opacity-70"
-              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}
-            >
-              <MoreHorizontal size={16} color={TEXT_SECONDARY} />
-            </Pressable>
-          </View>
+            <Text style={{ fontSize: 13, color: TEXT_MUTED }} numberOfLines={1}>{p.category}</Text>
 
-          <Text style={{ fontSize: 13, color: TEXT_MUTED }} numberOfLines={1}>{p.category}</Text>
-
-          <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
-            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 17, fontWeight: "800", color: "#0a0a0a" }}>{p.priceText}</Text>
-            <Text numberOfLines={1} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
-              {stockMatch ? (<><Text style={{ fontWeight: "700" }}>{stockMatch[1]}</Text> {stockMatch[2]}</>) : p.stockText}
-            </Text>
+            <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, fontWeight: "800", color: "#0a0a0a" }}>{p.priceText}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
+                {stockMatch ? (<><Text style={{ fontWeight: "700" }}>{stockMatch[1]}</Text> {stockMatch[2]}</>) : p.stockText}
+              </Text>
+            </View>
           </View>
         </View>
-      </Pressable>
 
-      {/* Behind: soft brand-green tray, tucked under the card and peeking below */}
-      <View
-        style={{
-          backgroundColor: "#eef6f1", borderRadius: 20,
-          borderWidth: 1, borderColor: "rgba(49,151,84,0.12)",
-          marginHorizontal: 8, marginTop: -18,
-          paddingTop: 26, paddingBottom: 11, paddingHorizontal: 16,
-          zIndex: 1,
-        }}
-      >
-        {/* Single non-wrapping row → tray height is identical on every card
-            (products with Flash/แนะนำ no longer push the tray to two lines). */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", gap: 6 }}>
-          {/* White fill + colored border so the pills pop against the tray */}
-          <Pill text={p.status} color={p.statusColor} bg="#ffffff" border={p.statusColor + "55"} Icon={Package} />
-          <Pill text={p.type} color={p.typeColor} bg="#ffffff" border={p.typeColor + "55"} />
-          {p.flash ? <Pill text="Flash" color="#fff" bg="#e62e05" Icon={Zap} /> : null}
-          {p.recommended ? <Pill text="★ แนะนำ" color="#fff" bg={BRAND_GREEN} /> : null}
-        </ScrollView>
-      </View>
-    </View>
+        {/* Gray base — status / type / flash / recommended pills */}
+        <View style={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", gap: 6 }}>
+            <Pill text={p.status} color={p.statusColor} bg="#ffffff" border={p.statusColor + "55"} Icon={Package} />
+            <Pill text={p.type} color={p.typeColor} bg="#ffffff" border={p.typeColor + "55"} />
+            {p.flash ? <Pill text="Flash" color="#fff" bg="#e62e05" Icon={Zap} /> : null}
+            {p.recommended ? <Pill text="★ แนะนำ" color="#fff" bg={BRAND_GREEN} /> : null}
+          </ScrollView>
+        </View>
+      </LinearGradient>
+    </Pressable>
   );
 }
 
