@@ -31,8 +31,10 @@ import {
   FileText,
   Store,
   Star,
+  MoreVertical,
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
+import { BottomSheet } from "../components/BottomSheet";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -44,6 +46,7 @@ import {
   BRAND_GREEN,
   BRAND_GREEN_DARK,
   DIVIDER_GRAY,
+  TEXT_PRIMARY,
   TEXT_SECONDARY,
   TEXT_MUTED,
 } from "../theme/tokens";
@@ -128,6 +131,7 @@ export function TrialRegistryDetailScreen() {
     { label: "เวลาเหลือ", value: `${product.endsInDays}`, sub: "วัน" },
   ];
   const ratingText = avgRating > 0 ? avgRating.toFixed(1) : "—";
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
@@ -139,35 +143,15 @@ export function TrialRegistryDetailScreen() {
         onBack={() => nav.goBack()}
         showSearch={false}
         rightSlot={
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <Pressable
-              onPress={editProduct}
-              accessibilityLabel="แก้ไขข้อมูลสินค้า"
-              hitSlop={6}
-              className="items-center justify-center active:opacity-80"
-              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
-            >
-              <Pencil size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
-            </Pressable>
-            <Pressable
-              onPress={deleteProduct}
-              accessibilityLabel="ลบสินค้าทดลอง"
-              hitSlop={6}
-              className="items-center justify-center active:opacity-80"
-              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
-            >
-              <Trash2 size={16} color={TEXT_SECONDARY} strokeWidth={2.4} />
-            </Pressable>
-            <Pressable
-              onPress={exportData}
-              accessibilityLabel="ส่งออก"
-              hitSlop={6}
-              className="items-center justify-center active:opacity-80"
-              style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: BRAND_GREEN }}
-            >
-              <Download size={16} color="#fff" strokeWidth={2.4} />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={() => setMenuOpen(true)}
+            accessibilityLabel="เมนู"
+            hitSlop={6}
+            className="items-center justify-center active:opacity-80"
+            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
+          >
+            <MoreVertical size={18} color={TEXT_SECONDARY} strokeWidth={2.4} />
+          </Pressable>
         }
       />
 
@@ -321,6 +305,37 @@ export function TrialRegistryDetailScreen() {
         </ScrollView>
         <BottomFade />
       </View>
+
+      {/* Action menu sheet */}
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} centerTitle title="จัดการสินค้าทดลอง" minHeightRatio={0.3} maxHeightRatio={0.5}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 2 }}>
+          <Pressable
+            onPress={() => { setMenuOpen(false); editProduct(); }}
+            className="flex-row items-center active:opacity-60"
+            style={{ paddingVertical: 13, gap: 12 }}
+          >
+            <Pencil size={18} color={TEXT_MUTED} strokeWidth={2.2} />
+            <Text style={{ fontSize: 14, fontWeight: "500", color: TEXT_PRIMARY }}>แก้ไขข้อมูลสินค้า</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => { setMenuOpen(false); exportData(); }}
+            className="flex-row items-center active:opacity-60"
+            style={{ paddingVertical: 13, gap: 12 }}
+          >
+            <Download size={18} color={TEXT_MUTED} strokeWidth={2.2} />
+            <Text style={{ fontSize: 14, fontWeight: "500", color: TEXT_PRIMARY }}>ส่งออกข้อมูล</Text>
+          </Pressable>
+          <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginVertical: 4 }} />
+          <Pressable
+            onPress={() => { setMenuOpen(false); deleteProduct(); }}
+            className="flex-row items-center active:opacity-60"
+            style={{ paddingVertical: 13, gap: 12 }}
+          >
+            <Trash2 size={18} color="#ff3b30" strokeWidth={2.2} />
+            <Text style={{ fontSize: 14, fontWeight: "500", color: "#ff3b30" }}>ลบสินค้าทดลอง</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
     </View>
   );
 }

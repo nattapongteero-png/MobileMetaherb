@@ -33,6 +33,9 @@ type Props = {
   minHeightRatio?: number;
   /** Max height as ratio of screen (default 0.9). */
   maxHeightRatio?: number;
+  /** Force a flex:1 content area (so a scrollable child fills + scrolls) even
+   *  with centerTitle. Use for search+list picker sheets. */
+  fill?: boolean;
 };
 
 /**
@@ -52,6 +55,7 @@ export function BottomSheet({
   centerTitle,
   minHeightRatio = 0.6,
   maxHeightRatio = 0.9,
+  fill,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(false);
@@ -252,7 +256,7 @@ export function BottomSheet({
                 hug their content (no flex:1) so the sheet height fits exactly. */}
             <View
               style={{
-                flex: centerTitle ? undefined : 1,
+                flex: fill || !centerTitle ? 1 : undefined,
                 paddingBottom: insets.bottom,
               }}
             >
