@@ -11,7 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Search, ChevronRight, ChevronLeft, Boxes, Check } from "lucide-react-native";
+import { Search, ChevronRight, Boxes, Check } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
@@ -99,14 +99,20 @@ export function FlashAddProductScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, "FlashAddProduct">>();
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(null);
+  // Edit mode — opened from a card's ⋯ sheet: skip step 1, prefill everything.
+  const edit = params?.edit;
+  const editIsBaht = !!edit?.discountText?.startsWith("-฿");
+  const [step, setStep] = useState<1 | 2>(edit ? 2 : 1);
+  const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(() =>
+    edit ? ({ id: edit.id, name: edit.name, price: edit.normalPrice, image: edit.image, category: "" } as unknown as (typeof SHOP_PRODUCTS)[number]) : null,
+  );
   const [query, setQuery] = useState("");
-  const [discType, setDiscType] = useState<"percent" | "baht">("percent");
-  const [discVal, setDiscVal] = useState(20);
-  const [qty, setQty] = useState(100);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [discType, setDiscType] = useState<"percent" | "baht">(editIsBaht ? "baht" : "percent");
+  const [discVal, setDiscVal] = useState(edit ? (editIsBaht ? parseInt(edit.discountText!.replace(/[^0-9]/g, "")) || 0 : edit.discount) : 20);
+  const [qty, setQty] = useState(edit?.total ?? 100);
+  // Opened from an event → prefill both dates with the event period (still editable).
+  const [startDate, setStartDate] = useState(edit?.startText ?? params?.eventDate ?? "");
+  const [endDate, setEndDate] = useState(edit?.endText ?? params?.eventDate ?? "");
 
   const q = query.trim().toLowerCase();
   // Pickable pool = products not already in Flash Sale and not in a running
@@ -124,32 +130,35 @@ export function FlashAddProductScreen() {
   const maxStock = DEFAULT_STOCK;
 
   const goBack = () => {
-    if (step === 2) setStep(1);
+    if (step === 2 && !edit) setStep(1); // edit mode has no step 1 to go back to
     else if (nav.canGoBack()) nav.goBack();
   };
 
   const confirm = () => {
     if (!picked) return;
     const pct = picked.price > 0 ? Math.round((1 - flashPrice / picked.price) * 100) : 0;
+    const sold = edit?.sold ?? 0;
     const product: FlashProduct = {
-      id: `${picked.id}-fs`,
+      id: edit ? edit.id : `${picked.id}-fs`,
       name: picked.name,
       image: picked.image as number,
       normalPrice: picked.price,
       flashPrice,
       discount: pct,
+      // ฿ discount shows as "-฿N" on the card; percent uses the default "-N%".
+      discountText: discType === "baht" ? `-฿${discVal.toLocaleString()}` : undefined,
       total: qty,
-      sold: 0,
-      remaining: qty,
-      revenue: 0,
-      status: "active",
+      sold,
+      remaining: Math.max(0, qty - sold),
+      revenue: edit?.revenue ?? 0,
+      status: edit ? (qty - sold <= 0 ? "soldout" : edit.status === "soldout" ? "active" : edit.status) : "active",
       timeRange: startDate && endDate ? `${startDate} – ${endDate}` : "—",
       startText: startDate,
       endText: endDate,
     };
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     params?.onDone?.(product);
-    showToast(`เพิ่ม "${picked.name}" เข้า Flash Sale เรียบร้อย`);
+    showToast(edit ? `แก้ไข "${picked.name}" เรียบร้อย` : `เพิ่ม "${picked.name}" เข้า Flash Sale เรียบร้อย`);
     nav.goBack();
   };
 
@@ -157,8 +166,8 @@ export function FlashAddProductScreen() {
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader
-        title="เพิ่มสินค้า Flash Sale"
-        subtitle={`ขั้นที่ ${step} / 2 · ${step === 1 ? "เลือกสินค้า" : "กำหนดส่วนลด"}`}
+        title={edit ? "แก้ไขสินค้า Flash Sale" : "เพิ่มสินค้า Flash Sale"}
+        subtitle={edit ? "แก้ไขส่วนลด / จำนวน" : `ขั้นที่ ${step} / 2 · ${step === 1 ? "เลือกสินค้า" : "กำหนดส่วนลด"}`}
         onBack={goBack}
         showSearch={false}
       />
@@ -193,7 +202,7 @@ export function FlashAddProductScreen() {
             {/* Selected product header */}
             <FSProductHeader image={picked.image as number} name={picked.name} originalPrice={picked.price} flashPrice={flashPrice} stock={maxStock.toLocaleString()} />
 
-            {/* Date row — เริ่มต้น / สิ้นสุด */}
+            {/* Date row — เริ่มต้น / สิ้นสุด (prefilled with the event period when opened from an event) */}
             <View className="flex-row" style={{ gap: 12, zIndex: 10 }}>
               <View style={{ flex: 1, gap: 8 }}>
                 <FSLabel>เริ่มต้น</FSLabel>
@@ -239,16 +248,10 @@ export function FlashAddProductScreen() {
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insets.bottom + 10 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
               <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
-                {/* Back to step 1 — circular glass button */}
-                <Pressable hitSlop={6} className="active:opacity-70" onPress={() => setStep(1)}>
-                  <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
-                    <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
-                  </GlassView>
-                </Pressable>
-                {/* Confirm — primary pill */}
+                {/* Confirm — primary pill (back = header back button) */}
                 <Pressable onPress={confirm} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}>
                   <Check size={20} color="#fff" strokeWidth={2.6} />
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>เพิ่มสินค้า Flash Sale</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>{edit ? "บันทึกการแก้ไข" : "เพิ่มสินค้า Flash Sale"}</Text>
                 </Pressable>
               </GlassView>
             </View>

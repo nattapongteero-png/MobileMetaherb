@@ -19,6 +19,8 @@ import {
   type TextStyle,
   type ScrollViewProps,
   type LayoutChangeEvent,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from "react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture, ScrollView as GHScrollView } from "react-native-gesture-handler";
 import Reanimated, { runOnJS, useSharedValue, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
@@ -706,6 +708,9 @@ type FlashStatus = "active" | "scheduled" | "soldout";
 export type FlashProduct = {
   id: string; name: string; image: number;
   normalPrice: number; flashPrice: number; discount: number;
+  /** Display text for the discount pill — set when the owner picked ฿ (e.g. "-฿50");
+   *  omitted = percent, rendered as `-{discount}%`. */
+  discountText?: string;
   total: number; sold: number; remaining: number; revenue: number;
   status: FlashStatus; timeRange: string; startText: string; endText: string;
 };
@@ -4079,7 +4084,7 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
               <Text style={{ fontSize: 14, color: TEXT_DISABLED, textDecorationLine: "line-through" }}>฿{p.normalPrice.toLocaleString()}</Text>
             </View>
             <View style={{ backgroundColor: "rgba(230,46,5,0.1)", borderRadius: 999, paddingHorizontal: 8, height: 22, justifyContent: "center" }}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: FS_DISCOUNT_RED }}>-{p.discount}%</Text>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: FS_DISCOUNT_RED }}>{p.discountText ?? `-${p.discount}%`}</Text>
             </View>
           </View>
         </View>
@@ -4129,10 +4134,79 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
   );
 }
 
+// Sales-summary card — flash-red header (revenue + item count) over a white base
+// with the sold ring + sold/remaining totals. Data = whatever product list it's given.
+export function FlashSummaryCard({ products }: { products: FlashProduct[] }) {
+  const sumSold = products.reduce((s, p) => s + p.sold, 0);
+  const sumRemaining = products.reduce((s, p) => s + p.remaining, 0);
+  const sumRevenue = products.reduce((s, p) => s + p.revenue, 0);
+  const sumTotal = sumSold + sumRemaining;
+  return (
+    <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+      <LinearGradient colors={["#ffffff", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
+        <LinearGradient colors={["#e62e05", "rgba(230,46,5,0.82)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
+          <Image source={FLASH_COIN} style={{ position: "absolute", right: 4, bottom: 4, width: 120, height: 120, opacity: 0.95 }} resizeMode="contain" />
+          <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>ยอดขาย</Text>
+          <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>฿{sumRevenue.toLocaleString()}</Text>
+          <View style={{ gap: 2 }}>
+            <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>สินค้าในร้านที่เข้าร่วม Flash Sale</Text>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "rgba(255,255,255,0.9)" }}>{products.length} รายการ</Text>
+          </View>
+        </LinearGradient>
+
+        <View className="flex-row items-center" style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+          <FlashRing pct={sumTotal > 0 ? sumSold / sumTotal : 0} size={40} />
+          <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
+            <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={sumSold.toLocaleString()} unit="ชิ้น" />
+            {/* คงเหลือ — with a smaller/gray "/total" behind */}
+            <View style={{ gap: 8 }}>
+              <View className="flex-row items-center" style={{ gap: 8 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
+                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
+              </View>
+              <View className="flex-row items-baseline" style={{ gap: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{sumRemaining.toLocaleString()}</Text>
+                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{sumTotal.toLocaleString()}</Text>
+                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
+// Skeleton mirroring FlashProductCard — shown while "ดูเพิ่มเติม" loads the next page.
+function FlashCardSkeleton() {
+  return (
+    <View style={{ backgroundColor: "white", borderRadius: 24, borderWidth: 1, borderColor: DIVIDER_GRAY, padding: 14, gap: 12 }}>
+      <View className="flex-row" style={{ gap: 12 }}>
+        <Skeleton width={56} height={56} radius={12} />
+        <View style={{ flex: 1, justifyContent: "center", gap: 8 }}>
+          <Skeleton width="70%" height={16} />
+          <View className="flex-row" style={{ gap: 8 }}>
+            <Skeleton width={56} height={16} />
+            <Skeleton width={44} height={16} radius={999} />
+          </View>
+        </View>
+      </View>
+      <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+      <View className="flex-row items-start justify-between">
+        <Skeleton width={72} height={40} />
+        <Skeleton width={90} height={40} />
+        <Skeleton width={72} height={40} />
+      </View>
+    </View>
+  );
+}
+
 export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | FlashStatus>("all");
   const [query, setQuery] = useState("");
+  // Local mutable copy so editing from the ⋯ sheet updates the list.
+  const [items, setItems] = useState<FlashProduct[]>(FLASH_PRODUCTS);
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
   const [termsFor, setTermsFor] = useState<FlashEvent | null>(null); // join terms sheet
   const filters: { id: "all" | FlashStatus; label: string; Icon: typeof Package }[] = [
@@ -4141,23 +4215,77 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
     { id: "soldout", label: "สินค้าหมด", Icon: AlertTriangle },
     { id: "scheduled", label: "กำหนดไว้", Icon: Clock },
   ];
-  const count = (id: "all" | FlashStatus) => (id === "all" ? FLASH_PRODUCTS.length : FLASH_PRODUCTS.filter((p) => p.status === id).length);
+  const count = (id: "all" | FlashStatus) => (id === "all" ? items.length : items.filter((p) => p.status === id).length);
   const q = query.trim().toLowerCase();
-  const visible = FLASH_PRODUCTS.filter((p) => (filter === "all" || p.status === filter) && (!q || p.name.toLowerCase().includes(q)));
-  const sumSold = visible.reduce((s, p) => s + p.sold, 0);
-  const sumRemaining = visible.reduce((s, p) => s + p.remaining, 0);
-  const sumRevenue = visible.reduce((s, p) => s + p.revenue, 0);
-  const sumTotal = sumSold + sumRemaining;
+  const visible = items.filter((p) => (filter === "all" || p.status === filter) && (!q || p.name.toLowerCase().includes(q)));
+
+  // Paginate: 10 cards per page, "ดูเพิ่มเติม" reveals the next 10. Resets when
+  // the filter/search changes so a new context starts from the first page.
+  const PAGE = 10;
+  const [shownCount, setShownCount] = useState(PAGE);
+  const [loadingMore, setLoadingMore] = useState(false);
+  useEffect(() => setShownCount(PAGE), [filter, q]);
+  const shown = visible.slice(0, shownCount);
+  const moreLeft = visible.length - shown.length;
+  const loadMore = () => {
+    if (loadingMore || moreLeft <= 0) return;
+    setLoadingMore(true);
+    // Brief skeleton beat (300ms rule) before revealing the next page.
+    setTimeout(() => { setShownCount((n) => n + PAGE); setLoadingMore(false); }, 350);
+  };
+  // Sticky state — the search shortcut appears only once the filter bar is pinned
+  // (i.e. the header block above it has scrolled away).
+  const [stuck, setStuck] = useState(false);
+  const headerH = useRef(0);
+  const offsetY = useRef(0);
+  // Infinite scroll — auto-load when the user nears the bottom (200px early).
+  const onListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    offsetY.current = contentOffset.y;
+    const nowStuck = headerH.current > 0 && contentOffset.y >= headerH.current - 1;
+    setStuck(nowStuck);
+    if (!nowStuck && searchOpen) setSearchOpenAnimated(false); // top search field is visible again — collapse
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) loadMore();
+  };
+  // Filter tap → jump back to the first card of the new context (list top, just
+  // under the pinned bar). Deferred one frame so the scroll clamps against the
+  // NEW (possibly shorter) list — scrolling before re-render made short filters
+  // land at the very top. Skips the scroll when the user is already above it.
+  const pickFilter = (id: "all" | FlashStatus) => {
+    setFilter(id);
+    if (offsetY.current > headerH.current) {
+      // Deferred one frame so the slide clamps against the NEW list, then glide up.
+      requestAnimationFrame(() => listRef.current?.scrollTo({ y: headerH.current, animated: true }));
+    }
+  };
+  // Sticky-bar search — tapping the icon expands an inline search field in place
+  // of the filter pills (no jump back to the top field).
+  const listRef = useRef<ScrollView>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  // Smooth expand/collapse (200ms ease) — the bar morphs instead of snapping.
+  const animateBar = () =>
+    LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+  const setSearchOpenAnimated = (open: boolean) => {
+    animateBar();
+    setSearchOpen(open);
+  };
+  const openStickySearch = () => {
+    Haptics.selectionAsync();
+    setSearchOpenAnimated(true);
+  };
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        ref={listRef}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[1]}
+        onScroll={onListScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: insetsBottom }}
       >
         {/* [0] Events strip + search (scrolls away) */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 16 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 16 }} onLayout={(e) => { headerH.current = e.nativeEvent.layout.height; }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
             {FLASH_EVENTS.map((ev) => (
               <FlashEventCard
@@ -4178,13 +4306,43 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
           </View>
         </View>
 
-        {/* [1] Filter pills — STICKY (bg so content scrolls under it) */}
-        <View style={{ backgroundColor: "#fafafa", paddingTop: 12, paddingBottom: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+        {/* [1] Filter pills — STICKY (bg so content scrolls under it) + search shortcut
+            (leading icon, only while the bar is pinned) */}
+        <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", paddingTop: 12, paddingBottom: 12, paddingLeft: 16 }}>
+          {stuck && searchOpen ? (
+            /* Expanded inline search — replaces the pills while open */
+            <View className="flex-row items-center" style={{ flex: 1, marginRight: 16, backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 36, paddingLeft: 14, paddingRight: 4, gap: 8 }}>
+              <Search size={14} color={TEXT_MUTED} strokeWidth={2.2} />
+              <TextInput
+                autoFocus
+                style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+                placeholder="ค้นหาสินค้า Flash Sale"
+                placeholderTextColor={TEXT_DISABLED}
+                value={query}
+                onChangeText={setQuery}
+                onBlur={() => setSearchOpenAnimated(false)} // leaving the field collapses it — no close tap needed
+                returnKeyType="search"
+              />
+            </View>
+          ) : (
+            <>
+          {stuck ? (
+            /* Same 36px height as the filter pills; explicit 12px space before the pills */
+            /* Green ring while a query is active — reminds the user a search is applied */
+            <Pressable
+              onPress={openStickySearch}
+              hitSlop={8}
+              className="items-center justify-center active:opacity-70"
+              style={{ width: 36, height: 36, borderRadius: 18, marginRight: 12, backgroundColor: q ? "rgba(49,151,84,0.08)" : "white", borderWidth: q ? 1.5 : 1, borderColor: q ? BRAND_GREEN : DIVIDER_GRAY }}
+            >
+              <Search size={16} color={q ? BRAND_GREEN : TEXT_MUTED} strokeWidth={2.2} />
+            </Pressable>
+          ) : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
             {filters.map(({ id, label, Icon }) => {
               const active = filter === id;
               return (
-                <Pressable key={id} onPress={() => setFilter(id)} className="flex-row items-center active:opacity-80"
+                <Pressable key={id} onPress={() => pickFilter(id)} className="flex-row items-center active:opacity-80"
                   style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, gap: 8, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}>
                   <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
                   <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
@@ -4195,45 +4353,14 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
               );
             })}
           </ScrollView>
+            </>
+          )}
         </View>
 
         {/* [2] Summary + product list (scrolls under the sticky filter) */}
         <View style={{ paddingHorizontal: 16, gap: 16 }}>
-          {/* Summary card — 2-layer style (flash header over gray base + ring + totals) */}
-          {visible.length > 0 ? (
-            <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
-              <LinearGradient colors={["#ffffff", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
-                <LinearGradient colors={["#e62e05", "rgba(230,46,5,0.82)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
-                  <Image source={FLASH_COIN} style={{ position: "absolute", right: 4, bottom: 4, width: 120, height: 120, opacity: 0.95 }} resizeMode="contain" />
-                  <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>ยอดขาย</Text>
-                  <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>฿{sumRevenue.toLocaleString()}</Text>
-                  <View style={{ gap: 2 }}>
-                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>สินค้าในร้านที่เข้าร่วม Flash Sale</Text>
-                    <Text style={{ fontSize: 18, fontWeight: "800", color: "rgba(255,255,255,0.9)" }}>{visible.length} รายการ</Text>
-                  </View>
-                </LinearGradient>
-
-                <View className="flex-row items-center" style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
-                  <FlashRing pct={sumTotal > 0 ? sumSold / sumTotal : 0} size={40} />
-                  <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
-                    <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={sumSold.toLocaleString()} unit="ชิ้น" />
-                    {/* คงเหลือ — with a smaller/gray "/total" behind */}
-                    <View style={{ gap: 8 }}>
-                      <View className="flex-row items-center" style={{ gap: 8 }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
-                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
-                      </View>
-                      <View className="flex-row items-baseline" style={{ gap: 2 }}>
-                        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{sumRemaining.toLocaleString()}</Text>
-                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{sumTotal.toLocaleString()}</Text>
-                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-          ) : null}
+          {/* Summary card — totals follow the filtered list */}
+          {visible.length > 0 ? <FlashSummaryCard products={visible} /> : null}
 
           {visible.length === 0 ? (
             <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 8 }}>
@@ -4241,13 +4368,32 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
               <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า Flash Sale</Text>
             </View>
           ) : (
-            visible.map((p) => <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
+            shown.map((p) => <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
           )}
+
+          {/* Loading beat — skeleton cards where the next page will appear */}
+          {loadingMore ? (
+            <>
+              <FlashCardSkeleton />
+              <FlashCardSkeleton />
+              <FlashCardSkeleton />
+            </>
+          ) : null}
+
         </View>
       </ScrollView>
 
       {/* Action sheet */}
-      <FlashActionSheet product={menuFor} onClose={() => setMenuFor(null)} />
+      <FlashActionSheet
+        product={menuFor}
+        onClose={() => setMenuFor(null)}
+        onEdit={(p) =>
+          nav.navigate("FlashAddProduct", {
+            edit: p,
+            onDone: (np) => setItems((prev) => prev.map((x) => (x.id === np.id ? np : x))),
+          })
+        }
+      />
 
       {/* Join flow: terms sheet → เข้าร่วม → FlashEventDetail page → เพิ่มสินค้า page */}
       <FlashTermsSheet
@@ -4260,7 +4406,7 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
 }
 
 // Flash product action sheet (edit discount/qty, stats, remove).
-export function FlashActionSheet({ product, onClose, onRemove }: { product: FlashProduct | null; onClose: () => void; onRemove?: (p: FlashProduct) => void }) {
+export function FlashActionSheet({ product, onClose, onRemove, onEdit }: { product: FlashProduct | null; onClose: () => void; onRemove?: (p: FlashProduct) => void; onEdit?: (p: FlashProduct) => void }) {
   const p = product;
   const Row = ({ Icon, label, color = "#0a0a0a", divider, onPress }: { Icon: typeof Package; label: string; color?: string; divider?: boolean; onPress: () => void }) => (
     <Pressable onPress={onPress} className="flex-row items-center active:bg-neutral-50" style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 16, borderTopWidth: divider ? 0.5 : 0, borderTopColor: "#ececec" }}>
@@ -4277,7 +4423,7 @@ export function FlashActionSheet({ product, onClose, onRemove }: { product: Flas
       centerSubtitle={p ? (
         <Text style={{ fontSize: 12.5, color: TEXT_MUTED }} numberOfLines={1}>
           <Text style={{ color: "#ff3b30", fontWeight: "700" }}>฿{p.flashPrice.toLocaleString()}</Text>
-          {" · "}-{p.discount}%{" · "}เหลือ {p.remaining.toLocaleString()}/{p.total.toLocaleString()}
+          {" · "}{p.discountText ?? `-${p.discount}%`}{" · "}เหลือ {p.remaining.toLocaleString()}/{p.total.toLocaleString()}
         </Text>
       ) : undefined}
       minHeightRatio={0.1}
@@ -4285,7 +4431,7 @@ export function FlashActionSheet({ product, onClose, onRemove }: { product: Flas
     >
       {p ? (
         <View style={{ paddingTop: 4 }}>
-          <Row Icon={Pencil} label="แก้ไขส่วนลด / จำนวน" onPress={() => { onClose(); Alert.alert("แก้ไข Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
+          <Row Icon={Pencil} label="แก้ไขส่วนลด / จำนวน" onPress={() => { onClose(); if (onEdit) onEdit(p); else Alert.alert("แก้ไข Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
           <Row divider Icon={BarChart3} label="ดูสถิติการขาย" onPress={() => { onClose(); Alert.alert("สถิติการขาย", `${p.name}\nขาย ${p.sold} · รายได้ ฿${p.revenue.toLocaleString()}`); }} />
           <Row divider Icon={Trash2} label="นำออกจาก Flash Sale" color="#ff3b30" onPress={() => { onClose(); if (onRemove) onRemove(p); else Alert.alert("นำออก", `นำ "${p.name}" ออกจาก Flash Sale? (กำลังพัฒนา)`); }} />
         </View>

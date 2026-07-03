@@ -152,7 +152,7 @@ export type RootStackParamList = {
   ProductDetail: { product: Product; preview?: boolean };
   ProductPreview: { product: Product; preview?: boolean };
   AddProduct: { mode: "regular" | "material" };
-  FlashAddProduct: { onDone?: (p: FlashProduct) => void } | undefined;
+  FlashAddProduct: { onDone?: (p: FlashProduct) => void; eventDate?: string; edit?: FlashProduct } | undefined;
   FlashEventDetail: { name: string; dateRange: string; joined?: boolean };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;

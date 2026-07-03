@@ -11,12 +11,12 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
-import { Package, Plus, Calendar } from "lucide-react-native";
+import { Package, Plus } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { FlashProductCard, FlashActionSheet, FLASH_PRODUCTS, type FlashProduct } from "./MyShopScreen";
+import { FlashProductCard, FlashActionSheet, FlashSummaryCard, FLASH_PRODUCTS, type FlashProduct } from "./MyShopScreen";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { BRAND_GREEN, DIVIDER_GRAY, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_PRIMARY } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -24,13 +24,15 @@ export function FlashEventDetailScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, "FlashEventDetail">>();
-  const cd = [0, 0, 0]; // newly-joined event hasn't started → 00:00:00
 
   // Already-joined events open with their products; a fresh join starts empty.
-  const [products, setProducts] = useState<FlashProduct[]>(() => (params.joined ? FLASH_PRODUCTS.slice(0, 3) : []));
+  const [products, setProducts] = useState<FlashProduct[]>(() => (params.joined ? FLASH_PRODUCTS.slice(0, 5) : []));
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
   const openAdd = () =>
-    nav.navigate("FlashAddProduct", { onDone: (p) => setProducts((prev) => [p, ...prev.filter((x) => x.id !== p.id)]) });
+    nav.navigate("FlashAddProduct", {
+      eventDate: params.dateRange, // event period is fixed — no date inputs on the add page
+      onDone: (p) => setProducts((prev) => [p, ...prev.filter((x) => x.id !== p.id)]),
+    });
   const removeProduct = (p: FlashProduct) => {
     setProducts((prev) => prev.filter((x) => x.id !== p.id));
     showToast("นำสินค้าออกแล้ว", "info");
@@ -46,28 +48,8 @@ export function FlashEventDetailScreen() {
       />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + (products.length > 0 ? 110 : 24), gap: 16 }}>
-        {/* Event info card — date + countdown on one row */}
-        <View style={{ backgroundColor: "white", borderRadius: 20, borderWidth: 1, borderColor: DIVIDER_GRAY, padding: 16 }}>
-          <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
-            <View className="flex-row items-center" style={{ gap: 10, flexShrink: 1 }}>
-              <Calendar size={24} color={BRAND_GREEN} strokeWidth={2} />
-              <View style={{ flexShrink: 1, gap: 1 }}>
-                <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>ระยะเวลากิจกรรม</Text>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY }} numberOfLines={1}>{params.dateRange}</Text>
-              </View>
-            </View>
-            <View className="flex-row items-center" style={{ gap: 5 }}>
-              {cd.map((n, i) => (
-                <View key={i} className="flex-row items-center" style={{ gap: 5 }}>
-                  <LinearGradient colors={["#e62e05", "#bc1b06"]} style={{ width: 38, paddingVertical: 6, borderRadius: 8, alignItems: "center" }}>
-                    <Text style={{ fontSize: 16, fontWeight: "700", color: "white" }}>{String(n).padStart(2, "0")}</Text>
-                  </LinearGradient>
-                  {i < 2 ? <Text style={{ fontSize: 15, fontWeight: "400", color: "#0a0a0a" }}>:</Text> : null}
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
+        {/* Sales-summary card — totals of this event's products */}
+        {products.length > 0 ? <FlashSummaryCard products={products} /> : null}
 
         {products.length > 0 ? (
           <>
@@ -115,7 +97,18 @@ export function FlashEventDetailScreen() {
       ) : null}
 
       {/* 3-dot menu — same bottom sheet as the Flash Sale store */}
-      <FlashActionSheet product={menuFor} onClose={() => setMenuFor(null)} onRemove={removeProduct} />
+      <FlashActionSheet
+        product={menuFor}
+        onClose={() => setMenuFor(null)}
+        onRemove={removeProduct}
+        onEdit={(p) =>
+          nav.navigate("FlashAddProduct", {
+            edit: p,
+            eventDate: params.dateRange,
+            onDone: (np) => setProducts((prev) => prev.map((x) => (x.id === np.id ? np : x))),
+          })
+        }
+      />
     </View>
   );
 }
