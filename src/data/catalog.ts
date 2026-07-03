@@ -43,6 +43,22 @@ export function webCategoryLabel(category: string): string {
   return (WEB_CATEGORY_LABEL as Record<string, string>)[category] ?? category;
 }
 
+// Synthesized stock for METAHERB Store's own products (the storefront catalog
+// carries no stock field). Single source for จัดการสินค้า + the promotion
+// product pool so every owner surface reports the same numbers. Keys = the
+// shop's share of the real catalog ids. Every entry stays in-stock and open —
+// the storefront sells all 7 cards, so nothing here may be หมด/ปิดขาย.
+export type ShopStock = { stock: number; closed?: boolean };
+export const SHOP_STOCK: Record<string, ShopStock> = {
+  "1": { stock: 500 }, // น้ำผึ้งมะนาว — flash sale บนหน้าร้าน
+  "9": { stock: 320 }, // น้ำผักผลไม้สด — flash sale
+  "23": { stock: 1200 }, // ชุดของขวัญ Just For You — โปรโมชั่น
+  "33": { stock: 80 }, // Meta Herb Essence — flash sale
+  "36": { stock: 90 }, // สมุลเว้ง
+  "39": { stock: 260 }, // ดอกจันทน์เทศ Mace
+  "45": { stock: 150 }, // กาแฟดริปอเมริกาโนเย็น — โปรโมชั่น + แนะนำ
+};
+
 // Product form/type — a second taxonomy, independent of category.
 export type TypeKey = "capsule" | "powder" | "beverage" | "aroma" | "gift" | "food";
 

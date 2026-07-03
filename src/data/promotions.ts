@@ -5,6 +5,8 @@
  *  mockPromotions. Not persisted across reloads (mockup).
  *  ========================================================================== */
 import { useSyncExternalStore } from "react";
+import { REAL_PRODUCTS } from "./realProducts";
+import { SHOP_STOCK } from "./catalog";
 
 export type PromoStatus = "active" | "scheduled" | "ended";
 export type PromoDiscountType = "percent" | "baht";
@@ -27,34 +29,34 @@ export type Promotion = {
   products: PromoProductLimit[];
 };
 
-/** Minimal product shape the picker needs (subset of the web mockProducts). */
+/** Minimal product shape the picker needs (image = require() from the catalog). */
 export type PromoProduct = {
   id: string;
   name: string;
   price: string;
   stock: string;
   status: string; // "เปิดขาย" | "สินค้าหมด" | "ปิดขาย"
-  image: string;
+  image: number;
 };
 
-/* Subset of the web mockProducts — only fields the picker + chips display. */
-export const PROMO_PRODUCTS: PromoProduct[] = [
-  { id: "1", name: "พิมเสนน้ำอโรมา ตราเมต้าเฮิร์บ", price: "฿ 89.00", stock: "120 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1624454002302-36b824d7bd0a?w=400&q=80" },
-  { id: "2", name: "ขมิ้นชันแคปซูล 60 แคป", price: "฿ 220.00", stock: "85 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1740592754365-2117f5977528?w=400&q=80" },
-  { id: "3", name: "ฟ้าทะลายโจรผง 100 g", price: "฿ 145.00", stock: "40 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1759064716219-ba8c60a7ce07?w=400&q=80" },
-  { id: "4", name: "กาแฟดริป Signature อเมริกาโนเย็น", price: "฿ 150.00 - 280.00", stock: "62 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1599639932525-213272ff954b?w=400&q=80" },
-  { id: "5", name: "ใบบัวบกแคปซูล 60 แคป", price: "฿ 180.00", stock: "95 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1748390359572-8e7a47bf5cb5?w=400&q=80" },
-  { id: "6", name: "ชาเก๊กฮวยออร์แกนิก 20 ซอง", price: "฿ 125.00", stock: "210 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1610643625267-aee6dae3ca22?w=400&q=80" },
-  { id: "7", name: "น้ำมันมะพร้าวสกัดเย็น 250 ml", price: "฿ 290.00 - 520.00", stock: "48 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1591282017732-207fbba7dfd4?w=400&q=80" },
-  { id: "8", name: "ชามะรุม 30 ซอง", price: "฿ 130.00", stock: "75 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=400&q=80" },
-  { id: "9", name: "เห็ดหลินจือสกัด 60 แคป", price: "฿ 245.00", stock: "0 ชิ้น", status: "สินค้าหมด", image: "https://images.unsplash.com/photo-1644061923948-f5b918b524c7?w=400&q=80" },
-  { id: "10", name: "น้ำผึ้งดอกลำไย 250 ml", price: "฿ 215.00 - 380.00", stock: "32 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1645693091199-77a764e1ea16?w=400&q=80" },
-  { id: "11", name: "ขิงผงออร์แกนิก 100 g", price: "฿ 130.00", stock: "150 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1573821663912-6df460f9c684?w=400&q=80" },
-  { id: "12", name: "สบู่สมุนไพรขมิ้น", price: "฿ 65.00", stock: "180 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&q=80" },
-  { id: "13", name: "บาล์มสมุนไพรไพล", price: "฿ 95.00", stock: "8 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1546039907-7fa05f864c02?w=400&q=80" },
-  { id: "14", name: "ถุงหอมอโรมา MetaHerb Bloom Essence", price: "฿ 79.00 - 199.00", stock: "0 ชิ้น", status: "ปิดขาย", image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80" },
-  { id: "15", name: "ชาตะไคร้ใบเตย 30 ซอง", price: "฿ 110.00", stock: "245 ชิ้น", status: "เปิดขาย", image: "https://images.unsplash.com/photo-1592479996-0c8a1e8c5d4e?w=400&q=80" },
-];
+// The promotion pool = METAHERB Store's real storefront products, minus the
+// flash-sale items (a product is never in Flash Sale AND a promotion at once).
+// Price shows the pre-discount base (originalPrice) so the promo math lands on
+// the exact price the storefront card displays; stock comes from SHOP_STOCK —
+// the same map จัดการสินค้า reads.
+export const PROMO_PRODUCTS: PromoProduct[] = REAL_PRODUCTS.filter(
+  (p) => p.shop === "METAHERB Store" && !p.isFlashSale,
+).map((p) => {
+  const s = SHOP_STOCK[p.id] ?? { stock: 200 };
+  return {
+    id: p.id,
+    name: p.name,
+    price: `฿ ${(p.originalPrice ?? p.price).toFixed(2)}`,
+    stock: `${s.stock.toLocaleString()} ชิ้น`,
+    status: s.closed ? "ปิดขาย" : s.stock === 0 ? "สินค้าหมด" : "เปิดขาย",
+    image: p.image as number,
+  };
+});
 
 export function promoProductById(id: string): PromoProduct | undefined {
   return PROMO_PRODUCTS.find((p) => p.id === id);
@@ -69,30 +71,25 @@ const _promoDay = (offset: number, h = 0, m = 0): string => {
 
 const mockPromotions: Promotion[] = [
   // ── กำลังดำเนินการ (active) ──
+  // The two active product-scoped promos cover EXACTLY the storefront's two
+  // discounted (non-flash) cards: id 23 (฿120 → ฿85, ลด 29%) and id 45
+  // (฿169 → ฿149, ลด 12%). The baht cuts reproduce those prices to the satang,
+  // and stay disjoint from the flash-sale products (1/9/33).
   {
-    id: "p-a1", name: "ลดสุดคุ้ม สมุนไพรทุกชนิด 15%",
-    description: "ลดราคาสมุนไพรแคปซูลและผงสมุนไพรทุกตัว",
-    discountType: "percent", discountValue: 15, maxDiscount: 200,
+    id: "p-a1", name: "ชุดของขวัญสุดคุ้ม ลด ฿35",
+    description: "ลดราคาชุดของขวัญ Just For You ทันที 35 บาท",
+    discountType: "baht", discountValue: 35,
     startsAt: _promoDay(-3, 0, 0), endsAt: _promoDay(14, 23, 59),
     enabled: true, scope: "products",
-    products: [
-      { productId: "2", limit: "unlimited" },
-      { productId: "3", limit: "unlimited" },
-      { productId: "5", limit: "unlimited" },
-      { productId: "9", limit: "unlimited" },
-    ],
+    products: [{ productId: "23", limit: "unlimited" }],
   },
   {
-    id: "p-a2", name: "ดื่มดี สุขภาพดี ลด ฿30",
-    description: "ลดราคาชาสมุนไพรทุกซอง 30 บาท เมื่อช้อปครบ 200 บาท",
-    discountType: "baht", discountValue: 30,
+    id: "p-a2", name: "ดื่มดี สุขภาพดี ลด ฿20",
+    description: "ลดราคากาแฟดริป Signature อเมริกาโนเย็น 20 บาท",
+    discountType: "baht", discountValue: 20,
     startsAt: _promoDay(-5, 0, 0), endsAt: _promoDay(7, 23, 59),
     enabled: true, scope: "products",
-    products: [
-      { productId: "6", limit: "unlimited" },
-      { productId: "8", limit: "unlimited" },
-      { productId: "15", limit: "unlimited" },
-    ],
+    products: [{ productId: "45", limit: "unlimited" }],
   },
   {
     id: "p-a3", name: "Mid Year Sale ลดทั้งร้าน 10%",
@@ -110,10 +107,10 @@ const mockPromotions: Promotion[] = [
     startsAt: _promoDay(20, 0, 0), endsAt: _promoDay(20, 23, 59),
     enabled: true, scope: "products",
     products: [
-      { productId: "1", limit: "unlimited" },
-      { productId: "4", limit: "unlimited" },
-      { productId: "10", limit: "unlimited" },
-      { productId: "12", limit: "unlimited" },
+      { productId: "23", limit: 2 },
+      { productId: "36", limit: "unlimited" },
+      { productId: "39", limit: "unlimited" },
+      { productId: "45", limit: 5 },
     ],
   },
   {
@@ -132,9 +129,9 @@ const mockPromotions: Promotion[] = [
     startsAt: _promoDay(-50, 17, 53), endsAt: _promoDay(-30, 17, 53),
     enabled: true, scope: "products",
     products: [
-      { productId: "1", limit: "unlimited" },
-      { productId: "2", limit: "unlimited" },
-      { productId: "3", limit: "unlimited" },
+      { productId: "36", limit: "unlimited" },
+      { productId: "39", limit: "unlimited" },
+      { productId: "45", limit: "unlimited" },
     ],
   },
   {
@@ -144,11 +141,10 @@ const mockPromotions: Promotion[] = [
     startsAt: _promoDay(-60, 2, 0), endsAt: _promoDay(-60, 16, 59),
     enabled: true, scope: "products",
     products: [
-      { productId: "4", limit: "unlimited" },
-      { productId: "5", limit: "unlimited" },
-      { productId: "6", limit: "unlimited" },
-      { productId: "7", limit: "unlimited" },
-      { productId: "8", limit: "unlimited" },
+      { productId: "23", limit: "unlimited" },
+      { productId: "36", limit: "unlimited" },
+      { productId: "39", limit: "unlimited" },
+      { productId: "45", limit: "unlimited" },
     ],
   },
 ];

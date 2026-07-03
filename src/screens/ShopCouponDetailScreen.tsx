@@ -7,6 +7,7 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ban, Check, Clock, MoreHorizontal, Pencil, Percent, Ticket, Trash2, Truck, type LucideIcon } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { EmptyState } from "../components/EmptyState";
 import { BottomFade } from "../components/BottomFade";
@@ -188,7 +189,7 @@ export function ShopCouponDetailScreen() {
 
       {/* More menu — the app-bar ⋯ button morphs into this options card */}
       <AppleMenu visible={menuOpen} onClose={() => setMenuOpen(false)} anchorTop={insets.top + 6}>
-        <MenuItem
+        <AppleMenuItem
           label="แก้ไข"
           Icon={Pencil}
           onPress={() => {
@@ -196,93 +197,9 @@ export function ShopCouponDetailScreen() {
             nav.navigate("CouponCreate", { editId: c.id });
           }}
         />
-        <MenuItem label="ลบ" Icon={Trash2} danger onPress={onDelete} />
+        <AppleMenuItem label="ลบ" Icon={Trash2} danger onPress={onDelete} />
       </AppleMenu>
     </View>
   );
 }
 
-const MENU_W = 240;
-const MENU_H = 112; // 2 rows × 48 + vertical padding — used to pin the top-right corner
-
-/** iOS 26-style options menu — the app-bar button itself morphs into the card:
- *  the card's TOP-RIGHT corner stays pinned at the button's position while it
- *  scales up from button size (and collapses back on close). */
-function AppleMenu({
-  visible,
-  onClose,
-  anchorTop,
-  children,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  anchorTop: number;
-  children: React.ReactNode;
-}) {
-  const [mounted, setMounted] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      Animated.spring(anim, { toValue: 1, useNativeDriver: true, stiffness: 340, damping: 28, mass: 0.9 }).start();
-    } else if (mounted) {
-      Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(({ finished }) => {
-        if (finished) setMounted(false);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  if (!mounted) return null;
-
-  // Pin the top-right corner while scaling s0 → 1 (centre-origin scale needs a
-  // compensating translation of (size/2)·(1−s0) toward the corner).
-  const s0 = 44 / MENU_W;
-  return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
-      {/* Tap-outside catcher */}
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <Animated.View
-        style={{
-          position: "absolute",
-          top: anchorTop,
-          right: 12,
-          width: MENU_W,
-          opacity: anim.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 1, 1] }),
-          transform: [
-            { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [(MENU_W / 2) * (1 - s0), 0] }) },
-            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-(MENU_H / 2) * (1 - s0), 0] }) },
-            { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [s0, 1] }) },
-          ],
-          shadowColor: "#000",
-          shadowOpacity: 0.16,
-          shadowRadius: 28,
-          shadowOffset: { width: 0, height: 12 },
-          elevation: 12,
-        }}
-      >
-        {/* Solid light-gray card (like the Notes menu) — GlassView breaks under
-            animated opacity (UIVisualEffectView renders empty), so plain fill. */}
-        <View style={{ borderRadius: 26, overflow: "hidden", paddingVertical: 8, backgroundColor: "#f4f4f5" }}>
-          {children}
-        </View>
-      </Animated.View>
-    </View>
-  );
-}
-
-// Apple (Notes-style) menu row — icon on the left, roomy 48px row, 16px label.
-function MenuItem({ label, Icon, onPress, danger }: { label: string; Icon: LucideIcon; onPress: () => void; danger?: boolean }) {
-  const color = danger ? "#ff3b30" : "#1a1a1a";
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:opacity-60"
-      style={{ height: 48, paddingHorizontal: 18, gap: 14 }}
-    >
-      <Icon size={20} color={color} strokeWidth={2} />
-      <Text style={{ flex: 1, fontSize: 16, color }}>{label}</Text>
-    </Pressable>
-  );
-}

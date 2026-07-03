@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -73,6 +73,7 @@ import {
   PackageCheck,
   PackageX,
   Pencil,
+  Sprout,
   GripVertical,
   PlusCircle,
   ScanSearch,
@@ -102,6 +103,8 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { Skeleton } from "../components/Skeleton";
 import { SegmentedTabs } from "../components/SegmentedTabs";
+import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
+import { useAllPromotions, computedStatus as promoStatus } from "../data/promotions";
 import { showToast } from "../components/Toast";
 import { GlassDatePicker } from "../components/GlassDatePicker";
 import { getImagePicker } from "../utils/imagePicker";
@@ -109,7 +112,9 @@ import { useSeller } from "../context/SellerContext";
 import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
-import { webCategoryLabel } from "../data/catalog";
+import { webCategoryLabel, SHOP_STOCK } from "../data/catalog";
+import { GROUP_BY_ID } from "../data/productVariants";
+import { RAW_PRODUCT_BY_ID } from "../data/realProducts";
 import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmtSigned, type Settlement, type SettlementStatus } from "../data/financeTransactions";
 import { ShopSalesReportView } from "./ShopSalesReportView";
 import { ShopReportView } from "./ShopReportView";
@@ -581,39 +586,41 @@ export type PMProduct = {
   recommended: boolean;
 };
 
-const PM_STATUS_COLOR: Record<PMStatus, string> = {
+export const PM_STATUS_COLOR: Record<PMStatus, string> = {
   เปิดขาย: "#319754",
   ปิดขาย: "#8a8f8a",
   สินค้าหมด: "#dc2626",
 };
 
-// Synthesized stock / flags so the status filter has variety (the storefront
-// catalog itself carries no stock field).
-const REGULAR_META: Record<string, { stock: number; closed?: boolean; flash?: boolean; recommended?: boolean }> = {
-  sp1: { stock: 500, flash: true, recommended: true },
-  sp2: { stock: 0 },
-  sp3: { stock: 1200, recommended: true },
-  sp4: { stock: 320 },
-  sp5: { stock: 0, closed: true },
-  sp6: { stock: 80, flash: true },
-};
-
-const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
-  const m = REGULAR_META[p.id] ?? { stock: 200 };
+// Stock comes from the shared SHOP_STOCK map (data/catalog.ts); the Flash Sale /
+// แนะนำ flags come straight off the catalog product, so the จัดการสินค้า tags
+// always match what the storefront cards actually display. Products whose
+// detail page offers variant options (VARIANT_GROUPS) show "มีตัวเลือก" with
+// the min–max price across their SKUs instead of "ราคาเดียว".
+export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
+  const m = SHOP_STOCK[p.id] ?? { stock: 200 };
   const status: PMStatus = m.closed ? "ปิดขาย" : m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
+  const group = GROUP_BY_ID[p.id];
+  let priceText = `฿ ${p.price.toFixed(2)}`;
+  if (group) {
+    const prices = group.items.map((it) => it.custom?.price ?? RAW_PRODUCT_BY_ID[it.id]?.price ?? p.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    priceText = min === max ? `฿ ${min.toFixed(2)}` : `฿ ${min.toFixed(2)} - ${max.toFixed(2)}`;
+  }
   return {
     id: p.id,
     name: p.name,
     category: webCategoryLabel(p.category),
     image: p.image as number,
-    type: "ราคาเดียว",
-    typeColor: "#ff9500",
-    priceText: `฿ ${p.price.toFixed(2)}`,
+    type: group ? "มีตัวเลือก" : "ราคาเดียว",
+    typeColor: group ? "#0088ff" : "#ff9500",
+    priceText,
     stockText: `${m.stock.toLocaleString()} ชิ้น`,
     status,
     statusColor: PM_STATUS_COLOR[status],
-    flash: !!m.flash,
-    recommended: !!m.recommended,
+    flash: !!p.isFlashSale,
+    recommended: !!p.isRecommended,
   };
 });
 
@@ -621,7 +628,7 @@ const GRADE_ACCENT: Record<string, string> = {
   พรีเมียม: "#d97706", คัดสรร: "#475569", มาตรฐาน: "#c2410c", ทั่วไป: "#047857", ประหยัด: "#475569",
 };
 
-const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
+export const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
   const status: PMStatus = m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
   return {
     id: m.id,
@@ -639,12 +646,57 @@ const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
   };
 });
 
+/* ── PM store — status overrides + deletions shared by the list, search, and
+   detail pages (same in-memory pattern as the coupons/promotions stores).
+   Base data stays the derived PM_REGULAR / PM_MATERIAL arrays; overrides
+   layer on top so every surface re-renders together. ── */
+type PMOverrides = Record<string, { status?: PMStatus; recommended?: boolean; deleted?: boolean }>;
+let pmOverrides: PMOverrides = {};
+const pmListeners = new Set<() => void>();
+const pmEmit = () => pmListeners.forEach((l) => l());
+const pmSubscribe = (l: () => void) => {
+  pmListeners.add(l);
+  return () => {
+    pmListeners.delete(l);
+  };
+};
+export function setPMStatus(id: string, status: PMStatus) {
+  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], status } };
+  pmEmit();
+}
+export function deletePMProduct(id: string) {
+  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], deleted: true } };
+  pmEmit();
+}
+export function setPMRecommended(id: string, recommended: boolean) {
+  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], recommended } };
+  pmEmit();
+}
+function applyPMOverrides(base: PMProduct[], o: PMOverrides): PMProduct[] {
+  return base
+    .filter((p) => !o[p.id]?.deleted)
+    .map((p) => {
+      const ov = o[p.id];
+      if (!ov) return p;
+      return {
+        ...p,
+        ...(ov.status ? { status: ov.status, statusColor: PM_STATUS_COLOR[ov.status] } : null),
+        ...(ov.recommended != null ? { recommended: ov.recommended } : null),
+      };
+    });
+}
+/** Live product list (overrides applied) — re-renders on toggle / delete. */
+export function usePMProducts(type: "regular" | "material"): PMProduct[] {
+  const o = useSyncExternalStore(pmSubscribe, () => pmOverrides, () => pmOverrides);
+  return useMemo(() => applyPMOverrides(type === "regular" ? PM_REGULAR : PM_MATERIAL, o), [type, o]);
+}
+
 // ===================== FLASH SALE (sidebar → Flash Sale) ====================
 // Ported from the web FlashSaleTab: platform events + the shop's joined products.
 type FlashEventStatus = "join" | "pending" | "active" | "ended";
 type FlashEvent = { id: string; name: string; status: FlashEventStatus; itemCount: number; dateRange: string; hms?: [number, number, number] };
 const FLASH_EVENTS: FlashEvent[] = [
-  { id: "fe1", name: "Flash Sale 7.1", status: "active", itemCount: 8, dateRange: "1-3 ก.ค. 69", hms: [39, 5, 53] },
+  { id: "fe1", name: "Flash Sale 7.1", status: "active", itemCount: 3, dateRange: "1-3 ก.ค. 69", hms: [39, 5, 53] },
   { id: "fe2", name: "Flash Sale 12.12", status: "join", itemCount: 0, dateRange: "12 ธ.ค. 69" },
   { id: "fe3", name: "Flash Sale 11.11", status: "join", itemCount: 0, dateRange: "11 พ.ย. 69" },
   { id: "fe4", name: "Flash Sale 10.10", status: "join", itemCount: 0, dateRange: "10 ต.ค. 69" },
@@ -662,23 +714,22 @@ const FLASH_STATUS_CFG: Record<FlashStatus, { label: string; color: string }> = 
   scheduled: { label: "กำหนดไว้ล่วงหน้า", color: "#f59e0b" },
   soldout: { label: "สินค้าหมด", color: "#dc2626" },
 };
-const FLASH_META = [
-  { discount: 38, total: 300, sold: 60, status: "active" as FlashStatus, startText: "08 พ.ค. 69 - 00:00", endText: "09 พ.ค. 69 - 23:59" },
-  { discount: 25, total: 300, sold: 180, status: "active" as FlashStatus, startText: "12 ธ.ค. 69 - 09:00", endText: "12 ธ.ค. 69 - 23:59" },
-  { discount: 40, total: 800, sold: 800, status: "soldout" as FlashStatus, startText: "12 ธ.ค. 69 - 09:00", endText: "12 ธ.ค. 69 - 23:59" },
-  { discount: 20, total: 200, sold: 0, status: "scheduled" as FlashStatus, startText: "28 ธ.ค. 69 - 20:00", endText: "28 ธ.ค. 69 - 23:59" },
-  { discount: 35, total: 150, sold: 96, status: "active" as FlashStatus, startText: "12 ธ.ค. 69 - 09:00", endText: "12 ธ.ค. 69 - 23:59" },
-];
-export const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.slice(0, 5).map((p, i) => {
-  const m = FLASH_META[i];
-  const flashPrice = Math.round(p.price * (1 - m.discount / 100));
-  const remaining = Math.max(0, m.total - m.sold);
+// Joined flash products = exactly the storefront's flash-sale cards (catalog
+// isFlashSale flags): normal/flash prices and the discount % mirror the card's
+// strikethrough + "ลด N%" pill, and sold tracks the same deterministic
+// soldPercent that drives the card's progress bar.
+const FLASH_QUOTA: Record<string, number> = { "1": 300, "9": 300, "33": 150 };
+export const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.filter((p) => p.isFlashSale).map((p) => {
+  const total = FLASH_QUOTA[p.id] ?? 200;
+  const sold = Math.round((total * (p.soldPercent ?? 50)) / 100);
+  const startText = "01 ก.ค. 69 - 00:00"; // Flash Sale 7.1 window (fe1)
+  const endText = "03 ก.ค. 69 - 23:59";
   return {
     id: p.id, name: p.name, image: p.image as number,
-    normalPrice: p.price, flashPrice, discount: m.discount,
-    total: m.total, sold: m.sold, remaining, revenue: flashPrice * m.sold,
-    status: m.status, timeRange: `${m.startText} – ${m.endText}`,
-    startText: m.startText, endText: m.endText,
+    normalPrice: p.originalPrice ?? p.price, flashPrice: p.price, discount: p.discountPercent ?? 0,
+    total, sold, remaining: Math.max(0, total - sold), revenue: p.price * sold,
+    status: "active" as FlashStatus, timeRange: `${startText} – ${endText}`,
+    startText, endText,
   };
 });
 
@@ -1027,11 +1078,11 @@ function OverviewScreen() {
           pmType={pmType}
           onPmType={setPmType}
         />
-        {/* FAB — add product/material based on the active tab */}
+        {/* FAB — expands into the add menu (ผลิตภัณฑ์ / วัตถุดิบ) */}
         {sub === "products_manage" ? (
-          <PMAddFab
+          <PMAddMenuFab
             bottom={tabBarHeight + 16}
-            onPress={() => nav.navigate("AddProduct", { mode: pmType })}
+            onAdd={(mode) => nav.navigate("AddProduct", { mode })}
           />
         ) : null}
         {sub === "flash_sale" ? (
@@ -2728,14 +2779,14 @@ function OverviewTab({
     <SectionCard
       title="ออเดอร์ล่าสุด"
       count={ORDER_STATUS.reduce((a, b) => a + b.count, 0)}
-      onSeeAll={() => {}}
+      onSeeAll={() => nav.navigate("ShopOrders")}
     >
       <View
         className="flex-row flex-wrap"
         style={{ justifyContent: "space-between", rowGap: 8 }}
       >
         {ORDER_STATUS.map((s) => (
-          <StatusTile key={s.id} {...s} width="31.5%" />
+          <StatusTile key={s.id} {...s} width="31.5%" onPress={() => nav.navigate("ShopOrders", { initialFilter: s.id })} />
         ))}
       </View>
     </SectionCard>
@@ -2745,11 +2796,11 @@ function OverviewTab({
     <SectionCard
       title="สถานะใบเสนอราคา"
       count={QUOTATION_STATUS.reduce((a, b) => a + b.count, 0)}
-      onSeeAll={() => {}}
+      onSeeAll={() => nav.navigate("ShopSection", { section: "hm_quotations" })}
     >
       <View className="flex-row" style={{ justifyContent: "space-between" }}>
         {QUOTATION_STATUS.map((s) => (
-          <StatusTile key={s.id} {...s} width="31.5%" />
+          <StatusTile key={s.id} {...s} width="31.5%" onPress={() => nav.navigate("ShopSection", { section: "hm_quotations", initialFilter: s.id })} />
         ))}
       </View>
     </SectionCard>
@@ -2759,11 +2810,11 @@ function OverviewTab({
     <SectionCard
       title="สถานะสินค้าทดลอง"
       count={TRIAL_STATUS.reduce((a, b) => a + b.count, 0)}
-      onSeeAll={() => {}}
+      onSeeAll={() => nav.navigate("ShopSection", { section: "trials_products" })}
     >
       <View className="flex-row" style={{ justifyContent: "space-between" }}>
         {TRIAL_STATUS.map((s) => (
-          <StatusTile key={s.id} {...s} width="31.5%" />
+          <StatusTile key={s.id} {...s} width="31.5%" onPress={() => nav.navigate("ShopSection", { section: "trials_products" })} />
         ))}
       </View>
     </SectionCard>
@@ -3387,15 +3438,18 @@ function StatusTile({
   accent,
   Icon,
   width,
+  onPress,
 }: {
   label: string;
   count: number;
   accent: string;
   Icon: typeof Wallet;
   width: number | string;
+  onPress?: () => void;
 }) {
   return (
     <Pressable
+      onPress={onPress}
       className="active:opacity-70"
       style={{
         width: width as never,
@@ -3625,10 +3679,12 @@ const QT_TABS = [
 
 // ใบเสนอราคา — status filter chips + web-matching cards. The pushed subpage
 // hides the inline search (its app-bar button opens ShopQuoteSearch instead).
-export function QuotationSection({ showSearch = true }: { showSearch?: boolean }) {
+export function QuotationSection({ showSearch = true, initialFilter }: { showSearch?: boolean; initialFilter?: string }) {
   const nav = useNavigation<Nav>();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<(typeof QT_TABS)[number]["id"]>("all");
+  const [filter, setFilter] = useState<(typeof QT_TABS)[number]["id"]>(
+    (initialFilter as (typeof QT_TABS)[number]["id"]) ?? "all",
+  );
 
   const count = (id: string) =>
     id === "all" ? QUOTATIONS.length : QUOTATIONS.filter((d) => d.status === id).length;
@@ -3830,23 +3886,19 @@ const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[
 // Skeleton placeholder mirroring a product card while the list loads.
 function PMCardSkeleton() {
   return (
-    <View style={{ borderRadius: 24, overflow: "hidden", backgroundColor: "#eef0ee" }}>
-      {/* White header */}
-      <View className="flex-row" style={{ backgroundColor: "white", borderRadius: 24, padding: 12, gap: 12 }}>
-        <Skeleton width={56} height={56} radius={14} />
-        <View style={{ flex: 1, justifyContent: "center", gap: 8 }}>
-          <Skeleton width="80%" height={16} />
-          <Skeleton width="50%" height={12} />
-          <View className="flex-row items-center justify-between">
-            <Skeleton width={70} height={16} />
-            <Skeleton width={52} height={12} />
-          </View>
+    <View style={{ backgroundColor: "white", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}>
+      <View className="flex-row items-center" style={{ gap: 12 }}>
+        <Skeleton width={52} height={52} radius={12} />
+        <View style={{ flex: 1, gap: 7 }}>
+          <Skeleton width="70%" height={14} />
+          <Skeleton width="45%" height={11} />
         </View>
+        <Skeleton width={64} height={22} radius={999} />
       </View>
-      {/* Gray base — pills */}
-      <View className="flex-row" style={{ gap: 6, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}>
-        <Skeleton width={72} height={22} radius={999} />
-        <Skeleton width={90} height={22} radius={999} />
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
+      <View className="flex-row items-center justify-between">
+        <Skeleton width={90} height={20} radius={999} />
+        <Skeleton width={72} height={16} />
       </View>
     </View>
   );
@@ -4306,52 +4358,14 @@ function FlashTermsSheet({ event, onClose, onJoin }: { event: FlashEvent | null;
 }
 
 
-// Product-type segmented control with a sliding pill (same motion as PeriodTabs).
-function TypeTabs({ type, onChange, regularN, materialN }: { type: "regular" | "material"; onChange: (t: "regular" | "material") => void; regularN: number; materialN: number }) {
-  const tabs = [
-    { id: "regular" as const, label: "ผลิตภัณฑ์", Icon: ShoppingBag, n: regularN },
-    { id: "material" as const, label: "วัตถุดิบ", Icon: Beaker, n: materialN },
-  ];
-  const idx = type === "regular" ? 0 : 1;
-  const pos = useRef(new Animated.Value(idx)).current;
-  const [segW, setSegW] = useState(0);
-  useEffect(() => {
-    Animated.timing(pos, { toValue: idx, duration: 100, useNativeDriver: true }).start();
-  }, [idx, pos]);
-  const translateX = pos.interpolate({ inputRange: [0, 1], outputRange: [0, segW] });
-  return (
-    <View
-      onLayout={(e) => setSegW((e.nativeEvent.layout.width - 8) / 2)}
-      style={{ height: 46, borderRadius: 999, backgroundColor: "white", padding: 4, borderWidth: 1, borderColor: DIVIDER_GRAY }}
-    >
-      {segW > 0 ? (
-        <Animated.View style={{ position: "absolute", top: 4, bottom: 4, left: 4, width: segW, borderRadius: 999, backgroundColor: BRAND_GREEN, transform: [{ translateX }] }} />
-      ) : null}
-      <View style={{ flex: 1, flexDirection: "row" }}>
-        {tabs.map((tab) => {
-          const on = type === tab.id;
-          return (
-            <Pressable key={tab.id} onPress={() => onChange(tab.id)} className="flex-row items-center justify-center" style={{ flex: 1, gap: 6 }}>
-              <tab.Icon size={15} color={on ? "white" : TEXT_MUTED} strokeWidth={2.2} />
-              <Text style={{ fontSize: 13, fontWeight: on ? "700" : "600", color: on ? "white" : TEXT_SECONDARY }}>{tab.label}</Text>
-              <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", backgroundColor: on ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: on ? "white" : TEXT_MUTED }}>{tab.n}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
 
-export function ProductsManageSection({ type, setType }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void }) {
+export function ProductsManageSection({ type, setType, showSearch = true }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void; showSearch?: boolean }) {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | PMStatus>("all");
   const [query, setQuery] = useState("");
-  // Local copies so toggle-status / delete persist within the session.
-  const [regular, setRegular] = useState<PMProduct[]>(PM_REGULAR);
-  const [material, setMaterial] = useState<PMProduct[]>(PM_MATERIAL);
+  // Store-backed lists — toggle/delete from any page updates here live.
+  const regular = usePMProducts("regular");
+  const material = usePMProducts("material");
   const [menuFor, setMenuFor] = useState<PMProduct | null>(null);
 
   // Brief skeleton-load whenever the tab changes (or on first mount).
@@ -4363,17 +4377,6 @@ export function ProductsManageSection({ type, setType }: { type: "regular" | "ma
   }, [type]);
 
   const list = type === "regular" ? regular : material;
-  const setList = type === "regular" ? setRegular : setMaterial;
-
-  // Tap a card → storefront preview shown as a swipe-up sheet (customer view).
-  const openPreview = (p: PMProduct) => {
-    if (type === "material") {
-      nav.navigate("HerbalMarketPreview", { id: p.id, preview: true });
-    } else {
-      const sp = SHOP_PRODUCTS.find((x) => x.id === p.id);
-      if (sp) nav.navigate("ProductPreview", { product: sp, preview: true });
-    }
-  };
 
   const count = (id: "all" | PMStatus) => (id === "all" ? list.length : list.filter((p) => p.status === id).length);
 
@@ -4384,23 +4387,29 @@ export function ProductsManageSection({ type, setType }: { type: "regular" | "ma
     return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
   });
 
-  const setStatus = (id: string, status: PMStatus) =>
-    setList((prev) => prev.map((p) => (p.id === id ? { ...p, status, statusColor: PM_STATUS_COLOR[status] } : p)));
-
   const remove = (p: PMProduct) =>
     Alert.alert("ลบสินค้า", `ต้องการลบ "${p.name}" ใช่หรือไม่?`, [
       { text: "ยกเลิก", style: "cancel" },
-      { text: "ลบ", style: "destructive", onPress: () => { setList((prev) => prev.filter((x) => x.id !== p.id)); setMenuFor(null); } },
+      { text: "ลบ", style: "destructive", onPress: () => { deletePMProduct(p.id); setMenuFor(null); } },
     ]);
 
   return (
     <View style={{ gap: 14 }}>
-      {/* Product-type segmented control — sliding pill */}
-      <TypeTabs type={type} regularN={regular.length} materialN={material.length} onChange={(t) => { setType(t); setFilter("all"); }} />
+      {/* Product-type switcher — shared sliding-pill segmented control (same
+          look as the storefront tabs) */}
+      <SegmentedTabs
+        tabs={[
+          { id: "regular" as const, label: "ผลิตภัณฑ์", count: regular.length },
+          { id: "material" as const, label: "วัตถุดิบ", count: material.length },
+        ]}
+        active={type}
+        onChange={(t) => { setType(t); setFilter("all"); }}
+      />
 
       {/* Add action is a floating FAB rendered by OverviewScreen (above the tab bar). */}
 
-      {/* Search */}
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopProductManageSearch) */}
+      {showSearch ? (
       <View
         className="flex-row items-center"
         style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
@@ -4416,6 +4425,7 @@ export function ProductsManageSection({ type, setType }: { type: "regular" | "ma
           <Search size={16} color="white" />
         </View>
       </View>
+      ) : null}
 
       {/* Status filter pills — full-bleed so the row scrolls edge-to-edge (not cropped by the page padding) */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
@@ -4447,16 +4457,18 @@ export function ProductsManageSection({ type, setType }: { type: "regular" | "ma
           <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า</Text>
         </View>
       ) : (
-        visible.map((p) => <PMCard key={p.id} p={p} onMenu={() => setMenuFor(p)} onPreview={() => openPreview(p)} />)
+        visible.map((p) => (
+          <PMCard key={p.id} p={p} onMenu={() => setMenuFor(p)} onPreview={() => nav.navigate("ShopProductDetail", { productId: p.id, type })} />
+        ))
       )}
 
-      {/* 3-dot action menu */}
+      {/* Long-press action menu */}
       <PMActionSheet
         product={menuFor}
         onClose={() => setMenuFor(null)}
         onToggle={(prod) => {
           const next: PMStatus = prod.status === "เปิดขาย" ? "ปิดขาย" : "เปิดขาย";
-          setStatus(prod.id, next);
+          setPMStatus(prod.id, next);
           // Update the open sheet's product so the switch reflects the new state.
           setMenuFor({ ...prod, status: next, statusColor: PM_STATUS_COLOR[next] });
         }}
@@ -4490,82 +4502,106 @@ export function PMAddFab({ bottom, onPress }: { bottom: number; onPress: () => v
   );
 }
 
-// Product card — tap = storefront preview; 3-dot = action menu.
-function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; onPreview: () => void }) {
+// Add-FAB that morphs into a 2-option menu (เพิ่มผลิตภัณฑ์ / เพิ่มวัตถุดิบ) —
+// same iOS 26 morph as the app-bar ⋯ menus, but pinned to the FAB's
+// bottom-right corner so the card grows upward. The FAB hides while open
+// (the button "becomes" the menu).
+export function PMAddMenuFab({ bottom, onAdd }: { bottom: number; onAdd: (mode: "regular" | "material") => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {!open ? <PMAddFab bottom={bottom} onPress={() => setOpen(true)} /> : null}
+      <AppleMenu visible={open} onClose={() => setOpen(false)} anchorBottom={bottom} right={16} originSize={58}>
+        <AppleMenuItem label="เพิ่มผลิตภัณฑ์" Icon={Package} onPress={() => { setOpen(false); onAdd("regular"); }} />
+        <AppleMenuItem label="เพิ่มวัตถุดิบ" Icon={Sprout} onPress={() => { setOpen(false); onAdd("material"); }} />
+      </AppleMenu>
+    </>
+  );
+}
+
+// Product card — same layout language as the order / quotation cards: flat
+// white card, header row (image + name / category / chip row: status + type +
+// participation tags), divider, then stock flush left with the price flush
+// right. Tap = product detail page; long-press = action menu.
+export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; onPreview: () => void }) {
   const dimmed = p.status !== "เปิดขาย";
   const overlay = p.status === "สินค้าหมด" ? "หมด" : p.status === "ปิดขาย" ? "ปิด" : null;
-  const stockMatch = p.stockText.match(/^([\d,]+)\s*(.*)$/);
-
-  const Pill = ({ text, color, bg, border, Icon }: { text: string; color: string; bg: string; border?: string; Icon?: typeof Package }) => (
-    <View
-      className="flex-row items-center"
-      style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 999, gap: 4, borderWidth: border ? 1 : 0, borderColor: border }}
-    >
-      {Icon ? <Icon size={10} color={color} strokeWidth={2.6} /> : null}
-      <Text style={{ fontSize: 10.5, fontWeight: "700", color }}>{text}</Text>
-    </View>
-  );
+  // In a RUNNING product-scoped promotion? (store-backed, live). Scheduled
+  // promos don't count — the tag mirrors what the storefront shows right now.
+  // A flash-sale product can never simultaneously be in a promotion, so the
+  // flash flag wins if the data ever conflicts.
+  const promotions = useAllPromotions();
+  const inPromo =
+    !p.flash &&
+    promotions.some(
+      (pr) => pr.enabled && promoStatus(pr) === "active" && pr.scope === "products" && pr.products.some((x) => x.productId === p.id),
+    );
 
   return (
-    // Flash-card style: white header on top of a light-gray gradient base that
-    // peeks below (holding the status/type pills). Data unchanged from before.
     <Pressable
       onPress={onPreview}
-      className="active:opacity-95"
-      style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.08), 0px 6px 12px rgba(0,0,0,0.06)", elevation: 3 }}
+      onLongPress={onMenu}
+      className="active:opacity-90"
+      style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}
     >
-      <LinearGradient colors={["#f7f8f7", "#e3e7e3"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
-        {/* White header — image + name/category/price + 3-dot */}
-        <View className="flex-row" style={{ backgroundColor: "white", borderRadius: 24, padding: 12, gap: 12 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 14, overflow: "hidden", backgroundColor: SURFACE_GRAY }}>
-            <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
-            {overlay ? (
-              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
-                <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>{overlay}</Text>
+      {/* Header — image + name / category / status + type + participation chips */}
+      <View className="flex-row items-center" style={{ gap: 12 }}>
+        <View style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
+          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
+          {overlay ? (
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
+              <Text style={{ color: "white", fontSize: 11, fontWeight: "800" }}>{overlay}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {/* Name row — status pill sits flush right of the name */}
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
+            <View style={{ backgroundColor: p.statusColor + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: p.statusColor }}>{p.status}</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }} numberOfLines={1}>{p.category}</Text>
+          {/* Chip row — type + participation tags, under the category. Pill
+              sizing matches the peer list cards (order/coupon status pills). */}
+          <View className="flex-row items-center" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            <View style={{ backgroundColor: p.typeColor + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: p.typeColor }}>{p.type}</Text>
+            </View>
+            {p.flash ? (
+              <View className="flex-row items-center" style={{ gap: 4, backgroundColor: "rgba(230,46,5,0.1)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+                <Zap size={11} color="#e62e05" strokeWidth={2.6} />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#e62e05" }}>Flash Sale</Text>
+              </View>
+            ) : null}
+            {p.recommended ? (
+              <View style={{ backgroundColor: "rgba(49,151,84,0.1)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: BRAND_GREEN }}>★ แนะนำ</Text>
+              </View>
+            ) : null}
+            {inPromo ? (
+              <View style={{ backgroundColor: "rgba(245,158,11,0.12)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#d97706" }}>โปรโมชั่น</Text>
               </View>
             ) : null}
           </View>
-
-          <View style={{ flex: 1, justifyContent: "center", gap: 3 }}>
-            <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
-              <Text style={{ flex: 1, fontSize: 16, fontWeight: "700", color: "#0a0a0a", lineHeight: 21 }} numberOfLines={1}>{p.name}</Text>
-              <Pressable
-                onPress={onMenu}
-                hitSlop={8}
-                className="items-center justify-center active:opacity-70"
-                style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(118,118,128,0.14)" }}
-              >
-                <MoreHorizontal size={16} color={TEXT_SECONDARY} />
-              </Pressable>
-            </View>
-
-            <Text style={{ fontSize: 13, color: TEXT_MUTED }} numberOfLines={1}>{p.category}</Text>
-
-            <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, fontWeight: "800", color: "#0a0a0a" }}>{p.priceText}</Text>
-              <Text numberOfLines={1} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
-                {stockMatch ? (<><Text style={{ fontWeight: "700" }}>{stockMatch[1]}</Text> {stockMatch[2]}</>) : p.stockText}
-              </Text>
-            </View>
-          </View>
         </View>
+      </View>
 
-        {/* Gray base — status / type / flash / recommended pills */}
-        <View style={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: "center", gap: 6 }}>
-            <Pill text={p.status} color={p.statusColor} bg="#ffffff" border={p.statusColor + "55"} Icon={Package} />
-            <Pill text={p.type} color={p.typeColor} bg="#ffffff" border={p.typeColor + "55"} />
-            {p.flash ? <Pill text="Flash" color="#fff" bg="#e62e05" Icon={Zap} /> : null}
-            {p.recommended ? <Pill text="★ แนะนำ" color="#fff" bg={BRAND_GREEN} /> : null}
-          </ScrollView>
-        </View>
-      </LinearGradient>
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
+
+      {/* Footer — stock left · price right (menu moved to long-press) */}
+      <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
+        <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED }}>คงเหลือ {p.stockText}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "800", color: "#0a0a0a" }}>{p.priceText}</Text>
+      </View>
     </Pressable>
   );
 }
 
 // Bottom-sheet action menu for a product (toggle sale / edit / stock / delete).
-function PMActionSheet({
+export function PMActionSheet({
   product, onClose, onToggle, onDelete,
 }: {
   product: PMProduct | null;
@@ -5084,8 +5120,8 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
 // ===================== ORDERS SECTION =====================
 // Mobile port of the web OrdersTab: filter pills (horizontal scroll) + search,
 // then a stack of order cards filtered by the active tab + query.
-export function OrdersSection({ showSearch = true }: { showSearch?: boolean }) {
-  const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+export function OrdersSection({ showSearch = true, initialFilter }: { showSearch?: boolean; initialFilter?: string }) {
+  const [filter, setFilter] = useState<"all" | OrderStatus>((initialFilter as OrderStatus) ?? "all");
   const [query, setQuery] = useState("");
 
   const count = (id: "all" | OrderStatus) =>

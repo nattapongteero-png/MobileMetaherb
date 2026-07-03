@@ -114,7 +114,13 @@ import { ShopOrderReviewScreen } from "../screens/ShopOrderReviewScreen";
 import { ShopQuoteSearchScreen } from "../screens/ShopQuoteSearchScreen";
 import { ShopDocSearchScreen } from "../screens/ShopDocSearchScreen";
 import { ShopCouponSearchScreen } from "../screens/ShopCouponSearchScreen";
+import { ShopPromotionSearchScreen } from "../screens/ShopPromotionSearchScreen";
+import { ShopPromotionDetailScreen } from "../screens/ShopPromotionDetailScreen";
+import { PromoProductPickerScreen } from "../screens/PromoProductPickerScreen";
+import { OptionPickerScreen } from "../screens/OptionPickerScreen";
+import { ShopProductManageSearchScreen } from "../screens/ShopProductManageSearchScreen";
 import { ShopCouponDetailScreen } from "../screens/ShopCouponDetailScreen";
+import { ShopProductDetailScreen } from "../screens/ShopProductDetailScreen";
 import { ShopSectionScreen } from "../screens/ShopSectionScreen";
 import { ShopReportScreen } from "../screens/ShopReportView";
 import { ShopManagerChatScreen } from "../screens/ShopManagerChatScreen";
@@ -226,7 +232,7 @@ export type RootStackParamList = {
   ShopComplaintSearch: undefined;
   ShopComplaints: undefined;
   ShopProducts: undefined;
-  ShopOrders: undefined;
+  ShopOrders: { initialFilter?: string } | undefined;
   ShopOrderSearch: undefined;
   ShopOrderDetail: { orderId: string };
   CancelOrder: { orderId: string; onConfirm?: (reason: string, note: string) => void };
@@ -235,8 +241,14 @@ export type RootStackParamList = {
   ShopQuoteSearch: undefined;
   ShopDocSearch: { kind: DocKind };
   ShopCouponSearch: undefined;
+  ShopPromotionSearch: undefined;
+  ShopPromotionDetail: { promotionId: string };
+  PromoProductPicker: { excludeIds: string[]; onDone?: (ids: string[]) => void };
+  OptionPicker: { title: string; options: string[]; value?: string; searchPlaceholder?: string; onSelect?: (v: string) => void };
+  ShopProductManageSearch: undefined;
+  ShopProductDetail: { productId: string; type: "regular" | "material" };
   ShopCouponDetail: { couponId: string };
-  ShopSection: { section: string };
+  ShopSection: { section: string; initialFilter?: string };
   ShopReport: { kind: "sales" | "customers" | "products" | "market" };
   ShopManagerChat: undefined;
   Cafe: undefined;
@@ -356,11 +368,11 @@ export function RootStack() {
         component={ProductDetailScreen}
         options={{ animation: "slide_from_right" }}
       />
-      {/* Storefront preview — same screen, shown as a swipe-up sheet */}
+      {/* Storefront preview — same screen, pushed full-page (customer view) */}
       <Stack.Screen
         name="ProductPreview"
         component={ProductDetailScreen as React.ComponentType}
-        options={{ headerShown: false, presentation: "pageSheet", sheetGrabberVisible: true, sheetCornerRadius: 24 }}
+        options={{ headerShown: false, animation: "slide_from_right" }}
       />
       <Stack.Screen
         name="ArticleDetail"
@@ -401,7 +413,7 @@ export function RootStack() {
       <Stack.Screen name="ComplaintStatus" component={ComplaintStatusScreen} options={{ headerShown: true, title: "สถานะการร้องเรียน", animation: "slide_from_right" }} />
       <Stack.Screen name="CouponCollect" component={CouponCollectScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketDetail" component={HerbalMarketDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="HerbalMarketPreview" component={HerbalMarketDetailScreen} options={{ headerShown: false, presentation: "pageSheet", sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
+      <Stack.Screen name="HerbalMarketPreview" component={HerbalMarketDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketPR" component={HerbalMarketPRScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketPurchase" component={HerbalMarketPurchaseScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketQuote" component={HerbalMarketQuoteScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
@@ -466,7 +478,13 @@ export function RootStack() {
       <Stack.Screen name="ShopQuoteSearch" component={ShopQuoteSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopDocSearch" component={ShopDocSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopCouponSearch" component={ShopCouponSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopPromotionSearch" component={ShopPromotionSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopPromotionDetail" component={ShopPromotionDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="PromoProductPicker" component={PromoProductPickerScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="OptionPicker" component={OptionPickerScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopProductManageSearch" component={ShopProductManageSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopCouponDetail" component={ShopCouponDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopProductDetail" component={ShopProductDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopSection" component={ShopSectionScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopReport" component={ShopReportScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopManagerChat" component={ShopManagerChatScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

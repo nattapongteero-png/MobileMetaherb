@@ -19,6 +19,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassDatePicker } from "../components/GlassDatePicker";
 import { showToast } from "../components/Toast";
 import { SHOP_PRODUCTS } from "./ShopScreen";
+import { useAllPromotions, computedStatus } from "../data/promotions";
 import type { FlashProduct } from "./MyShopScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, DIVIDER_GRAY, SURFACE_GRAY } from "../theme/tokens";
@@ -108,7 +109,16 @@ export function FlashAddProductScreen() {
   const [endDate, setEndDate] = useState("");
 
   const q = query.trim().toLowerCase();
-  const list = SHOP_PRODUCTS.filter((p) => !q || p.name.toLowerCase().includes(q));
+  // Pickable pool = products not already in Flash Sale and not in a running
+  // promotion (a product is never in both at once).
+  const promotions = useAllPromotions();
+  const inActivePromo = (id: string) =>
+    promotions.some(
+      (pr) => pr.enabled && computedStatus(pr) === "active" && pr.scope === "products" && pr.products.some((x) => x.productId === id),
+    );
+  const list = SHOP_PRODUCTS.filter(
+    (p) => !p.isFlashSale && !inActivePromo(p.id) && (!q || p.name.toLowerCase().includes(q)),
+  );
 
   const flashPrice = picked ? (discType === "percent" ? Math.round(picked.price * (1 - discVal / 100)) : Math.max(0, picked.price - discVal)) : 0;
   const maxStock = DEFAULT_STOCK;

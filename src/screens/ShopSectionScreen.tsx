@@ -35,7 +35,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function ShopSectionScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { section } = useRoute<RouteProp<RootStackParamList, "ShopSection">>().params;
+  const { section, initialFilter } = useRoute<RouteProp<RootStackParamList, "ShopSection">>().params;
 
   // Per-section floating "create/add" action (mirrors the old in-console FABs).
   const fabPress =
@@ -74,6 +74,13 @@ export function ShopSectionScreen() {
             >
               <Search size={20} color="#1a1a1a" />
             </GlassIconButton>
+          ) : section === "promotions" ? (
+            <GlassIconButton
+              onPress={() => nav.navigate("ShopPromotionSearch")}
+              accessibilityLabel="ค้นหาโปรโมชั่น"
+            >
+              <Search size={20} color="#1a1a1a" />
+            </GlassIconButton>
           ) : undefined
         }
       />
@@ -83,12 +90,12 @@ export function ShopSectionScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + (fabPress ? 96 : 24) }}
         >
           {section === "flash_sale" ? <FlashSaleSection /> : null}
-          {section === "hm_quotations" ? <QuotationSection showSearch={false} /> : null}
+          {section === "hm_quotations" ? <QuotationSection showSearch={false} initialFilter={initialFilter} /> : null}
           {section === "hm_pr" ? <DocSection kind="pr" showSearch={false} /> : null}
           {section === "hm_po" ? <DocSection kind="po" showSearch={false} /> : null}
           {section === "trials_products" ? <TrialRegistryOwnerSection /> : null}
           {section === "trials_tracking" ? <TrialTrackingOwnerSection /> : null}
-          {section === "promotions" ? <PromotionsOwnerSection /> : null}
+          {section === "promotions" ? <PromotionsOwnerSection showSearch={false} /> : null}
           {section === "coupons" ? <CouponsOwnerSection showSearch={false} /> : null}
         </ScrollView>
         {/* Scroll fades — content dissolves into the header / bottom edge */}
@@ -104,7 +111,7 @@ export function ShopSectionScreen() {
           onPress={fabPress}
           accessibilityLabel="สร้าง / เพิ่ม"
           className="items-center justify-center active:opacity-90"
-          style={{ position: "absolute", right: 16, bottom: insets.bottom + 20, width: 56, height: 56, borderRadius: 28, backgroundColor: BRAND_GREEN, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
+          style={{ position: "absolute", right: 16, bottom: 18, width: 56, height: 56, borderRadius: 28, backgroundColor: BRAND_GREEN, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
         >
           <Plus size={26} color="#fff" strokeWidth={2.6} />
         </Pressable>

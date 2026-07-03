@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, type View as RNView } from "react-native";
-import { ChevronDown, Check } from "lucide-react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, type View as RNView } from "react-native";
+import { ChevronDown, Check, Search } from "lucide-react-native";
 import { GlassView } from "expo-glass-effect";
 import { BRAND_GREEN } from "../theme/tokens";
 import { PressableScale } from "./PressableScale";
@@ -13,18 +13,26 @@ import { PressableScale } from "./PressableScale";
  * so every dropdown in the app feels native.
  *
  * The closed trigger keeps the form's gray pill look; while open it gains a green
- * outline + a rotated green chevron.
+ * outline + a rotated green chevron. Long lists scroll inside the popover;
+ * `searchable` adds a filter box pinned above the options.
  */
 export function GlassSelect<T extends string>({
   value,
   options,
   onSelect,
+  placeholder,
+  searchable = false,
+  searchPlaceholder = "ค้นหา...",
 }: {
   value: T;
   options: { key: T; label: string }[];
   onSelect: (k: T) => void;
+  placeholder?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 0 });
   const ref = useRef<RNView>(null);
   const current = options.find((o) => o.key === value)?.label ?? "";
@@ -32,9 +40,13 @@ export function GlassSelect<T extends string>({
   const openMenu = () => {
     ref.current?.measureInWindow((x, y, w, h) => {
       setAnchor({ x, y: y + h + 6, width: w });
+      setQuery("");
       setOpen(true);
     });
   };
+
+  const q = query.trim().toLowerCase();
+  const visible = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
 
   return (
     <View>
@@ -53,7 +65,12 @@ export function GlassSelect<T extends string>({
           borderColor: open ? BRAND_GREEN : "transparent",
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: "500", color: open ? BRAND_GREEN : "#374151" }}>{current}</Text>
+        <Text
+          numberOfLines={1}
+          style={{ flex: 1, fontSize: 14, fontWeight: "500", color: open ? BRAND_GREEN : current ? "#374151" : "#9ca3af" }}
+        >
+          {current || placeholder || ""}
+        </Text>
         <ChevronDown
           size={18}
           color={open ? BRAND_GREEN : "#9ca3af"}
@@ -67,25 +84,48 @@ export function GlassSelect<T extends string>({
         <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
           <View style={[styles.popoverShadow, { left: anchor.x, top: anchor.y, width: anchor.width }]}>
             <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor="rgba(255,255,255,0.45)" style={styles.popover}>
-              {options.map((o) => {
-                const active = o.key === value;
-                return (
-                  <Pressable
-                    key={o.key}
-                    onPress={() => {
-                      onSelect(o.key);
-                      setOpen(false);
-                    }}
-                    className="flex-row items-center active:opacity-50"
-                    style={{ paddingHorizontal: 14, height: 46 }}
-                  >
-                    <View style={{ width: 26, alignItems: "flex-start" }}>
-                      {active ? <Check size={18} color={BRAND_GREEN} strokeWidth={2.8} /> : null}
-                    </View>
-                    <Text style={{ flex: 1, fontSize: 15, color: "#1c1c1e", fontWeight: active ? "600" : "400" }}>{o.label}</Text>
-                  </Pressable>
-                );
-              })}
+              {searchable ? (
+                <View
+                  className="flex-row items-center"
+                  style={{ marginHorizontal: 10, marginTop: 6, marginBottom: 4, height: 38, borderRadius: 12, paddingHorizontal: 12, gap: 8, backgroundColor: "rgba(118,118,128,0.12)" }}
+                >
+                  <Search size={15} color="#8e8e93" strokeWidth={2.2} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder={searchPlaceholder}
+                    placeholderTextColor="#a3a3a3"
+                    style={{ flex: 1, fontSize: 14, color: "#1c1c1e", padding: 0 }}
+                  />
+                </View>
+              ) : null}
+              <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {visible.length === 0 ? (
+                  <View style={{ paddingHorizontal: 14, height: 46, justifyContent: "center" }}>
+                    <Text style={{ fontSize: 14, color: "#8e8e93" }}>ไม่พบตัวเลือก</Text>
+                  </View>
+                ) : (
+                  visible.map((o) => {
+                    const active = o.key === value;
+                    return (
+                      <Pressable
+                        key={o.key}
+                        onPress={() => {
+                          onSelect(o.key);
+                          setOpen(false);
+                        }}
+                        className="flex-row items-center active:opacity-50"
+                        style={{ paddingHorizontal: 14, height: 46 }}
+                      >
+                        <View style={{ width: 26, alignItems: "flex-start" }}>
+                          {active ? <Check size={18} color={BRAND_GREEN} strokeWidth={2.8} /> : null}
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 15, color: "#1c1c1e", fontWeight: active ? "600" : "400" }}>{o.label}</Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
             </GlassView>
           </View>
         </Pressable>

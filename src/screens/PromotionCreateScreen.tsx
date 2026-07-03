@@ -6,7 +6,7 @@
  *  calendar. On a phone we keep the SAME sections stacked in one scroll column,
  *  and adapt the range calendar to a compact inline month grid (start → end tap
  *  selection) plus a "ไม่มีวันหมดอายุ" toggle. The product picker (web sub-modal)
- *  becomes a BottomSheet listing เปิดขาย products, searchable, tap-to-add; picked
+ *  opens the PromoProductPicker modal (AddCard shell, multi-select); picked
  *  products show as removable rows with a per-product limit stepper.
  *
  *  On save: build the Promotion and add/update the promotions store, toast, back.
@@ -14,6 +14,9 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, TextInput, Image, Switch } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
+import { BottomFade } from "../components/BottomFade";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -32,7 +35,6 @@ import {
 } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { NumberStepper } from "../components/NumberStepper";
-import { BottomSheet } from "../components/BottomSheet";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
@@ -87,19 +89,17 @@ function SectionHeader({ Icon, tint, title, sub, required }: { Icon: typeof Perc
   );
 }
 
+// Full-bleed white section — edge-to-edge blocks separated by the gray gap,
+// same shell as the coupon create / detail pages.
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <View
       style={{
         backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 16,
+        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
         gap: 14,
-        shadowColor: "#000",
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
       }}
     >
       {children}
@@ -209,8 +209,6 @@ export function PromotionCreateScreen() {
   const [scope, setScope] = useState<PromoScope>(() => editing?.scope ?? "products");
   const [selectedProducts, setSelectedProducts] = useState<PromoProductLimit[]>(() => editing?.products ?? []);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerSearch, setPickerSearch] = useState("");
 
   const num = (s: string) => Number(s.replace(/[^0-9]/g, "")) || 0;
   const canSubmit = !!name.trim() && discountValue > 0 && (scope === "all" || selectedProducts.length > 0);
@@ -235,12 +233,6 @@ export function PromotionCreateScreen() {
     return Math.max(1, Math.ceil((to.getTime() - from.getTime()) / 86400000) + 1);
   }, [from, to, noExpiry]);
 
-  const availableForPicker = PROMO_PRODUCTS.filter(
-    (p) =>
-      p.status === "เปิดขาย" &&
-      !selectedProducts.find((s) => s.productId === p.id) &&
-      (pickerSearch.trim() ? p.name.toLowerCase().includes(pickerSearch.trim().toLowerCase()) : true),
-  );
 
   const submit = () => {
     if (!canSubmit) return;
@@ -283,7 +275,8 @@ export function PromotionCreateScreen() {
         showSearch={false}
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
         {/* ── ข้อมูลโปรโมชั่น ── */}
         <Card>
           <SectionHeader Icon={Megaphone} tint={BRAND_GREEN} title="ข้อมูลโปรโมชั่น" sub="ชื่อและรายละเอียด" />
@@ -439,18 +432,19 @@ export function PromotionCreateScreen() {
                   ) : null}
                 </View>
                 <Pressable
-                  onPress={() => { setPickerSearch(""); setPickerOpen(true); }}
+                  onPress={() => nav.navigate("PromoProductPicker", { excludeIds: selectedProducts.map((x) => x.productId), onDone: (ids) => setSelectedProducts((prev) => [...prev, ...ids.map((id) => ({ productId: id, limit: "unlimited" as const }))]) })}
                   className="flex-row items-center active:opacity-80"
-                  style={{ gap: 4, paddingHorizontal: 12, height: 32, borderRadius: 999, backgroundColor: BRAND_GREEN }}
+                  hitSlop={6}
+                  style={{ gap: 6, paddingHorizontal: 16, height: 40, borderRadius: 999, backgroundColor: BRAND_GREEN }}
                 >
-                  <Plus size={14} color="#fff" strokeWidth={2.4} />
-                  <Text style={{ fontSize: 12, fontWeight: "500", color: "#fff" }}>เพิ่มสินค้า</Text>
+                  <Plus size={16} color="#fff" strokeWidth={2.4} />
+                  <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#fff" }}>เพิ่มสินค้า</Text>
                 </Pressable>
               </View>
 
               {selectedProducts.length === 0 ? (
                 <Pressable
-                  onPress={() => { setPickerSearch(""); setPickerOpen(true); }}
+                  onPress={() => nav.navigate("PromoProductPicker", { excludeIds: selectedProducts.map((x) => x.productId), onDone: (ids) => setSelectedProducts((prev) => [...prev, ...ids.map((id) => ({ productId: id, limit: "unlimited" as const }))]) })}
                   className="items-center justify-center active:opacity-80"
                   style={{ borderWidth: 2, borderStyle: "dashed", borderColor: "#e5e7eb", borderRadius: 16, paddingVertical: 24, gap: 8 }}
                 >
@@ -465,11 +459,13 @@ export function PromotionCreateScreen() {
                     const p = promoProductById(sp.productId);
                     if (!p) return null;
                     const numericLimit = sp.limit === "unlimited" ? 0 : sp.limit;
+                    // Cap the promo limit at the product's remaining stock.
+                    const stockMax = parseInt(p.stock.replace(/[^0-9]/g, ""), 10) || 0;
                     return (
                       <View key={sp.productId} style={{ gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 10 }}>
                         {/* Top: image + info + remove */}
                         <View className="flex-row items-start" style={{ gap: 10 }}>
-                          <Image source={{ uri: p.image }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover" />
+                          <Image source={p.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover" />
                           <View style={{ flex: 1, minWidth: 0 }}>
                             <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "500", color: "#000", lineHeight: 18 }}>{p.name}</Text>
                             <Text style={{ fontSize: 12, fontWeight: "500", color: BRAND_GREEN, marginTop: 2 }}>{p.price}</Text>
@@ -494,6 +490,7 @@ export function PromotionCreateScreen() {
                               value={numericLimit}
                               onChange={(n) => setLimit(sp.productId, n)}
                               min={0}
+                              max={stockMax}
                               step={1}
                               placeholder="ไม่จำกัด"
                             />
@@ -509,63 +506,45 @@ export function PromotionCreateScreen() {
         </Card>
       </ScrollView>
 
-      {/* Sticky footer — centered save button */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: DIVIDER_GRAY }}>
-        <Pressable
-          onPress={submit}
-          disabled={!canSubmit}
-          className="flex-row items-center justify-center active:opacity-90"
-          style={{ height: 50, borderRadius: 999, gap: 8, backgroundColor: canSubmit ? BRAND_GREEN : "#d4d4d4" }}
-        >
-          <Save size={17} color="#fff" strokeWidth={2.6} />
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{editId ? "บันทึกการแก้ไข" : "สร้างโปรโมชั่น"}</Text>
-        </Pressable>
+      {/* Top fade + bottom fade — same language as the detail pages */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["#fafafa", "rgba(250,250,250,0)"]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+      />
+      <BottomFade />
       </View>
 
-      {/* Product picker sheet */}
-      <BottomSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} centerTitle fill title="เลือกสินค้าเข้าร่วมโปรโมชั่น" minHeightRatio={0.5} maxHeightRatio={0.85}>
-        <View style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 }}>
-            <View className="flex-row items-center" style={{ backgroundColor: FAFAFA, borderRadius: 999, borderWidth: 1, borderColor: "#e5e7eb", paddingLeft: 14, paddingRight: 6, height: 40, gap: 8 }}>
-              <Search size={16} color="#9ca3af" />
-              <TextInput
-                style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, paddingVertical: 0 }}
-                placeholder="ค้นหาสินค้า..."
-                placeholderTextColor={PLACEHOLDER}
-                value={pickerSearch}
-                onChangeText={setPickerSearch}
-              />
-            </View>
-          </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }} keyboardShouldPersistTaps="handled">
-            {availableForPicker.length === 0 ? (
-              <Text style={{ textAlign: "center", paddingVertical: 32, fontSize: 13, color: "#8e8e93" }}>ไม่พบสินค้า</Text>
-            ) : (
-              availableForPicker.map((p) => (
-                <Pressable
-                  key={p.id}
-                  onPress={() => setSelectedProducts((prev) => [...prev, { productId: p.id, limit: "unlimited" }])}
-                  className="flex-row items-center active:opacity-80"
-                  style={{ gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: "#f0f0f0", backgroundColor: "#fff" }}
-                >
-                  <Image source={{ uri: p.image }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover" />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "500", color: "#000" }}>{p.name}</Text>
-                    <View className="flex-row items-center" style={{ gap: 8, marginTop: 3 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "500", color: BRAND_GREEN }}>{p.price}</Text>
-                      <View className="flex-row items-center" style={{ gap: 3 }}>
-                        <Boxes size={11} color="#9ca3af" strokeWidth={2.2} />
-                        <Text style={{ fontSize: 10.5, color: TEXT_MUTED }}>{p.stock}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Plus size={16} color={BRAND_GREEN} strokeWidth={2.4} />
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
+      {/* Floating Liquid Glass save bar — same as the coupon create page */}
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+        <View
+          style={{
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
+          }}
+        >
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
+          >
+            <Pressable
+              onPress={submit}
+              disabled={!canSubmit}
+              className="flex-row items-center justify-center active:opacity-90"
+              style={{ flex: 1, height: 50, borderRadius: 999, gap: 8, backgroundColor: canSubmit ? BRAND_GREEN : "#d4d4d4" }}
+            >
+              <Save size={17} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{editId ? "บันทึกการแก้ไข" : "สร้างโปรโมชั่น"}</Text>
+            </Pressable>
+          </GlassView>
         </View>
-      </BottomSheet>
+      </View>
+
     </View>
   );
 }

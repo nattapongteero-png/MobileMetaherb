@@ -6,13 +6,13 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ImagePlus, X, Package, FileText, Beaker, Banknote, Settings2, Plus, Minus, Trash2, MapPin,
-  Check, Star, Zap, Eye, AlertCircle, ChevronDown, Boxes,
+  Check, Star, Zap, Eye, AlertCircle, ChevronDown, Boxes, Save, Search,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BottomFade } from "../components/BottomFade";
 import * as Haptics from "expo-haptics";
 import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { BottomSheet } from "../components/BottomSheet";
 import { getImagePicker } from "../utils/imagePicker";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -51,77 +51,60 @@ function FieldLabel({ children, required }: { children: ReactNode; required?: bo
   );
 }
 
-// White section card — subtle shadow, icon + title + subtitle + divider (web parity).
-function Section({ Icon, title, subtitle, right, children }: { Icon: typeof Package; title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
+// Full-bleed white section — colored icon tile + title + sub header, same
+// language as the coupon / promotion create pages.
+function Section({ Icon, tint = BRAND_GREEN, title, subtitle, right, children }: { Icon: typeof Package; tint?: string; title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
   return (
-    <View style={{ backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 18 }}>
-      <View className="flex-row" style={{ gap: 12, alignItems: subtitle ? "flex-start" : "center" }}>
-        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={20} color={BRAND_GREEN} strokeWidth={2.2} />
+    <View style={{ backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 16, gap: 14 }}>
+      <View className="flex-row items-center" style={{ gap: 12 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${tint}1a`, alignItems: "center", justifyContent: "center" }}>
+          <Icon size={16} color={tint} strokeWidth={2.2} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: "600", color: "#0a0a0a", lineHeight: 24 }}>{title}</Text>
-          {subtitle ? (
-            <View className="flex-row items-center" style={{ gap: 5, marginTop: 3 }}>
-              <AlertCircle size={13} color="#bdbdbd" strokeWidth={2.2} />
-              <Text style={{ flex: 1, fontSize: 12, color: GRAY }}>{subtitle}</Text>
-            </View>
-          ) : null}
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#000" }}>{title}</Text>
+          {subtitle ? <Text style={{ fontSize: 11, color: "#8e8e93", marginTop: 1 }}>{subtitle}</Text> : null}
         </View>
         {right ?? null}
       </View>
-      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginTop: 16, marginBottom: 16 }} />
       <View style={{ gap: 16 }}>{children}</View>
     </View>
   );
 }
 
-// Number field with − / + steppers (pill). prefix (฿) / suffix (g, กก.) optional.
+// Number field with − / + steppers — same look as the shared NumberStepper
+// (promotion / coupon / shipping forms), plus optional prefix (฿) / suffix (กก.).
 function Stepper({ value, onChange, prefix, suffix, placeholder = "0", step = 1 }: { value: string; onChange: (v: string) => void; prefix?: string; suffix?: string; placeholder?: string; step?: number }) {
   const bump = (d: number) => {
     const n = Math.max(0, (parseFloat(value) || 0) + d);
     onChange(String(n));
     Haptics.selectionAsync().catch(() => {}); // tactile tick on each step
   };
-  // Fitts's Law — a wide, tall touch target (44px, Apple HIG min) + generous
-  // hitSlop makes the steppers easy to hit. Pressed → circle highlight + scale.
-  const StepBtn = ({ onPress, children }: { onPress: () => void; children: ReactNode }) => {
-    const [pressed, setPressed] = useState(false);
-    return (
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
-        hitSlop={10}
-        style={{ width: 46, height: 44, alignItems: "center", justifyContent: "center" }}
-      >
-        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? "rgba(0,0,0,0.10)" : "transparent", transform: [{ scale: pressed ? 0.86 : 1 }] }}>
-          {children}
-        </View>
-      </Pressable>
-    );
-  };
   return (
-    <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingLeft: 16, paddingRight: 2, gap: 6 }}>
+    <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 46, paddingLeft: 18, paddingRight: 6, gap: 6 }}>
       {prefix ? <Text style={{ fontSize: 14, color: GRAY }}>{prefix}</Text> : null}
-      <TextInput value={withCommas(value)} onChangeText={(t) => onChange(stripCommas(t))} placeholder={placeholder} placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a", minWidth: 0 }} />
+      <TextInput value={withCommas(value)} onChangeText={(t) => onChange(stripCommas(t))} placeholder={placeholder} placeholderTextColor="#a3a3a3" keyboardType="numeric" style={{ flex: 1, fontSize: 14, color: "#0a0a0a", minWidth: 0, paddingVertical: 0 }} />
       {suffix ? <Text style={{ fontSize: 12, color: GRAY }}>{suffix}</Text> : null}
-      <View className="flex-row items-center" style={{ backgroundColor: "#eceeeb", borderRadius: 999, height: 44, paddingHorizontal: 2 }}>
-        <StepBtn onPress={() => bump(-step)}><Minus size={16} color="#6b7280" strokeWidth={2.4} /></StepBtn>
-        <View style={{ width: 1, height: 18, backgroundColor: "#d3d6d1" }} />
-        <StepBtn onPress={() => bump(step)}><Plus size={16} color={BRAND_GREEN} strokeWidth={2.6} /></StepBtn>
+      <View className="flex-row items-center" style={{ backgroundColor: "#fff", borderRadius: 999, height: 34, overflow: "hidden" }}>
+        <Pressable onPress={() => bump(-step)} hitSlop={6} className="items-center justify-center active:opacity-70" style={{ width: 44, height: 34 }}>
+          <Minus size={16} color="#0a0a0a" strokeWidth={2.6} />
+        </Pressable>
+        <View style={{ width: 1, height: 18, backgroundColor: "#e5e7eb" }} />
+        <Pressable onPress={() => bump(step)} hitSlop={6} className="items-center justify-center active:opacity-70" style={{ width: 44, height: 34 }}>
+          <Plus size={16} color="#0a0a0a" strokeWidth={2.6} />
+        </Pressable>
       </View>
     </View>
   );
 }
 
-// Dropdown field — pill showing value/placeholder + chevron; opens a picker sheet.
+// Dropdown trigger — gray form pill; tapping opens the OptionPicker modal
+// (AddCard-style slide-up sheet, same shell as the promo product picker).
 function SelectField({ value, placeholder, onPress }: { value: string; placeholder: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} className="flex-row items-center justify-between active:opacity-80"
-      style={{ backgroundColor: "#fafafa", borderRadius: 999, paddingHorizontal: 20, height: 48 }}>
-      <Text style={{ flex: 1, fontSize: 14, color: value ? "#0a0a0a" : "#a3a3a3" }} numberOfLines={1}>{value || placeholder}</Text>
-      <ChevronDown size={18} color="#9ca3af" strokeWidth={2.2} />
+      style={{ backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 18, height: 48 }}>
+      <Text style={{ flex: 1, fontSize: 14, fontWeight: "500", color: value ? "#374151" : "#9ca3af" }} numberOfLines={1}>{value || placeholder}</Text>
+      <ChevronDown size={18} color="#9ca3af" strokeWidth={2.4} />
     </Pressable>
   );
 }
@@ -160,7 +143,7 @@ function MultiChip({ options, values, onToggle }: { options: string[]; values: s
 }
 
 // Settings card — gradient + icon circle + toggle + decorative image (web parity).
-function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, image }: { Icon: typeof Package; label: string; subtitle: string; value: boolean; onValueChange: (v: boolean) => void; accent: string; image?: number }) {
+export function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, image }: { Icon: typeof Package; label: string; subtitle: string; value: boolean; onValueChange: (v: boolean) => void; accent: string; image?: number }) {
   return (
     <View style={{ borderRadius: 20, padding: 18, overflow: "hidden", borderWidth: 1, borderColor: value ? accent + "33" : "#f0f0f0", backgroundColor: value ? undefined : "#fafafa" }}>
       {value ? (
@@ -168,7 +151,7 @@ function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, imag
       ) : null}
       {/* Decorative illustration — bottom-right */}
       {image ? (
-        <Image source={image} style={{ position: "absolute", right: -6, bottom: -8, width: 82, height: 82, opacity: value ? 0.92 : 0.42 }} resizeMode="contain" />
+        <Image source={image} style={{ position: "absolute", right: -8, bottom: -8, width: 90, height: 90, opacity: value ? 1 : 0.5 }} resizeMode="contain" />
       ) : null}
       <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
         <View className="flex-row items-center" style={{ gap: 10, flex: 1 }}>
@@ -187,8 +170,9 @@ function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, imag
   );
 }
 
-const IMG_SELL = require("../../assets/shop-open.png");
-const IMG_RECOMMEND = require("../../assets/test-product.png");
+// Same artwork as the web's ตั้งค่าสินค้า cards (selling-products / recommended-products).
+export const IMG_SELL = require("../../assets/selling-products.png");
+export const IMG_RECOMMEND = require("../../assets/recommended-products.png");
 
 export function AddProductScreen() {
   const nav = useNavigation<Nav>();
@@ -215,6 +199,10 @@ export function AddProductScreen() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [weight, setWeight] = useState("");
+  // ตั้งค่า SEO (web parity) — toggle reveals the title/keywords fields.
+  const [seoEnabled, setSeoEnabled] = useState(false);
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   // Variants (ตัวเลือกสินค้า) — regular products only.
   const [hasVariants, setHasVariants] = useState(false);
   const [variants, setVariants] = useState<{ image: string | null; name: string; price: string; stock: string; weight: string }[]>([
@@ -238,9 +226,6 @@ export function AddProductScreen() {
   const [recommended, setRecommended] = useState(false);
   const [flash, setFlash] = useState(false);
 
-  // Active option picker (opens a bottom sheet).
-  const [picker, setPicker] = useState<{ title: string; options: string[]; value: string; onChange: (v: string) => void } | null>(null);
-  const openPicker = (title: string, options: string[], value: string, onChange: (v: string) => void) => setPicker({ title, options, value, onChange });
 
   const sku = useMemo(() => `${isMaterial ? "MAT" : "PRD"}-${String(Date.now()).slice(-4)}`, [isMaterial]);
   const title = isMaterial ? "เพิ่มวัตถุดิบ" : "เพิ่มผลิตภัณฑ์";
@@ -277,11 +262,16 @@ export function AddProductScreen() {
 
   const previewPrice = Number(basePrice) || 0;
 
+  // Open the shared OptionPicker modal (slide-up sheet with search) for a field.
+  const openPicker = (title: string, options: string[], value: string, onChange: (v: string) => void, searchPlaceholder?: string) =>
+    nav.navigate("OptionPicker", { title, options, value: value || undefined, searchPlaceholder, onSelect: onChange });
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader title={title} onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
 
+      <View style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 110, gap: 8 }}>
         {/* รูปภาพสินค้า */}
         <Section Icon={ImagePlus} title="รูปภาพสินค้า" subtitle="อัปโหลดได้สูงสุด 3 รูป (JPG, PNG, WebP) ไม่เกิน 2MB">
@@ -316,7 +306,7 @@ export function AddProductScreen() {
         </Section>
 
         {/* ข้อมูลสินค้า */}
-        <Section Icon={FileText} title="ข้อมูลสินค้า">
+        <Section Icon={FileText} tint="#3b82f6" title="ข้อมูลสินค้า">
           <View>
             <FieldLabel required>ชื่อสินค้า</FieldLabel>
             <TextInput value={name} onChangeText={setName} placeholder={isMaterial ? "เช่น: ขมิ้นชันผง" : "เช่น: ยาดมสมุนไพร"} placeholderTextColor="#a3a3a3" style={INPUT} />
@@ -324,12 +314,12 @@ export function AddProductScreen() {
           <View className="flex-row" style={{ gap: 10 }}>
             <View style={{ flex: 1 }}>
               <FieldLabel required>หมวดหมู่</FieldLabel>
-              <SelectField value={category} placeholder="เลือกหมวดหมู่" onPress={() => openPicker("เลือกหมวดหมู่", isMaterial ? MATERIAL_CATEGORIES : REGULAR_CATEGORIES, category, setCategory)} />
+              <SelectField value={category} placeholder="เลือกหมวดหมู่" onPress={() => openPicker("เลือกหมวดหมู่", isMaterial ? MATERIAL_CATEGORIES : REGULAR_CATEGORIES, category, setCategory, "ค้นหาหมวดหมู่")} />
             </View>
             {!isMaterial ? (
               <View style={{ flex: 1 }}>
                 <FieldLabel>หน่วย</FieldLabel>
-                <SelectField value={unit} placeholder="เลือกหน่วย" onPress={() => openPicker("เลือกหน่วย", UNITS, unit, setUnit)} />
+                <SelectField value={unit} placeholder="เลือกหน่วย" onPress={() => openPicker("เลือกหน่วย", UNITS, unit, setUnit, "ค้นหาหน่วย")} />
               </View>
             ) : null}
           </View>
@@ -342,7 +332,7 @@ export function AddProductScreen() {
           </View>
           <View>
             <FieldLabel>รูปแบบสินค้า</FieldLabel>
-            <SelectField value={format} placeholder="เลือกรูปแบบสินค้า" onPress={() => openPicker("รูปแบบสินค้า", FORMATS, format, setFormat)} />
+            <SelectField value={format} placeholder="เลือกรูปแบบสินค้า" onPress={() => openPicker("รูปแบบสินค้า", FORMATS, format, setFormat, "ค้นหารูปแบบสินค้า")} />
           </View>
           <View>
             <FieldLabel>ยี่ห้อ / แบรนด์</FieldLabel>
@@ -362,7 +352,7 @@ export function AddProductScreen() {
 
         {/* ข้อมูล Herbal Market (B2B) — material only */}
         {isMaterial ? (
-          <Section Icon={Beaker} title="ข้อมูล Herbal Market (B2B)" subtitle="ข้อมูลเพิ่มเติมสำหรับลงตลาดวัตถุดิบ">
+          <Section Icon={Beaker} tint="#14b8a6" title="ข้อมูล Herbal Market (B2B)" subtitle="ข้อมูลเพิ่มเติมสำหรับลงตลาดวัตถุดิบ">
             <View>
               <FieldLabel required>แหล่งผลิต / จังหวัด</FieldLabel>
               <View style={AFFIX}>
@@ -370,9 +360,9 @@ export function AddProductScreen() {
                 <TextInput value={location} onChangeText={setLocation} placeholder="เช่น: เชียงใหม่" placeholderTextColor="#a3a3a3" style={{ flex: 1, fontSize: 14, color: "#0a0a0a" }} />
               </View>
             </View>
-            <View><FieldLabel>เกรดวัตถุดิบ</FieldLabel><SelectField value={grade} placeholder="เลือกเกรด" onPress={() => openPicker("เลือกเกรด", GRADES, grade, setGrade)} /></View>
-            <View><FieldLabel>วิธีการแปรรูป</FieldLabel><SelectField value={processing} placeholder="เลือกวิธีการแปรรูป" onPress={() => openPicker("วิธีการแปรรูป", PROCESSING, processing, setProcessing)} /></View>
-            <View><FieldLabel>บรรจุภัณฑ์เริ่มต้น</FieldLabel><SelectField value={packaging} placeholder="เลือกบรรจุภัณฑ์" onPress={() => openPicker("บรรจุภัณฑ์เริ่มต้น", PACKAGING, packaging, setPackaging)} /></View>
+            <View><FieldLabel>เกรดวัตถุดิบ</FieldLabel><SelectField value={grade} placeholder="เลือกเกรด" onPress={() => openPicker("เลือกเกรด", GRADES, grade, setGrade, "ค้นหาเกรด")} /></View>
+            <View><FieldLabel>วิธีการแปรรูป</FieldLabel><SelectField value={processing} placeholder="เลือกวิธีการแปรรูป" onPress={() => openPicker("วิธีการแปรรูป", PROCESSING, processing, setProcessing, "ค้นหาวิธีการแปรรูป")} /></View>
+            <View><FieldLabel>บรรจุภัณฑ์เริ่มต้น</FieldLabel><SelectField value={packaging} placeholder="เลือกบรรจุภัณฑ์" onPress={() => openPicker("บรรจุภัณฑ์เริ่มต้น", PACKAGING, packaging, setPackaging, "ค้นหาบรรจุภัณฑ์")} /></View>
             <View>
               <FieldLabel>อายุการเก็บรักษา (เดือน)</FieldLabel>
               <Stepper value={shelfLife} onChange={setShelfLife} suffix="เดือน" placeholder="12" />
@@ -383,7 +373,7 @@ export function AddProductScreen() {
 
         {/* ตั้งราคา (วัตถุดิบ) */}
         {isMaterial ? (
-        <Section Icon={Banknote} title="ตั้งราคา" subtitle="ราคาฐานต่อ กก. + MOQ — ซื้อมากขึ้นราคาต่อ กก. ลดลงได้">
+        <Section Icon={Banknote} tint="#f59e0b" title="ตั้งราคา" subtitle="ราคาฐานต่อ กก. + MOQ — ซื้อมากขึ้นราคาต่อ กก. ลดลงได้">
           <>
               <View>
                 <FieldLabel required>ราคาฐาน / กก.</FieldLabel>
@@ -447,6 +437,7 @@ export function AddProductScreen() {
         /* ตัวเลือกสินค้า (ผลิตภัณฑ์) */
         <Section
           Icon={Boxes}
+          tint="#0088ff"
           title="ตัวเลือกสินค้า"
           subtitle="เปิดใช้งานหากสินค้ามีหลายตัวเลือก เช่น ขนาด, สี"
           right={<Switch value={hasVariants} onValueChange={setHasVariants} trackColor={{ false: "#e9e9ea", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#e9e9ea" />}
@@ -519,55 +510,57 @@ export function AddProductScreen() {
         </Section>
         )}
 
+        {/* ตั้งค่า SEO — web parity (OwnerDashboard addprod-seo section) */}
+        <Section
+          Icon={Search}
+          tint="#3b82f6"
+          title="ตั้งค่า SEO"
+          subtitle="เปิดตั้งค่า SEO เพื่อช่วยให้สินค้าติดอันดับใน Google ได้ดีขึ้น"
+          right={<Switch value={seoEnabled} onValueChange={setSeoEnabled} trackColor={{ false: "#e9e9ea", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#e9e9ea" />}
+        >
+          {seoEnabled ? (
+            <>
+              <View>
+                <FieldLabel>SEO Title</FieldLabel>
+                <TextInput value={seoTitle} onChangeText={setSeoTitle} placeholder="เช่น: ขมิ้นชันผง 100% ออร์แกนิก" placeholderTextColor="#a3a3a3" style={INPUT} />
+              </View>
+              <View>
+                <FieldLabel>SEO Keywords</FieldLabel>
+                <TextInput value={seoKeywords} onChangeText={setSeoKeywords} placeholder="คั่นด้วยเครื่องหมายจุลภาค (,)" placeholderTextColor="#a3a3a3" style={INPUT} />
+              </View>
+            </>
+          ) : null}
+        </Section>
+
         {/* ตั้งค่าสินค้า */}
-        <Section Icon={Settings2} title="ตั้งค่าสินค้า">
+        <Section Icon={Settings2} tint="#8b5cf6" title="ตั้งค่าสินค้า">
           <SettingCard Icon={Eye} label="เปิดขาย" subtitle="แสดงสินค้านี้บนหน้าร้านให้ลูกค้ามองเห็นและสั่งซื้อได้" value={active} onValueChange={setActive} accent={BRAND_GREEN} image={IMG_SELL} />
           {!isMaterial ? (
             <SettingCard Icon={Star} label="สินค้าแนะนำ" subtitle="ปักหมุดสินค้านี้ในส่วนแนะนำบนหน้าร้าน" value={recommended} onValueChange={setRecommended} accent="#f7931d" image={IMG_RECOMMEND} />
           ) : null}
         </Section>
       </ScrollView>
+      {/* Scroll fades — content dissolves into the header / bottom edge */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["#fafafa", "rgba(250,250,250,0)"]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+      />
+      <BottomFade />
+      </View>
 
-      {/* Footer — floating Liquid Glass bar (same style as the ProductDetail buy bar) */}
-      <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 130 }} />
-      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insets.bottom + 10 }}>
+      {/* Floating Liquid Glass save bar — same as the other create pages */}
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
-            {/* Cancel — circular glass button */}
-            <Pressable hitSlop={6} className="active:opacity-70" onPress={() => nav.canGoBack() && nav.goBack()}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor="rgba(255,59,48,0.1)" isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
-                <X size={22} color="#ff3b30" strokeWidth={2.4} />
-              </GlassView>
-            </Pressable>
-            {/* Save — primary pill */}
-            <Pressable onPress={onSave} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}>
-              <Check size={20} color="#fff" strokeWidth={2.6} />
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>{title}</Text>
+          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+            <Pressable onPress={onSave} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, gap: 8, backgroundColor: BRAND_GREEN }}>
+              <Save size={17} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{title}</Text>
             </Pressable>
           </GlassView>
         </View>
       </View>
 
-      {/* Option picker sheet — radio rows in a white card (matches Sort/Filter sheets) */}
-      <BottomSheet visible={!!picker} onClose={() => setPicker(null)} centerTitle title={picker?.title ?? ""} minHeightRatio={0.1} maxHeightRatio={0.75}>
-        {picker ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
-            {picker.options.map((opt, i) => {
-              const sel = opt === picker.value;
-              return (
-                <Pressable key={opt} onPress={() => { picker.onChange(opt); setPicker(null); }}
-                  className="flex-row items-center active:bg-neutral-50"
-                  style={{ minHeight: 54, paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: "#ececec" }}>
-                  <Text style={{ flex: 1, fontSize: 16, color: "#1a1a1a", fontWeight: sel ? "600" : "400" }}>{opt}</Text>
-                  <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: sel ? BRAND_GREEN : "#cbd0cb", alignItems: "center", justifyContent: "center" }}>
-                    {sel ? <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: BRAND_GREEN }} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        ) : null}
-      </BottomSheet>
     </View>
   );
 }

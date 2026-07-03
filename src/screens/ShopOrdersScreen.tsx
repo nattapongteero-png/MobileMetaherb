@@ -9,7 +9,7 @@ import { View, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Search } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
@@ -23,6 +23,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function ShopOrdersScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+  // Preselected status filter — e.g. tapping a status tile on the overview.
+  const initialFilter = useRoute<RouteProp<RootStackParamList, "ShopOrders">>().params?.initialFilter;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
@@ -45,7 +47,7 @@ export function ShopOrdersScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
         >
-          <OrdersSection showSearch={false} />
+          <OrdersSection showSearch={false} initialFilter={initialFilter} />
         </ScrollView>
         {/* Scroll fades — content dissolves into the header / bottom edge */}
         <LinearGradient

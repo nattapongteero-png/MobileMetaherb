@@ -15,43 +15,33 @@
  * framer-motion / Popover are dropped for plain View/Pressable + BottomSheet.
  */
 import { useMemo, useState } from "react";
-import { View, Text, TextInput, ScrollView, Pressable, Alert, Image } from "react-native";
+import { View, Text, ScrollView, Pressable, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ClipboardList,
   Zap,
   Clock,
   Ban,
-  Search,
   Boxes,
   Calendar,
-  MoreHorizontal,
-  Pencil,
   Megaphone,
-  Trash2,
   type LucideIcon,
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { BottomSheet } from "../components/BottomSheet";
 import { SearchBar } from "../components/SearchBar";
-import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   useAllPromotions,
   computedStatus,
-  removePromotion,
-  togglePromotion,
   fmtPromoThaiDateTime,
   type Promotion,
   type PromoStatus,
 } from "../data/promotions";
-import { BRAND_GREEN, DIVIDER_GRAY, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, DIVIDER_GRAY, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 
 type FilterKey = "all" | PromoStatus;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-const RED = "#ff3b30";
 
 /** Status pill / gradient config — colors match the web card 1:1. */
 function statusConfig(status: PromoStatus): { label: string; color: string; Icon: LucideIcon } {
@@ -66,6 +56,8 @@ function headerGradient(status: PromoStatus): [string, string] {
   return ["rgba(255,107,53,0.95)", "rgba(230,46,5,0.95)"];
 }
 
+// Standard filter chip — same pill language as the orders / quotations /
+// coupons pages (white pill + border, count badge; active = solid green).
 function FilterPill({
   label,
   count,
@@ -84,27 +76,17 @@ function FilterPill({
       onPress={onPress}
       className="flex-row items-center active:opacity-80"
       style={{
-        height: 32,
-        paddingLeft: 6,
-        paddingRight: 10,
+        height: 36,
+        paddingHorizontal: 14,
         borderRadius: 999,
         gap: 6,
-        backgroundColor: active ? BRAND_GREEN : "transparent",
+        backgroundColor: active ? BRAND_GREEN : "white",
+        borderWidth: 1,
+        borderColor: active ? BRAND_GREEN : DIVIDER_GRAY,
       }}
     >
-      <View
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: active ? "rgba(255,255,255,0.22)" : "#d6eadd",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon size={12} color={active ? "#fff" : BRAND_GREEN} strokeWidth={2.4} />
-      </View>
-      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "#fff" : TEXT_SECONDARY }}>
+      <Icon size={14} color={active ? "white" : TEXT_MUTED} />
+      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>
         {label}
       </Text>
       <View
@@ -113,18 +95,18 @@ function FilterPill({
           height: 18,
           paddingHorizontal: 5,
           borderRadius: 9,
-          backgroundColor: active ? "rgba(255,255,255,0.25)" : RED,
           alignItems: "center",
           justifyContent: "center",
+          backgroundColor: active ? "rgba(255,255,255,0.25)" : "#f5f5f5",
         }}
       >
-        <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{count}</Text>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count}</Text>
       </View>
     </Pressable>
   );
 }
 
-function PromoCard({ p, width, onMenu }: { p: Promotion; width: number; onMenu: () => void }) {
+export function PromoCard({ p, width, onPress }: { p: Promotion; width: number; onPress: () => void }) {
   const status = computedStatus(p);
   const isEnded = status === "ended";
   const st = statusConfig(status);
@@ -135,7 +117,7 @@ function PromoCard({ p, width, onMenu }: { p: Promotion; width: number; onMenu: 
 
   return (
     <Pressable
-      onPress={onMenu}
+      onPress={onPress}
       className="active:opacity-90"
       style={{
         width,
@@ -210,21 +192,11 @@ function PromoCard({ p, width, onMenu }: { p: Promotion; width: number; onMenu: 
   );
 }
 
-function SheetAction({ Icon, label, onPress, danger }: { Icon: LucideIcon; label: string; onPress: () => void; danger?: boolean }) {
-  return (
-    <Pressable onPress={onPress} className="flex-row items-center active:opacity-60" style={{ paddingVertical: 13, gap: 12 }}>
-      <Icon size={18} color={danger ? RED : TEXT_MUTED} strokeWidth={2.2} />
-      <Text style={{ fontSize: 14, fontWeight: "500", color: danger ? RED : TEXT_PRIMARY }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-export function PromotionsOwnerSection() {
+export function PromotionsOwnerSection({ showSearch = true }: { showSearch?: boolean }) {
   const nav = useNavigation<Nav>();
   const promotions = useAllPromotions();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
-  const [sheetFor, setSheetFor] = useState<Promotion | null>(null);
 
   // 2-col grid: floor to avoid flex-wrap breakage (per project convention).
   const cardWidth = useMemo(() => {
@@ -249,56 +221,25 @@ export function PromotionsOwnerSection() {
     { key: "ended", label: "สิ้นสุดแล้ว", count: countBy("ended"), Icon: Ban },
   ];
 
-  const onDelete = (p: Promotion) => {
-    setSheetFor(null);
-    Alert.alert("ลบโปรโมชั่น", `ลบโปรโมชั่น "${p.name}"?`, [
-      { text: "ยกเลิก", style: "cancel" },
-      {
-        text: "ลบ",
-        style: "destructive",
-        onPress: () => {
-          removePromotion(p.id);
-          showToast(`ลบ: ${p.name}`, "info");
-        },
-      },
-    ]);
-  };
-
-  const onToggle = (p: Promotion) => {
-    setSheetFor(null);
-    togglePromotion(p.id);
-    showToast(p.enabled ? `ปิดใช้งาน: ${p.name}` : `เปิดใช้งาน: ${p.name}`);
-  };
-
   return (
     <View style={{ gap: 16 }}>
-      {/* Filter pills — white rounded container; scroller clipped to the pill shape */}
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 999,
-          padding: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 1,
-        }}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ borderRadius: 999, overflow: "hidden" }}
-          contentContainerStyle={{ gap: 4, alignItems: "center" }}
-        >
-          {pills.map((p) => (
-            <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
-          ))}
-        </ScrollView>
-      </View>
+      {/* Search — shared SearchBar; hidden on the pushed subpage (app-bar
+          button → ShopPromotionSearch) */}
+      {showSearch ? (
+        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อโปรโมชั่น..." />
+      ) : null}
 
-      {/* Search box (shared สินค้าทดลอง style) */}
-      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อโปรโมชั่น..." />
+      {/* Filter chips — full-bleed scroll row, same as the other list pages */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -16 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
+      >
+        {pills.map((p) => (
+          <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
+        ))}
+      </ScrollView>
 
       {/* Card grid / empty state */}
       {filtered.length === 0 ? (
@@ -319,30 +260,11 @@ export function PromotionsOwnerSection() {
       ) : (
         <View className="flex-row flex-wrap" style={{ gap: 12 }}>
           {filtered.map((p) => (
-            <PromoCard key={p.id} p={p} width={cardWidth} onMenu={() => setSheetFor(p)} />
+            <PromoCard key={p.id} p={p} width={cardWidth} onPress={() => nav.navigate("ShopPromotionDetail", { promotionId: p.id })} />
           ))}
         </View>
       )}
 
-      {/* Per-promo action sheet */}
-      <BottomSheet visible={!!sheetFor} onClose={() => setSheetFor(null)} centerTitle title={sheetFor?.name ?? ""} minHeightRatio={0.32} maxHeightRatio={0.55}>
-        {sheetFor ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 2 }}>
-            <SheetAction
-              Icon={Pencil}
-              label="แก้ไข"
-              onPress={() => {
-                const id = sheetFor.id;
-                setSheetFor(null);
-                nav.navigate("PromotionCreate", { editId: id });
-              }}
-            />
-            <SheetAction Icon={Ban} label={sheetFor.enabled ? "ปิดใช้งาน" : "เปิดใช้งาน"} onPress={() => onToggle(sheetFor)} />
-            <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginVertical: 4 }} />
-            <SheetAction Icon={Trash2} label="ลบ" danger onPress={() => onDelete(sheetFor)} />
-          </View>
-        ) : null}
-      </BottomSheet>
     </View>
   );
 }
