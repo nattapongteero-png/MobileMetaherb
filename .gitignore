@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# LINE bot (แยกจาก metaherb — deploy บน Cloudflare, ไม่เกี่ยวโปรเจกต์)
+/bots

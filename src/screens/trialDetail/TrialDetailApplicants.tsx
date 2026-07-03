@@ -30,7 +30,6 @@ import {
   Text,
   Pressable,
   Image,
-  TextInput,
   ScrollView,
   Alert,
 } from "react-native";
@@ -40,7 +39,6 @@ import {
   Clock,
   Check,
   Ban,
-  Search,
   Users,
   Phone,
   MessageCircle,
@@ -55,6 +53,7 @@ import {
 } from "lucide-react-native";
 
 import { BottomSheet } from "../../components/BottomSheet";
+import { SearchBar } from "../../components/SearchBar";
 import {
   getRegistrationsForTrial,
   getRegistrationStatus,
@@ -1001,38 +1000,8 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
         </ScrollView>
       </View>
 
-      {/* Search box */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: "#f5f5f5",
-          borderRadius: 999,
-          paddingLeft: 16,
-          paddingRight: 4,
-          height: 36,
-        }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: "#171717", paddingVertical: 0 }}
-          placeholder="ค้นหาชื่อ, เบอร์..."
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-        />
-        <View
-          style={{
-            backgroundColor: BRAND_GREEN,
-            width: 28,
-            height: 28,
-            borderRadius: 999,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Search size={16} color="#fff" />
-        </View>
-      </View>
+      {/* Search box (shared) */}
+      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์..." />
 
       {/* Card list / empty state */}
       {filteredApplicants.length === 0 ? (
