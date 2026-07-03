@@ -265,11 +265,12 @@ export function BottomSheet({
               </View>
             )}
 
-            {/* Content area — caller controls padding/layout. centerTitle sheets
-                hug their content (no flex:1) so the sheet height fits exactly. */}
+            {/* Content area — caller controls padding/layout. centerTitle and
+                noHeader sheets hug their content (no flex:1) so the sheet height
+                fits exactly, unless fill/fillContent asks it to stretch. */}
             <View
               style={{
-                flex: fill || fillContent || !centerTitle ? 1 : undefined,
+                flex: fill || fillContent || (!centerTitle && !noHeader) ? 1 : undefined,
                 paddingBottom: insets.bottom,
               }}
             >

@@ -28,6 +28,7 @@ import {
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { SearchBar } from "../components/SearchBar";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   useAllCoupons,
@@ -204,30 +205,10 @@ export function CouponsOwnerSection({ showSearch = true }: { showSearch?: boolea
 
   return (
     <View style={{ gap: 16 }}>
-      {/* Search — hidden on the pushed subpage (app-bar button → ShopCouponSearch) */}
+      {/* Search — shared SearchBar; hidden on the pushed subpage (app-bar
+          button → ShopCouponSearch) */}
       {showSearch ? (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: "#f5f5f5",
-          borderRadius: 999,
-          paddingLeft: 16,
-          paddingRight: 4,
-          height: 36,
-        }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, paddingVertical: 0 }}
-          placeholder="ค้นหาโค้ด, ชื่อคูปอง..."
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-        />
-        <View style={{ backgroundColor: BRAND_GREEN, width: 28, height: 28, borderRadius: 999, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="#fff" />
-        </View>
-      </View>
+        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาโค้ด, ชื่อคูปอง..." />
       ) : null}
 
       {/* Filter chips — full-bleed scroll row, same as the other list pages */}

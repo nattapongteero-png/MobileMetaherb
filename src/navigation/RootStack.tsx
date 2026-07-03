@@ -91,6 +91,9 @@ import { MyShopScreen } from "../screens/MyShopScreen";
 import type { MarketDoc, DocKind } from "../screens/MyShopScreen";
 import { ShopDocDetailScreen } from "../screens/ShopDocDetailScreen";
 import { AddProductScreen } from "../screens/AddProductScreen";
+import { FlashAddProductScreen } from "../screens/FlashAddProductScreen";
+import type { FlashProduct } from "../screens/MyShopScreen";
+import { FlashEventDetailScreen } from "../screens/FlashEventDetailScreen";
 import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
 import { ShopAccountScreen } from "../screens/ShopAccountScreen";
 import { ShopAddressScreen } from "../screens/ShopAddressScreen";
@@ -143,6 +146,8 @@ export type RootStackParamList = {
   ProductDetail: { product: Product; preview?: boolean };
   ProductPreview: { product: Product; preview?: boolean };
   AddProduct: { mode: "regular" | "material" };
+  FlashAddProduct: { onDone?: (p: FlashProduct) => void } | undefined;
+  FlashEventDetail: { name: string; dateRange: string; joined?: boolean };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
   OrderDetail: { orderId: string };
@@ -439,6 +444,8 @@ export function RootStack() {
       <Stack.Screen name="MyShop" component={MyShopScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopDocDetail" component={ShopDocDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="FlashAddProduct" component={FlashAddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="FlashEventDetail" component={FlashEventDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="MyShopMenu" component={MyShopMenuScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="ShopAccount" component={ShopAccountScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopAddress" component={ShopAddressScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

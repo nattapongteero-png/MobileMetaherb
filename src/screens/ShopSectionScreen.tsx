@@ -6,7 +6,6 @@
  * Renders the matching section component (all return parent-scroll <View>s) and
  * re-creates each section's floating "create/add" FAB.
  */
-import { useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,7 +21,6 @@ import {
   FlashSaleSection,
   QuotationSection,
   DocSection,
-  FlashAddSheet,
   type SectionId,
 } from "./MyShopScreen";
 import { TrialRegistryOwnerSection } from "./TrialRegistryView";
@@ -38,11 +36,10 @@ export function ShopSectionScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { section } = useRoute<RouteProp<RootStackParamList, "ShopSection">>().params;
-  const [flashAddOpen, setFlashAddOpen] = useState(false);
 
   // Per-section floating "create/add" action (mirrors the old in-console FABs).
   const fabPress =
-    section === "flash_sale" ? () => setFlashAddOpen(true)
+    section === "flash_sale" ? () => nav.navigate("FlashAddProduct")
     : section === "trials_products" ? () => nav.navigate("TrialAddProduct")
     : section === "promotions" ? () => nav.navigate("PromotionCreate")
     : section === "coupons" ? () => nav.navigate("CouponCreate")
@@ -112,7 +109,6 @@ export function ShopSectionScreen() {
           <Plus size={26} color="#fff" strokeWidth={2.6} />
         </Pressable>
       ) : null}
-      <FlashAddSheet visible={flashAddOpen} onClose={() => setFlashAddOpen(false)} />
     </View>
   );
 }

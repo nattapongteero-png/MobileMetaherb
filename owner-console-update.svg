@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="720" viewBox="0 0 900 720" font-family="'IBM Plex Sans Thai','Sarabun','Noto Sans Thai',sans-serif">
+  <defs>
+    <linearGradient id="hdr" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#319754"/>
+      <stop offset="1" stop-color="#1d5b32"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="900" height="720" fill="#fafafa"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="900" height="104" fill="url(#hdr)"/>
+  <text x="40" y="52" fill="#fff" font-size="26" font-weight="700">Owner Console — อัปเดต</text>
+  <text x="40" y="82" fill="rgba(255,255,255,0.85)" font-size="15">สินค้าทดลอง · โปรโมชั่น · คูปอง   |   พอร์ตจาก web → mobile (bundle ผ่าน iOS + web)</text>
+  <text x="770" y="60" fill="rgba(255,255,255,0.9)" font-size="13" font-family="monospace">main 1c9e1ad</text>
+
+  <!-- Card: สินค้าทดลอง -->
+  <g filter="url(#sh)">
+    <rect x="32" y="132" width="836" height="150" rx="16" fill="#fff"/>
+  </g>
+  <rect x="32" y="132" width="6" height="150" rx="3" fill="#319754"/>
+  <circle cx="72" cy="170" r="16" fill="#d6eadd"/>
+  <text x="72" y="176" text-anchor="middle" font-size="17">🧪</text>
+  <text x="104" y="168" fill="#111" font-size="19" font-weight="700">สินค้าทดลอง</text>
+  <text x="104" y="188" fill="#777" font-size="12">b463ea2 · 41b1075 · caff286</text>
+  <text x="104" y="216" fill="#374151" font-size="13.5">• ทะเบียน: รายการ + KPI 5 การ์ด + ตัวกรอง + manage sheet + FAB เพิ่ม</text>
+  <text x="104" y="238" fill="#374151" font-size="13.5">• รายละเอียด: hero card (Figma), app bar มินต์จาง, เมนู ⋯ → bottom sheet</text>
+  <text x="104" y="260" fill="#374151" font-size="13.5">• ติดตาม: roster ผู้สมัคร + อนุมัติ/ปฏิเสธ + toast   • เพิ่ม/แก้ไข: ฟอร์มหลายขั้น + sticky save</text>
+
+  <!-- Card: โปรโมชั่น -->
+  <g filter="url(#sh)">
+    <rect x="32" y="298" width="410" height="150" rx="16" fill="#fff"/>
+  </g>
+  <rect x="32" y="298" width="6" height="150" rx="3" fill="#e0610c"/>
+  <circle cx="72" cy="336" r="16" fill="#fde68a"/>
+  <text x="72" y="342" text-anchor="middle" font-size="16">🏷️</text>
+  <text x="104" y="334" fill="#111" font-size="19" font-weight="700">โปรโมชั่น</text>
+  <text x="104" y="354" fill="#777" font-size="12">1c9e1ad</text>
+  <text x="56" y="382" fill="#374151" font-size="13">• การ์ด gradient ตามสถานะ + ตัวกรอง</text>
+  <text x="56" y="404" fill="#374151" font-size="13">• กดการ์ด → sheet จัดการ</text>
+  <text x="56" y="426" fill="#374151" font-size="13">• สร้าง/แก้ไข: ส่วนลด, ช่วงเวลา, ขอบเขต</text>
+  <text x="72" y="446" fill="#6b7280" font-size="12">+ product picker sheet</text>
+
+  <!-- Card: คูปอง -->
+  <g filter="url(#sh)">
+    <rect x="458" y="298" width="410" height="150" rx="16" fill="#fff"/>
+  </g>
+  <rect x="458" y="298" width="6" height="150" rx="3" fill="#3b82f6"/>
+  <circle cx="498" cy="336" r="16" fill="#dbeafe"/>
+  <text x="498" y="342" text-anchor="middle" font-size="16">🎟️</text>
+  <text x="530" y="334" fill="#111" font-size="19" font-weight="700">คูปอง</text>
+  <text x="530" y="354" fill="#777" font-size="12">1c9e1ad</text>
+  <text x="482" y="382" fill="#374151" font-size="13">• การ์ดสไตล์ตั๋ว (รหัส/ส่วนลด/ใช้แล้ว/สถานะ)</text>
+  <text x="482" y="404" fill="#374151" font-size="13">• status badge มุมซ้ายบน</text>
+  <text x="482" y="426" fill="#374151" font-size="13">• สร้าง/แก้ไข: %/บาท/ส่งฟรี, เงื่อนไข, เวลา</text>
+  <text x="498" y="446" fill="#6b7280" font-size="12">เฉพาะสมาชิก / ออเดอร์แรก</text>
+
+  <!-- Card: Shared -->
+  <g filter="url(#sh)">
+    <rect x="32" y="464" width="836" height="128" rx="16" fill="#fff"/>
+  </g>
+  <rect x="32" y="464" width="6" height="128" rx="3" fill="#8b5cf6"/>
+  <circle cx="72" cy="500" r="16" fill="#ede9fe"/>
+  <text x="72" y="506" text-anchor="middle" font-size="16">🧩</text>
+  <text x="104" y="500" fill="#111" font-size="19" font-weight="700">Shared / อื่นๆ</text>
+  <text x="104" y="530" fill="#374151" font-size="13.5">• NumberStepper — พิมพ์เองได้ + ปุ่ม −/+ (ใช้ทุก numeric field)</text>
+  <text x="104" y="552" fill="#374151" font-size="13.5">• BottomSheet — prop `fill` รองรับ list เลื่อนได้; ทุก sheet ใช้ component เดียวกัน</text>
+  <text x="104" y="574" fill="#374151" font-size="13.5">• ตรวจเทียบ web แล้ว (data/mock/logic/strings ตรง) — แก้สี status + label ส่งฟรี</text>
+
+  <!-- Footer note -->
+  <text x="40" y="640" fill="#9ca3af" font-size="12.5">ปรับให้เหมาะ mobile (ต่างจาก web โดยตั้งใจ): ตัด pagination · วันที่เป็นแบบรายวัน (ไม่เลือกเวลา)</text>
+  <text x="40" y="662" fill="#9ca3af" font-size="12.5">Stack: React Native · NativeWind · react-navigation · expo-linear-gradient · lucide-react-native</text>
+</svg>
