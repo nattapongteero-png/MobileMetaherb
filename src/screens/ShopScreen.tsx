@@ -8,7 +8,6 @@ import {
   Animated,
   Dimensions,
   Platform,
-  TextInput,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -29,16 +28,17 @@ import {
   SlidersHorizontal,
   Star,
   ThumbsUp,
-  X,
 } from "lucide-react-native";
 import { GlassView } from "expo-glass-effect";
 import { ProductCard } from "../components/ProductCard";
 import { EmptyState } from "../components/EmptyState";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import { STAR_YELLOW, RATING_BAR_FILL, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
 import type { Product } from "../types/Product";
 import { type SortKey } from "../data/shopSort";
+import { webCategoryLabel } from "../data/catalog";
 import { type HerbalSortKey } from "../data/herbalSort";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOPS, getShop } from "../data/shops";
@@ -111,27 +111,13 @@ export const REVIEWS: Review[] = [
 
 type ShopProduct = Product & { category: string; shop?: string };
 
-// These six are METAHERB Store's own storefront products → their seller is always
-// METAHERB (so detail page ↔ storefront never disagree). บ้านสมุนไพรไทย / กรีนลีฟ get
-// their distinct products via the Herbal Market + trial catalogs (split per shop).
-export const SHOP_PRODUCTS: ShopProduct[] = [
-  { id: "sp1", name: "อบเชยเทศ Cinnamon Varum 150g", price: 199, originalPrice: 249, discountPercent: 20, rating: 4.8, sold: "1.2k", image: require("../../assets/products/catalog/product-37.jpg"), category: "ผลิตภัณฑ์สมุนไพร", shop: "METAHERB Store" },
-  { id: "sp2", name: "ยาดมสมุนไพรเมต้าเฮิร์บ", price: 89, rating: 4.7, sold: "856", image: require("../../assets/products/catalog/product-10.jpg"), category: "ผลิตภัณฑ์สมุนไพร", shop: "METAHERB Store" },
-  { id: "sp3", name: "ชามะลิอินทรีย์", price: 159, originalPrice: 199, discountPercent: 20, rating: 4.9, sold: "2.1k", image: require("../../assets/products/catalog/product-16.jpg"), category: "อาหารและเครื่องดื่ม", shop: "METAHERB Store" },
-  { id: "sp4", name: "กาแฟอินทรีย์เมต้า", price: 220, rating: 4.6, sold: "640", image: require("../../assets/products/catalog/product-03.png"), category: "อาหารและเครื่องดื่ม", shop: "METAHERB Store" },
-  { id: "sp5", name: "เลมอนซอฟต์เจล", price: 129, rating: 4.5, sold: "420", image: require("../../assets/products/catalog/product-01.png"), category: "ผลิตภัณฑ์สุขภาพ", shop: "METAHERB Store" },
-  { id: "sp6", name: "ชุดของขวัญสมุนไพร", price: 399, originalPrice: 499, discountPercent: 20, rating: 4.9, sold: "320", image: require("../../assets/products/catalog/product-19.jpg"), category: "ชุดของชำร่วย/ของขวัญ", shop: "METAHERB Store" },
-];
-
-// Display order matches the web's category dropdown — same labels.
-const CATEGORY_ORDER = [
-  "ผลิตภัณฑ์สมุนไพร",
-  "เครื่องหอม & อโรม่า",
-  "อาหารและเครื่องดื่ม",
-  "ผลิตภัณฑ์สุขภาพ",
-  "วัตถุดิบสมุนไพร",
-  "ชุดของชำร่วย/ของขวัญ",
-];
+// METAHERB Store's storefront products = its even share of the main catalog
+// (split per shop via the `shop` field in realProducts). Sharing one source with
+// the customer ShopScreen + the other shops keeps every surface consistent —
+// owner console, storefront preview, product management, orders.
+export const SHOP_PRODUCTS: ShopProduct[] = REAL_PRODUCTS.filter(
+  (p) => p.shop === "METAHERB Store",
+) as ShopProduct[];
 
 type TabKey = "products" | "herbal" | "reviews";
 
@@ -162,9 +148,7 @@ export function ShopScreen() {
   const [tab, setTab] = useState<TabKey>("products");
   const [category, setCategory] = useState<string>("ทั้งหมด");
   const [sort, setSort] = useState<SortKey>("popular");
-  const [search, setSearch] = useState("");
   // Herbal Market tab filters.
-  const [herbalQuery, setHerbalQuery] = useState("");
   const [herbalCategory, setHerbalCategory] = useState<string>("ทั้งหมด");
   const [herbalSort, setHerbalSort] = useState<HerbalSortKey>("popular");
 
@@ -257,32 +241,27 @@ export function ShopScreen() {
     extrapolate: "clamp",
   });
 
-  // This shop's storefront products. METAHERB keeps its curated SHOP_PRODUCTS
-  // (also powering the owner console); the other two shops draw their distinct
-  // products from the main catalog, split per shop by the `shop` field (Phase 1).
+  // This shop's storefront products — every shop (METAHERB included) draws its
+  // share from the main catalog, split evenly per shop by the `shop` field, so
+  // each of the three shops shows ~1/3 of the products.
   const shopProducts = useMemo(
-    () =>
-      isMine
-        ? (SHOP_PRODUCTS as ShopProduct[])
-        : (REAL_PRODUCTS.filter((p) => p.shop === shopName) as ShopProduct[]),
-    [isMine, shopName],
+    () => REAL_PRODUCTS.filter((p) => p.shop === shopName) as ShopProduct[],
+    [shopName],
   );
 
-  // Categories with counts derived from products (web pattern).
+  // Categories with counts derived from products — same derivation as the web
+  // ShopProfilePage (Map insertion order = first-appearance order) on the web's
+  // 4-category Thai labels, so the chips match the web dropdown 1:1.
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
-    shopProducts.forEach((p) => counts.set(p.category, (counts.get(p.category) || 0) + 1));
-    // Build the chip list from whatever categories this shop actually stocks.
-    // SHOP_PRODUCTS use Thai labels (ordered via CATEGORY_ORDER); REAL_PRODUCTS
-    // use CategoryKey codes (not in CATEGORY_ORDER) — append those after, so both
-    // product sources surface their real categories.
-    const ordered = CATEGORY_ORDER.map((name) => ({ name, count: counts.get(name) || 0 })).filter(
-      (c) => c.count > 0,
-    );
-    const extra = Array.from(counts.keys())
-      .filter((name) => !CATEGORY_ORDER.includes(name))
-      .map((name) => ({ name, count: counts.get(name) || 0 }));
-    return [{ name: "ทั้งหมด", count: shopProducts.length }, ...ordered, ...extra];
+    shopProducts.forEach((p) => {
+      const label = webCategoryLabel(p.category);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return [
+      { name: "ทั้งหมด", count: shopProducts.length },
+      ...Array.from(counts.entries()).map(([name, count]) => ({ name, count })),
+    ];
   }, [shopProducts]);
 
   // Herbal Market materials this shop supplies — only show the tab if it has any.
@@ -298,34 +277,29 @@ export function ShopScreen() {
     [herbalMaterials],
   );
 
-  // Apply search + category + sort to the herbal materials (mirrors HerbalMarket).
+  // Apply category + sort to the herbal materials (mirrors HerbalMarket).
+  // (Text search lives on the ShopSearch page.)
   const filteredHerbal = useMemo(() => {
-    const q = herbalQuery.trim().toLowerCase();
     let list = herbalMaterials.filter(
-      (m) =>
-        (herbalCategory === "ทั้งหมด" || m.category === herbalCategory) &&
-        (q.length === 0 || m.name.toLowerCase().includes(q) || m.scientificName.toLowerCase().includes(q)),
+      (m) => herbalCategory === "ทั้งหมด" || m.category === herbalCategory,
     );
     if (herbalSort === "price_asc") list = [...list].sort((a, b) => a.pricePerKg - b.pricePerKg);
     else if (herbalSort === "price_desc") list = [...list].sort((a, b) => b.pricePerKg - a.pricePerKg);
     else if (herbalSort === "moq_asc") list = [...list].sort((a, b) => a.moq - b.moq);
     else list = [...list].sort((a, b) => b.rating - a.rating); // popular
     return list;
-  }, [herbalMaterials, herbalQuery, herbalCategory, herbalSort]);
+  }, [herbalMaterials, herbalCategory, herbalSort]);
 
-  // Apply category + search filter, then sort.
+  // Apply category filter, then sort. (Text search lives on the ShopSearch page.)
   const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = shopProducts.filter((p) => {
-      const inCategory = category === "ทั้งหมด" || p.category === category;
-      const inSearch = !q || p.name.toLowerCase().includes(q);
-      return inCategory && inSearch;
-    });
+    let list = shopProducts.filter(
+      (p) => category === "ทั้งหมด" || webCategoryLabel(p.category) === category,
+    );
     if (sort === "price-asc") list = [...list].sort((a, b) => a.price - b.price);
     else if (sort === "price-desc") list = [...list].sort((a, b) => b.price - a.price);
     else if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
     return list;
-  }, [shopProducts, category, search, sort]);
+  }, [shopProducts, category, sort]);
 
   const ratingBreakdown = useMemo(() => {
     return [5, 4, 3, 2, 1].map((s) => ({
@@ -361,9 +335,17 @@ export function ShopScreen() {
             <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel="ย้อนกลับ">
               <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
             </GlassIconButton>
-            <GlassIconButton accessibilityLabel="แชร์ร้านค้า">
-              <Share2 size={18} color="#1a1a1a" strokeWidth={2.2} />
-            </GlassIconButton>
+            <View className="flex-row items-center" style={{ gap: 10 }}>
+              <GlassIconButton
+                onPress={() => nav.navigate("ShopSearch", { shopName })}
+                accessibilityLabel="ค้นหาสินค้าในร้านนี้"
+              >
+                <Search size={18} color="#1a1a1a" strokeWidth={2.2} />
+              </GlassIconButton>
+              <GlassIconButton accessibilityLabel="แชร์ร้านค้า">
+                <Share2 size={18} color="#1a1a1a" strokeWidth={2.2} />
+              </GlassIconButton>
+            </View>
           </View>
         </SafeAreaView>
       </View>
@@ -543,73 +525,18 @@ export function ShopScreen() {
 
         </View>
 
-        {/* Tabs row — Products / [Herbal Market] / Reviews (Jakob's Law: same as web shop) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 16 }}
-          contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
-        >
-          <TabPill
-            active={tab === "products"}
-            label="สินค้า"
-            count={shopProducts.length}
-            Icon={Package}
-            onPress={() => setTab("products")}
-          />
-          {hasHerbal ? (
-            <TabPill
-              active={tab === "herbal"}
-              label="Herbal Market"
-              count={herbalMaterials.length}
-              Icon={Leaf}
-              onPress={() => setTab("herbal")}
-            />
-          ) : null}
-          <TabPill
-            active={tab === "reviews"}
-            label="รีวิวร้านค้า"
-            count={REVIEWS.length}
-            Icon={Star}
-            badgeRed
-            onPress={() => setTab("reviews")}
-          />
-        </ScrollView>
+        {/* Tabs row — Products / [Herbal Market] / Reviews as an underline tab bar */}
+        <ShopTabs
+          tab={tab}
+          onChange={setTab}
+          hasHerbal={hasHerbal}
+          counts={{ products: shopProducts.length, herbal: herbalMaterials.length, reviews: REVIEWS.length }}
+        />
 
         {tab === "products" ? (
           <>
-            {/* Search bar — white pill matching the other pages' header search */}
-            <View
-              className="flex-row items-center rounded-full px-4"
-              style={{
-                marginTop: 10,
-                marginHorizontal: 12,
-                height: 46,
-                backgroundColor: "#ffffff",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-                elevation: 2,
-              }}
-            >
-              <Search size={18} color="#319754" />
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="ค้นหาสินค้าในร้านนี้"
-                placeholderTextColor="#a3a3a3"
-                returnKeyType="search"
-                style={{ flex: 1, marginLeft: 10, fontSize: 13.5, color: "#374151" }}
-              />
-              {search ? (
-                <Pressable onPress={() => setSearch("")} hitSlop={8} className="active:opacity-60">
-                  <X size={16} color="#a3a3a3" />
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Filter button (sort) + category chips — same language as the Products page */}
+            {/* Filter button (sort) + category chips — same language as the Products page.
+                (Search moved to the app-bar button → ShopSearch page.) */}
             <View className="flex-row items-center" style={{ marginTop: 14, gap: 10, paddingLeft: 12 }}>
               <Pressable
                 onPress={() => nav.navigate("ShopSort", { current: sort, category, categories: categories.map((c) => c.name) })}
@@ -654,38 +581,8 @@ export function ShopScreen() {
           </>
         ) : tab === "herbal" ? (
           <>
-            {/* Search bar — white pill matching the products tab */}
-            <View
-              className="flex-row items-center rounded-full px-4"
-              style={{
-                marginTop: 10,
-                marginHorizontal: 12,
-                height: 46,
-                backgroundColor: "#ffffff",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-                elevation: 2,
-              }}
-            >
-              <Search size={18} color="#319754" />
-              <TextInput
-                value={herbalQuery}
-                onChangeText={setHerbalQuery}
-                placeholder="ค้นหาวัตถุดิบในร้านนี้"
-                placeholderTextColor="#a3a3a3"
-                returnKeyType="search"
-                style={{ flex: 1, marginLeft: 10, fontSize: 13.5, color: "#374151" }}
-              />
-              {herbalQuery ? (
-                <Pressable onPress={() => setHerbalQuery("")} hitSlop={8} className="active:opacity-60">
-                  <X size={16} color="#a3a3a3" />
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Filter button + material-category chips */}
+            {/* Filter button + material-category chips.
+                (Search moved to the app-bar button → ShopSearch page.) */}
             <View className="flex-row items-center" style={{ marginTop: 14, gap: 10, paddingLeft: 12 }}>
               <Pressable
                 onPress={() =>
@@ -730,7 +627,7 @@ export function ShopScreen() {
               <EmptyState
                 icon={<Leaf size={36} color="#d4d4d4" />}
                 title="ไม่พบวัตถุดิบ"
-                subtitle="ลองเปลี่ยนหมวดหมู่หรือคำค้นหาดู"
+                subtitle="ลองเปลี่ยนหมวดหมู่ดู"
               />
             ) : (
               <View className="flex-row flex-wrap" style={{ marginTop: 12, paddingHorizontal: 16, gap: 14 }}>
@@ -798,86 +695,25 @@ export function ShopScreen() {
   );
 }
 
-function TabPill({
-  active,
-  label,
-  count,
-  Icon,
-  badgeRed,
-  onPress,
+// Storefront tab switcher — the shared sliding-pill segmented control, so the
+// customer shop profile matches the owner's หน้าร้านค้า preview 1:1.
+function ShopTabs({
+  tab,
+  onChange,
+  counts,
+  hasHerbal,
 }: {
-  active: boolean;
-  label: string;
-  count: number;
-  Icon: typeof Package;
-  badgeRed?: boolean;
-  onPress: () => void;
+  tab: TabKey;
+  onChange: (t: TabKey) => void;
+  counts: Record<TabKey, number>;
+  hasHerbal: boolean;
 }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:opacity-80"
-      style={{
-        paddingLeft: 6,
-        paddingRight: 14,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: active ? "#319754" : "white",
-        borderWidth: 1,
-        borderColor: active ? "#319754" : "#e5e7eb",
-        gap: 8,
-      }}
-    >
-      <View
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: 13,
-          backgroundColor: active ? "rgba(255,255,255,0.22)" : "rgba(49,151,84,0.12)",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon size={14} color={active ? "white" : "#319754"} strokeWidth={2.4} />
-      </View>
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: active ? "600" : "500",
-          color: active ? "white" : "#1d5b32",
-        }}
-      >
-        {label}
-      </Text>
-      <View
-        style={{
-          minWidth: 22,
-          height: 20,
-          borderRadius: 10,
-          paddingHorizontal: 6,
-          backgroundColor: active
-            ? "rgba(255,255,255,0.22)"
-            : badgeRed
-              ? "#ef4444"
-              : "#f5f5f5",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 10,
-            fontWeight: "700",
-            color: active ? "white" : badgeRed ? "white" : "#737373",
-            includeFontPadding: false,
-            lineHeight: 12,
-          }}
-        >
-          {count}
-        </Text>
-      </View>
-    </Pressable>
-  );
+  const tabs = [
+    { id: "products" as TabKey, label: "สินค้า", count: counts.products },
+    ...(hasHerbal ? [{ id: "herbal" as TabKey, label: "Herbal", count: counts.herbal }] : []),
+    { id: "reviews" as TabKey, label: "รีวิว", count: counts.reviews },
+  ];
+  return <SegmentedTabs tabs={tabs} active={tab} onChange={onChange} style={{ marginTop: 16, marginHorizontal: 16 }} />;
 }
 
 function Stat({

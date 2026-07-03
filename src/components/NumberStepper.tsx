@@ -48,7 +48,7 @@ export function NumberStepper({
       />
       <View
         className="flex-row items-center"
-        style={{ backgroundColor: "#fff", borderRadius: 999, height: 34, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" }}
+        style={{ backgroundColor: "#fff", borderRadius: 999, height: 34, overflow: "hidden" }}
       >
         <Pressable onPress={dec} disabled={atMin} hitSlop={6} className="items-center justify-center active:opacity-70" style={{ width: 44, height: 34, opacity: atMin ? 0.35 : 1 }}>
           <Minus size={16} color={TEXT_PRIMARY} strokeWidth={2.6} />

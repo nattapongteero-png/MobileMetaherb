@@ -13,6 +13,8 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, TextInput, Switch } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
+import { GlassView } from "expo-glass-effect";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -27,6 +29,7 @@ import {
   Save,
 } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { BottomFade } from "../components/BottomFade";
 import { NumberStepper } from "../components/NumberStepper";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -78,19 +81,17 @@ function SectionHeader({ Icon, tint, title, sub, required }: { Icon: typeof Tick
   );
 }
 
+// Full-bleed white section — edge-to-edge blocks separated by the gray gap,
+// same shell as the detail pages (order / doc / coupon detail).
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <View
       style={{
         backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 16,
+        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
         gap: 14,
-        shadowColor: "#000",
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
       }}
     >
       {children}
@@ -117,7 +118,7 @@ function RangeCalendar({ from, to, onPick }: { from: Date | null; to: Date | nul
     <View>
       <View className="flex-row items-center justify-between" style={{ marginBottom: 10 }}>
         <Pressable onPress={prev} hitSlop={8} className="active:opacity-60"><ChevronLeft size={20} color={BRAND_GREEN_DARK} /></Pressable>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: "#1a1a1a" }}>{TH_FULL[month]} {year + 543}</Text>
+        <Text style={{ fontSize: 17, fontWeight: "700", color: "#1a1a1a" }}>{TH_FULL[month]} {year + 543}</Text>
         <Pressable onPress={next} hitSlop={8} className="active:opacity-60"><ChevronRight size={20} color={BRAND_GREEN_DARK} /></Pressable>
       </View>
       <View className="flex-row" style={{ marginBottom: 4 }}>
@@ -270,7 +271,8 @@ export function CouponCreateScreen() {
         showSearch={false}
       />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
         {/* ── ข้อมูลคูปอง ── */}
         <Card>
           <SectionHeader Icon={Ticket} tint={BRAND_GREEN} title="ข้อมูลคูปอง" sub="รหัส ชื่อ และคำอธิบายของคูปอง" />
@@ -400,17 +402,43 @@ export function CouponCreateScreen() {
         </Card>
       </ScrollView>
 
-      {/* Sticky footer — centered save button */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: DIVIDER_GRAY }}>
-        <Pressable
-          onPress={submit}
-          disabled={!canSubmit}
-          className="flex-row items-center justify-center active:opacity-90"
-          style={{ height: 50, borderRadius: 999, gap: 8, backgroundColor: canSubmit ? BRAND_GREEN : "#d4d4d4" }}
+      {/* Top fade + bottom fade — same language as the detail pages */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["#fafafa", "rgba(250,250,250,0)"]}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+      />
+      <BottomFade />
+      </View>
+
+      {/* Floating Liquid Glass save bar — same as the other detail pages */}
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+        <View
+          style={{
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
+          }}
         >
-          <Save size={17} color="#fff" strokeWidth={2.6} />
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{editId ? "บันทึกการแก้ไข" : "สร้างคูปอง"}</Text>
-        </Pressable>
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
+          >
+            <Pressable
+              onPress={submit}
+              disabled={!canSubmit}
+              className="flex-row items-center justify-center active:opacity-90"
+              style={{ flex: 1, height: 50, borderRadius: 999, gap: 8, backgroundColor: canSubmit ? BRAND_GREEN : "#d4d4d4" }}
+            >
+              <Save size={17} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{editId ? "บันทึกการแก้ไข" : "สร้างคูปอง"}</Text>
+            </Pressable>
+          </GlassView>
+        </View>
       </View>
     </View>
   );

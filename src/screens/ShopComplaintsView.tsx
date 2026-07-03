@@ -4,8 +4,11 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Inbox } from "lucide-react-native";
+import { Inbox, Search } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { GlassIconButton } from "../components/GlassIconButton";
+import { BottomFade } from "../components/BottomFade";
 import { COMPLAINT_TYPES } from "../data/complaintTypes";
 import {
   STATUS_LABEL,
@@ -33,7 +36,7 @@ export function StatusPill({ status }: { status: ComplaintStatus }) {
   );
 }
 
-function ComplaintRow({ c, onPress }: { c: Complaint; onPress: () => void }) {
+export function ComplaintRow({ c, onPress }: { c: Complaint; onPress: () => void }) {
   const TypeIcon = COMPLAINT_TYPES[c.type].Icon;
   const tc = TYPE_COLOR[c.type];
   return (
@@ -110,17 +113,36 @@ export function ShopComplaintsView() {
   );
 }
 
-/** เรื่องร้องเรียน — list as a standalone subpage (header + back). */
+/** เรื่องร้องเรียน — list as a standalone subpage (header + back + search). */
 export function ShopComplaintsScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title="เรื่องร้องเรียน" subtitle="คำร้องจากลูกค้า" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}>
-        <ShopComplaintsView />
-      </ScrollView>
+      <SubPageHeader
+        title="เรื่องร้องเรียน"
+        subtitle="คำร้องจากลูกค้า"
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+        rightSlot={
+          <GlassIconButton onPress={() => nav.navigate("ShopComplaintSearch")} accessibilityLabel="ค้นหาเรื่องร้องเรียน">
+            <Search size={20} color="#1a1a1a" />
+          </GlassIconButton>
+        }
+      />
+      <View style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}>
+          <ShopComplaintsView />
+        </ScrollView>
+        {/* Scroll fades — content dissolves into the header / bottom edge */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#fafafa", "rgba(250,250,250,0)"]}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }}
+        />
+        <BottomFade />
+      </View>
     </View>
   );
 }

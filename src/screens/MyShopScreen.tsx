@@ -40,7 +40,6 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowRightCircle,
-  Ban,
   BarChart3,
   Beaker,
   Bell,
@@ -50,7 +49,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Check,
   ClipboardList,
   Clock,
@@ -59,6 +57,7 @@ import {
   DollarSign,
   Download,
   Eye,
+  FileCheck2,
   FileText,
   FlaskConical,
   Info,
@@ -77,7 +76,6 @@ import {
   GripVertical,
   PlusCircle,
   ScanSearch,
-  Leaf,
   Search,
   Sparkles,
   ShieldCheck,
@@ -103,6 +101,7 @@ import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { Skeleton } from "../components/Skeleton";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import { showToast } from "../components/Toast";
 import { GlassDatePicker } from "../components/GlassDatePicker";
 import { getImagePicker } from "../utils/imagePicker";
@@ -110,6 +109,7 @@ import { useSeller } from "../context/SellerContext";
 import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
+import { webCategoryLabel } from "../data/catalog";
 import { SETTLEMENTS, FINANCE_TOTALS, MONTH_OPTIONS, DEFAULT_MONTH, fmtBaht, fmtSigned, type Settlement, type SettlementStatus } from "../data/financeTransactions";
 import { ShopSalesReportView } from "./ShopSalesReportView";
 import { ShopReportView } from "./ShopReportView";
@@ -139,9 +139,9 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const LEAF_C = require("../../assets/herb-leaf-c.png");
 const LEAF_D = require("../../assets/herb-leaf-d.png");
 const SHOP_TABS = [
-  { id: "products", label: "สินค้า", Icon: Package },
-  { id: "herbal", label: "Herbal Market", Icon: Leaf },
-  { id: "reviews", label: "รีวิวร้านค้า", Icon: Star },
+  { id: "products", label: "สินค้า" },
+  { id: "herbal", label: "Herbal" },
+  { id: "reviews", label: "รีวิว" },
 ] as const;
 
 
@@ -479,7 +479,7 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
 }
 
 // Flat label lookup for the section selector button.
-const SECTION_LABEL: Record<SectionId, string> = {
+export const SECTION_LABEL: Record<SectionId, string> = {
   dashboard: "Dashboard",
   orders: "จัดการคำสั่งซื้อ",
   hm_quotations: "ใบเสนอราคา",
@@ -499,6 +499,13 @@ const SECTION_LABEL: Record<SectionId, string> = {
   finance_tx: "ธุรกรรม",
   complaints: "เรื่องร้องเรียน",
 };
+
+// Sections that open as their own pushed subpage (generic ShopSection screen)
+// instead of swapping inside the console — same slide-in chrome as ร้องเรียน.
+export const SHOP_SUBPAGE_SECTIONS = new Set<SectionId>([
+  "flash_sale", "hm_quotations", "hm_pr", "hm_po",
+  "trials_products", "trials_tracking", "promotions", "coupons",
+]);
 
 // Shop identity is a single source of truth: the owner console reuses the exact
 // SHOP the customer-facing ShopScreen presents, so name/avatar/banner/description
@@ -551,7 +558,7 @@ const TRIAL_STATUS = [
 const parseSold = (s: string) => (/k/i.test(s) ? Math.round(parseFloat(s) * 1000) : Math.round(parseFloat(s)) || 0);
 const TOP_PRODUCTS = SHOP_PRODUCTS.map((p) => {
   const sold = parseSold(p.sold);
-  return { name: p.name, cat: p.category, unit: p.price, sold, revenue: p.price * sold, image: p.image as number };
+  return { name: p.name, cat: webCategoryLabel(p.category), unit: p.price, sold, revenue: p.price * sold, image: p.image as number };
 });
 
 // ===================== PRODUCT MANAGEMENT (sidebar → จัดการสินค้า) ==========
@@ -597,7 +604,7 @@ const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
   return {
     id: p.id,
     name: p.name,
-    category: p.category,
+    category: webCategoryLabel(p.category),
     image: p.image as number,
     type: "ราคาเดียว",
     typeColor: "#ff9500",
@@ -700,7 +707,7 @@ type OrderStatus =
   | "cancelled";
 
 // Status pill bg + footer note tag (exact web values from statusConfig).
-const ORDER_STATUS_CFG: Record<
+export const ORDER_STATUS_CFG: Record<
   OrderStatus,
   { label: string; pillBg: string; note: string; noteColor: string }
 > = {
@@ -724,7 +731,7 @@ const ORDER_TABS: { id: "all" | OrderStatus; label: string; Icon: typeof BarChar
 ];
 
 type OrderItem = { name: string; option: string; qty: number; price: number; image: number };
-type ShopOrder = {
+export type ShopOrder = {
   id: string;
   status: OrderStatus;
   date: string;
@@ -734,6 +741,23 @@ type ShopOrder = {
   shippingMethod: "รับที่ร้าน" | "จัดส่งปกติ" | "จัดส่งด่วน";
   trackingNumber?: string;
   reviewScore?: number;
+  // Detail-page fields (same shape as the web OwnerDashboard order).
+  paymentMethod?: string;
+  note?: string;
+  cancelReason?: string;
+  cancelNote?: string;
+  cancelledBy?: "shop" | "customer";
+  // Customer-requested cancellations await the shop's decision ("pending");
+  // deny reverts the order to previousStatus (web flow).
+  cancellationStatus?: "pending" | "approved" | "denied";
+  previousStatus?: OrderStatus;
+  // Customer review (web ReviewModal data) — per-item ratings reference items[].
+  review?: {
+    reviewerName: string;
+    reviewedAt: string;
+    shopRating: number;
+    items: { itemIndex: number; rating: number; comment: string }[];
+  };
   items: OrderItem[];
 };
 
@@ -744,54 +768,104 @@ const oi = (i: number, option: string, qty: number): OrderItem => {
   return { name: p.name, option, qty, price: p.unit * qty, image: p.image };
 };
 
-const ORDERS: ShopOrder[] = [
+export const ORDERS: ShopOrder[] = [
   {
     id: "ORD-20260204-03521", status: "pending_payment", date: "4 ก.พ. 2569 - 08:12 น.",
     customer: "คุณสมชาย ใจดี", phone: "081-234-5678",
     address: "88/12 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110",
-    shippingMethod: "จัดส่งปกติ",
+    shippingMethod: "จัดส่งปกติ", paymentMethod: "พร้อมเพย์ PromptPay",
     items: [oi(0, "150 g", 2)],
   },
   {
     id: "ORD-20260204-03520", status: "pending_verify", date: "4 ก.พ. 2569 - 11:08 น.",
     customer: "คุณสมหญิง รักสุขภาพ", phone: "089-876-5432",
     address: "120 หมู่ 5 ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งด่วน",
+    shippingMethod: "จัดส่งด่วน", paymentMethod: "บัญชีธนาคาร",
+    note: "ฝากแพ็คกันกระแทกด้วยนะคะ สั่งไปเป็นของฝากค่ะ",
     items: [oi(1, "1 หลอด", 1), oi(2, "20 ซอง", 2)],
   },
   {
     id: "ORD-20260203-03517", status: "ready_ship", date: "3 ก.พ. 2569 - 16:45 น.",
     customer: "คุณทานตะวัน งามดี", phone: "086-111-2233",
     address: "55/3 ถ.นิมมานเหมินท์ ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งปกติ",
+    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
     items: [oi(3, "200 g", 1)],
   },
   {
     id: "ORD-20260202-03512", status: "shipping", date: "2 ก.พ. 2569 - 09:20 น.",
     customer: "คุณสายฝน พรหมมา", phone: "082-555-7788",
     address: "9 ซ.ลาดพร้าว 71 แขวงลาดพร้าว เขตลาดพร้าว กรุงเทพฯ 10230",
-    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH6829-4471-220K",
+    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH6829-4471-220K", paymentMethod: "พร้อมเพย์ PromptPay",
     items: [oi(4, "30 แคปซูล", 1), oi(5, "1 ชุด", 1)],
   },
   {
     id: "ORD-20260131-03505", status: "shipped", date: "31 ม.ค. 2569 - 13:05 น.",
     customer: "คุณฟ้าใส แจ่มจันทร์", phone: "087-222-9090",
     address: "203/7 ถ.เพชรเกษม ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
-    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH1180-5523-901P", reviewScore: 5,
+    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH1180-5523-901P", reviewScore: 5, paymentMethod: "ชำระเงินปลายทาง",
+    review: {
+      reviewerName: "คุณฟ้าใส แจ่มจันทร์",
+      reviewedAt: "2 ก.พ. 2569",
+      shopRating: 5,
+      items: [{ itemIndex: 0, rating: 5, comment: "หอมอร่อยมากค่ะ ชงง่าย แพ็คมาดีมาก ส่งไวกว่าที่คิด จะกลับมาซื้อซ้ำแน่นอนค่ะ" }],
+    },
     items: [oi(6, "150 g", 3)],
+  },
+  {
+    // Shipped-but-not-yet-reviewed example — no reviewScore/review, so the
+    // detail page shows no review section and no "ดูคะแนน" button.
+    id: "ORD-20260130-03501", status: "shipped", date: "30 ม.ค. 2569 - 09:18 น.",
+    customer: "คุณพิมพ์ใจ บุญมา", phone: "085-666-2211",
+    address: "99/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
+    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH2244-8810-455M", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
+    items: [oi(9, "1 ชุด", 1), oi(10, "1 ขวด", 2)],
   },
   {
     id: "ORD-20260129-03498", status: "cancelled", date: "29 ม.ค. 2569 - 10:41 น.",
     customer: "คุณมานพ ตั้งใจ", phone: "081-444-1212",
     address: "17 หมู่ 2 ต.บางพระ อ.ศรีราชา จ.ชลบุรี 20110",
-    shippingMethod: "รับที่ร้าน",
+    shippingMethod: "รับที่ร้าน", paymentMethod: "พร้อมเพย์ PromptPay",
+    cancelledBy: "customer", cancelReason: "ลูกค้าเปลี่ยนใจ", cancelNote: "เปลี่ยนใจ ขอยกเลิกค่ะ",
+    cancellationStatus: "pending", previousStatus: "pending_verify",
     items: [oi(7, "1 หลอด", 1)],
+  },
+  {
+    // Reviewed multi-item example — 3 products in one order, per-item ratings
+    // (exercises the card's "ดูอีก N รายการ" collapse + the multi-item review page).
+    id: "ORD-20260128-03495", status: "shipped", date: "28 ม.ค. 2569 - 14:02 น.",
+    customer: "คุณชลธิชา แก้วใส", phone: "089-333-8877",
+    address: "8/15 ถ.ศรีจันทร์ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
+    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH7731-0092-114D", paymentMethod: "พร้อมเพย์ PromptPay",
+    reviewScore: 4,
+    review: {
+      reviewerName: "คุณชลธิชา แก้วใส",
+      reviewedAt: "31 ม.ค. 2569",
+      shopRating: 4,
+      items: [
+        { itemIndex: 0, rating: 5, comment: "กลิ่นหอมมาก ใช้แล้วผ่อนคลายสุด ๆ ซื้อซ้ำแน่นอนค่ะ" },
+        { itemIndex: 1, rating: 4, comment: "คุณภาพดี รสชาติเข้มข้น แต่ซองเล็กกว่าที่คิดนิดหน่อย" },
+        { itemIndex: 2, rating: 3, comment: "สินค้าโอเคค่ะ แต่กล่องมาถึงบุบมุมนึง อยากให้แพ็คแน่นกว่านี้" },
+      ],
+    },
+    items: [oi(11, "1 กล่อง", 1), oi(12, "2 ซอง", 2), oi(13, "1 ชุด", 1)],
+  },
+  {
+    // Shop-cancelled example — shows the red "ยกเลิกแล้ว" variant with full
+    // details (ยกเลิกโดย: ร้านค้า + เหตุผล + หมายเหตุ) on the detail page.
+    id: "ORD-20260126-03484", status: "cancelled", date: "26 ม.ค. 2569 - 15:22 น.",
+    customer: "คุณวรรณา สายทอง", phone: "084-777-3344",
+    address: "42/8 ถ.รัถการ ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
+    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัญชีธนาคาร",
+    cancelledBy: "shop", cancelReason: "สินค้าหมดสต็อก",
+    cancelNote: "วัตถุดิบล็อตล่าสุดหมด ทางร้านคืนเงินเต็มจำนวนให้แล้ว ขออภัยในความไม่สะดวกค่ะ",
+    cancellationStatus: "approved",
+    items: [oi(8, "250 g", 1)],
   },
 ];
 
-const orderTotal = (o: ShopOrder) => o.items.reduce((s, it) => s + it.price, 0);
+export const orderTotal = (o: ShopOrder) => o.items.reduce((s, it) => s + it.price, 0);
 
-const fmtTHB = (n: number) =>
+export const fmtTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtTHBShort = (n: number) => `฿${n.toLocaleString("th-TH")}`;
 const fmtNum = (n: number) => n.toLocaleString("th-TH");
@@ -925,6 +999,9 @@ function OverviewScreen() {
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
+    if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
+    if (id === "orders") { nav.navigate("ShopOrders"); return; }
+    if (SHOP_SUBPAGE_SECTIONS.has(id)) { nav.navigate("ShopSection", { section: id }); return; }
     const rk = REPORT_KIND[id];
     if (rk) { nav.navigate("ShopReport", { kind: rk }); return; }
     setSub(id);
@@ -992,6 +1069,9 @@ function FinanceScreen() {
   const [sub, setSub] = useState<SectionId>("finance_overview");
   const selectSection = (id: SectionId) => {
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
+    if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
+    if (id === "orders") { nav.navigate("ShopOrders"); return; }
+    if (SHOP_SUBPAGE_SECTIONS.has(id)) { nav.navigate("ShopSection", { section: id }); return; }
     const rk = REPORT_KIND[id];
     if (rk) { nav.navigate("ShopReport", { kind: rk }); return; }
     setSub(id);
@@ -1315,6 +1395,27 @@ function WalletHeroCard() {
 
 /* ============ หน้าร้านค้า (Shop front) ============ */
 
+// Segmented tab control for the storefront — the shared sliding-pill switcher
+// (same component the customer ShopScreen + Knowledge-style headers use).
+function ShopFrontTabs({
+  tab,
+  onChange,
+  counts,
+}: {
+  tab: "products" | "herbal" | "reviews";
+  onChange: (t: "products" | "herbal" | "reviews") => void;
+  counts: Record<"products" | "herbal" | "reviews", number>;
+}) {
+  return (
+    <SegmentedTabs
+      tabs={SHOP_TABS.map((tb) => ({ id: tb.id, label: tb.label, count: counts[tb.id] }))}
+      active={tab}
+      onChange={onChange}
+      style={{ marginHorizontal: 16 }}
+    />
+  );
+}
+
 // Storefront — how the shop looks to customers (ported from the web ShopProfilePage):
 // cover banner + shop info card (avatar/name/verified/stats) + product grid.
 function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; bannerTop?: number }) {
@@ -1411,22 +1512,14 @@ function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; b
           </View>
         </View>
 
-        {/* Tabs — สินค้า / Herbal Market / รีวิวร้านค้า */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 18 }}>
-          {SHOP_TABS.map((tb) => {
-            const active = shopTab === tb.id;
-            const count = tb.id === "products" ? SHOP_PRODUCTS.length : tb.id === "herbal" ? herbalMaterials.length : REVIEWS.length;
-            return (
-              <Pressable key={tb.id} onPress={() => setShopTab(tb.id)} className="active:opacity-80" style={{ flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 999, backgroundColor: active ? BRAND_GREEN : "#fff", borderWidth: active ? 0 : 1, borderColor: "#e5e7eb" }}>
-                <tb.Icon size={15} color={active ? "#fff" : BRAND_GREEN} strokeWidth={2.2} />
-                <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "#fff" : "#374151" }}>{tb.label}</Text>
-                <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: active ? "rgba(255,255,255,0.25)" : "rgba(49,151,84,0.12)", alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ fontSize: 10, fontWeight: "700", color: active ? "#fff" : BRAND_GREEN }}>{count > 99 ? "99+" : count}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {/* Tabs — segmented control (same sliding-pill style as the Knowledge page) */}
+        <View style={{ marginTop: 18 }}>
+          <ShopFrontTabs
+            tab={shopTab}
+            onChange={setShopTab}
+            counts={{ products: SHOP_PRODUCTS.length, herbal: herbalMaterials.length, reviews: REVIEWS.length }}
+          />
+        </View>
 
         {shopTab === "products" ? (
           <View style={{ marginTop: 16 }}>
@@ -3391,7 +3484,7 @@ export type MarketDoc = {
 };
 
 // Status pill colors per document kind (ported from the web *_STATUS_CFG).
-const DOC_STATUS: Record<DocKind, Record<string, { label: string; color: string }>> = {
+export const DOC_STATUS: Record<DocKind, Record<string, { label: string; color: string }>> = {
   qt: {
     sent: { label: "รอตอบกลับ", color: "#f59e0b" },
     accepted: { label: "ตอบรับแล้ว", color: "#10b981" },
@@ -3415,7 +3508,7 @@ const DOC_STATUS: Record<DocKind, Record<string, { label: string; color: string 
 export const DOC_TITLE: Record<DocKind, string> = { qt: "ใบเสนอราคา", pr: "ใบ PR", po: "ใบ PO" };
 
 // Pick a catalog thumbnail that loosely matches the raw-material name.
-const matImg = (name: string): number => {
+export const matImg = (name: string): number => {
   const map: [string, number][] = [
     ["ขมิ้น", 0], ["ฟ้าทะลาย", 1], ["เก๊กฮวย", 2], ["น้ำผึ้ง", 3], ["บัวบก", 4],
     ["กระชาย", 5], ["ตะไคร้", 6], ["ขิง", 7], ["เห็ดหลินจือ", 8],
@@ -3438,7 +3531,7 @@ const CO = {
 };
 
 // ใบเสนอราคา (issued quotations) — RAW_QTS from the web.
-const QUOTATIONS: MarketDoc[] = [
+export const QUOTATIONS: MarketDoc[] = [
   { id: "QT-2569-3012", status: "accepted", date: "10 มี.ค. 2569", ...CO.thaiDev, paymentTerms: "เครดิต 30 วัน",
     validUntil: "10 เม.ย. 2569", daysRemaining: 28, poNumber: "PO-2569-3012",
     items: [{ name: "ขมิ้นชันแห้ง (ผง)", grade: "พรีเมียม", qty: 200, unit: "กก.", pricePerUnit: 320 }] },
@@ -3469,7 +3562,7 @@ const QUOTATIONS: MarketDoc[] = [
 ];
 
 // ใบ PR (purchase requisitions) — MOCK_PURCHASE_REQUISITIONS from the web.
-const PURCHASE_REQUESTS: MarketDoc[] = [
+export const PURCHASE_REQUESTS: MarketDoc[] = [
   { id: "PR-2569-3012", status: "converted", date: "11 มี.ค. 2569", ...CO.thaiDev, paymentTerms: "เครดิต 30 วัน", priority: "Normal", approver: "คุณวิชัย ใจกล้า", validityDays: 15, description: "วัตถุดิบสำหรับสายการผลิตชาขมิ้นล็อตเดือนหน้า", justification: "สต๊อกขมิ้นคงเหลือต่ำกว่าจุดสั่งซื้อ ต้องเติมเพื่อไม่ให้ไลน์ผลิตสะดุด", needBy: "26 มี.ค. 2569", refId: "PO-2569-3012",
     items: [{ name: "ขมิ้นชันแห้ง (ผง)", grade: "พรีเมียม", qty: 200, unit: "กก.", pricePerUnit: 320 }] },
   { id: "PR-2569-3019", status: "converted", date: "9 มี.ค. 2569", ...CO.banya, paymentTerms: "เครดิต 60 วัน", priority: "High", approver: "คุณสมศักดิ์ ดวงดี", validityDays: 10, description: "วัตถุดิบรวมสำหรับสูตรเครื่องดื่มสมุนไพรใหม่ — รวมหลายร้านในใบเดียว", justification: "เตรียมผลิตตัวอย่างเสนอลูกค้ารายใหญ่ภายในเดือนนี้", needBy: "22 มี.ค. 2569", refId: "PO-2569-3019", note: "ออก PR ตรงเข้ามาเลย — ไม่ผ่าน Quote",
@@ -3493,7 +3586,7 @@ const PURCHASE_REQUESTS: MarketDoc[] = [
 ];
 
 // ใบ PO (purchase orders) — MOCK_PURCHASE_ORDERS from the web.
-const PURCHASE_ORDERS_DOC: MarketDoc[] = [
+export const PURCHASE_ORDERS_DOC: MarketDoc[] = [
   { id: "PO-2569-3012", status: "received", date: "12 มี.ค. 2569", ...CO.thaiDev, paymentTerms: "เครดิต 30 วัน", priority: "Normal", approver: "คุณวิชัย ใจกล้า", validityDays: 15, needBy: "26 มี.ค. 2569", shippingMethod: "จัดส่งโดยผู้ขาย", note: "ขอให้บรรจุในกระสอบ 25 กก. ปิดผนึกแน่นหนา",
     items: [{ name: "ขมิ้นชันแห้ง (ผง)", grade: "พรีเมียม", qty: 200, unit: "กก.", pricePerUnit: 320 }] },
   { id: "PO-2569-3019", status: "preparing", date: "10 มี.ค. 2569", ...CO.banya, paymentTerms: "เครดิต 60 วัน", priority: "High", approver: "คุณสมศักดิ์ ดวงดี", validityDays: 10, needBy: "22 มี.ค. 2569", shippingMethod: "จัดส่งโดยผู้ขาย",
@@ -3517,17 +3610,33 @@ const PURCHASE_ORDERS_DOC: MarketDoc[] = [
 ];
 
 // Look up a PO document by its number (e.g. a PR's refId / a quote's poNumber).
-const findPoDoc = (id?: string): MarketDoc | undefined => (id ? PURCHASE_ORDERS_DOC.find((d) => d.id === id) : undefined);
+export const findPoDoc = (id?: string): MarketDoc | undefined => (id ? PURCHASE_ORDERS_DOC.find((d) => d.id === id) : undefined);
 
-const docLineTotal = (it: DocItem) => it.qty * it.pricePerUnit;
-const docSubtotal = (d: MarketDoc) => d.items.reduce((s, it) => s + docLineTotal(it), 0);
+export const docLineTotal = (it: MarketDoc["items"][number]) => it.qty * it.pricePerUnit;
+export const docSubtotal = (d: MarketDoc) => d.items.reduce((s, it) => s + docLineTotal(it), 0);
 
-// ใบเสนอราคา — dedicated section with a search box + web-matching cards.
-function QuotationSection() {
+// Quotation filter chips — web QT_STATUS_STYLE statuses + "ทั้งหมด".
+const QT_TABS = [
+  { id: "all", label: "ทั้งหมด", Icon: FileText },
+  { id: "sent", label: "รอตอบกลับ", Icon: Clock },
+  { id: "accepted", label: "ตอบรับแล้ว", Icon: Check },
+  { id: "expired", label: "หมดอายุ", Icon: AlertCircle },
+  { id: "rejected", label: "ปฏิเสธ", Icon: X },
+] as const;
+
+// ใบเสนอราคา — status filter chips + web-matching cards. The pushed subpage
+// hides the inline search (its app-bar button opens ShopQuoteSearch instead).
+export function QuotationSection({ showSearch = true }: { showSearch?: boolean }) {
   const nav = useNavigation<Nav>();
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<(typeof QT_TABS)[number]["id"]>("all");
+
+  const count = (id: string) =>
+    id === "all" ? QUOTATIONS.length : QUOTATIONS.filter((d) => d.status === id).length;
+
   const q = query.trim().toLowerCase();
   const visible = QUOTATIONS.filter((d) => {
+    if (filter !== "all" && d.status !== filter) return false;
     if (!q) return true;
     return (
       d.id.toLowerCase().includes(q) ||
@@ -3537,7 +3646,8 @@ function QuotationSection() {
   });
   return (
     <View style={{ gap: 14 }}>
-      {/* Search */}
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopQuoteSearch) */}
+      {showSearch ? (
       <View
         className="flex-row items-center"
         style={{
@@ -3562,6 +3672,54 @@ function QuotationSection() {
           <Search size={16} color="white" />
         </View>
       </View>
+      ) : null}
+
+      {/* Status filter chips — same pill language as the orders list (Fitts: 36px) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -16 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
+      >
+        {QT_TABS.map((tb) => {
+          const active = filter === tb.id;
+          const c = count(tb.id);
+          return (
+            <Pressable
+              key={tb.id}
+              onPress={() => setFilter(tb.id)}
+              className="flex-row items-center active:opacity-80"
+              style={{
+                height: 36,
+                paddingHorizontal: 14,
+                borderRadius: 999,
+                gap: 6,
+                backgroundColor: active ? BRAND_GREEN : "white",
+                borderWidth: 1,
+                borderColor: active ? BRAND_GREEN : DIVIDER_GRAY,
+              }}
+            >
+              <tb.Icon size={14} color={active ? "white" : TEXT_MUTED} />
+              <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>
+                {tb.label}
+              </Text>
+              <View
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  paddingHorizontal: 5,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{c}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       {visible.length === 0 ? (
         <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 10 }}>
@@ -3575,47 +3733,49 @@ function QuotationSection() {
   );
 }
 
-// ใบเสนอราคา card — mirrors the web QuotationCard (pre-VAT, validity chip,
-// buyer row, per-unit pricing, download action). No status pill / VAT.
-function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDetail?: () => void }) {
+// ใบเสนอราคา card — web QuotationCard layout (issuer header, requester block,
+// validity chip) with the id · date row and item rows in the customer order
+// card's language.
+export function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDetail?: () => void }) {
   const total = docSubtotal(doc);
   const days = doc.daysRemaining ?? 0;
-  const daysColor = days <= 0 ? "#dc2626" : days <= 7 ? "#dc2626" : days <= 30 ? "#d97706" : "#319754";
+  const daysColor = days <= 7 ? "#dc2626" : days <= 30 ? "#d97706" : "#319754";
+  const cfg = DOC_STATUS.qt[doc.status] ?? { label: doc.status, color: TEXT_MUTED };
   return (
     <Pressable onPress={onOpenDetail} className="active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}>
-      {/* Issuer label + open-detail chevron */}
-      <View className="flex-row items-center" style={{ gap: 8, marginBottom: 8 }}>
-        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <ClipboardList size={13} color="#fff" strokeWidth={2.4} />
+      {/* Header — doc icon + quote number (big bold) + status pill (tinted),
+          exactly like the customer RFQ card */}
+      <View className="flex-row items-center" style={{ gap: 10 }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+          <FileText size={14} color="#fff" strokeWidth={2.4} />
         </View>
-        <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0a0a0a" }}>ใบเสนอราคา (Quotation)</Text>
-        <ChevronRight size={16} color={TEXT_MUTED} />
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{doc.id}</Text>
+        <View style={{ backgroundColor: cfg.color + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+          <Text style={{ fontSize: 12, fontWeight: "600", color: cfg.color }}>{cfg.label}</Text>
+        </View>
       </View>
 
-      {/* id + days chip + date */}
-      <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
-        <View className="flex-row items-center" style={{ gap: 8, flex: 1, flexWrap: "wrap" }}>
-          <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{doc.id}</Text>
-          <View style={{ backgroundColor: daysColor + "1a", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-            <Text style={{ fontSize: 10.5, fontWeight: "700", color: daysColor }}>
-              {days <= 0 ? "หมดอายุ" : `เหลือ ${days} วัน`}
-            </Text>
-          </View>
+      {/* Days-remaining chip (left) · date (right) */}
+      <View className="flex-row items-center justify-between" style={{ marginTop: 8, gap: 8 }}>
+        <View style={{ backgroundColor: daysColor + "1a", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+          <Text style={{ fontSize: 10.5, fontWeight: "700", color: daysColor }}>
+            {days <= 0 ? "หมดอายุ" : `เหลือ ${days} วัน`}
+          </Text>
         </View>
-        <Text style={{ fontSize: 11.5, color: TEXT_DISABLED }}>{doc.date}</Text>
+        <Text style={{ fontSize: 11.5, color: TEXT_MUTED }} numberOfLines={1}>{doc.date}</Text>
       </View>
 
-      <View style={{ height: 1, backgroundColor: "#e7e7ea", marginVertical: 12 }} />
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
 
-      {/* Buyer row */}
+      {/* Requester — company / contact person / phone */}
       <View className="flex-row items-center" style={{ gap: 10, marginBottom: 12 }}>
         <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
           <User size={16} color={BRAND_GREEN} strokeWidth={2.2} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 13, fontWeight: "600", color: "#000" }} numberOfLines={1}>{doc.company}</Text>
-          <Text style={{ fontSize: 11, color: TEXT_MUTED }} numberOfLines={1}>
-            มีผลถึง {doc.validUntil}{doc.email ? ` · ${doc.email}` : ""}
+          <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }} numberOfLines={1}>
+            {doc.contact}{doc.phone ? ` · ${doc.phone}` : ""}
           </Text>
         </View>
       </View>
@@ -3631,29 +3791,27 @@ function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDetail?: (
         </View>
       ) : null}
 
-      {/* Items */}
+      {/* Items — name + จำนวน below, line total right (customer RFQ card rows) */}
       <View style={{ gap: 12 }}>
         {doc.items.map((item, i) => (
-          <View key={i} className="flex-row" style={{ gap: 10 }}>
-            <Image source={matImg(item.name)} style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: "rgba(49,151,84,0.08)" }} resizeMode="cover" />
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: "#000" }} numberOfLines={1}>{item.name}</Text>
-              <Text style={{ fontSize: 10.5, color: TEXT_MUTED, marginTop: 2 }}>ราคา/หน่วย: ฿{fmtNum(item.pricePerUnit)} / {item.unit}</Text>
-              <View className="flex-row items-center justify-between" style={{ marginTop: 3 }}>
-                <Text style={{ fontSize: 10.5, color: TEXT_DISABLED }}>จำนวน {fmtNum(item.qty)} {item.unit}</Text>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: "#000" }}>{fmtTHBShort(docLineTotal(item))}</Text>
-              </View>
+              <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>{item.name}</Text>
+              <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>
+                จำนวน {fmtNum(item.qty)} {item.unit}
+              </Text>
             </View>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{fmtTHBShort(docLineTotal(item))}</Text>
           </View>
         ))}
       </View>
 
-      <View style={{ height: 1, backgroundColor: "#e7e7ea", marginVertical: 12 }} />
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
 
-      {/* Total — label left, price right (same column as item line totals, so
-          the eye scans straight down: each item price → grand total) */}
-      <View className="flex-row items-center justify-between">
-        <Text style={{ fontSize: 14, color: TEXT_PRIMARY, fontWeight: "700" }}>ยอดรวม</Text>
+      {/* Total — muted label left, green total right (customer card sizes) */}
+      <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>ยอดรวม</Text>
         <Text style={{ fontSize: 20, fontWeight: "700", color: BRAND_GREEN }}>{fmtTHBShort(total)}</Text>
       </View>
     </Pressable>
@@ -3868,7 +4026,7 @@ function FlashProductCard({ p, onMenu }: { p: FlashProduct; onMenu: () => void }
   );
 }
 
-function FlashSaleSection() {
+export function FlashSaleSection() {
   const [filter, setFilter] = useState<"all" | FlashStatus>("all");
   const [query, setQuery] = useState("");
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
@@ -4178,7 +4336,7 @@ function FSInlineStepper({ value, onChange, min = 1, max, step = 1 }: { value: n
   );
 }
 
-function FlashAddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function FlashAddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(null);
   const [query, setQuery] = useState("");
@@ -4342,7 +4500,7 @@ function TypeTabs({ type, onChange, regularN, materialN }: { type: "regular" | "
   );
 }
 
-function ProductsManageSection({ type, setType }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void }) {
+export function ProductsManageSection({ type, setType }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void }) {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | PMStatus>("all");
   const [query, setQuery] = useState("");
@@ -4465,7 +4623,7 @@ function ProductsManageSection({ type, setType }: { type: "regular" | "material"
 
 // Floating "+" add button (FAB) — sits above the bottom tab bar on the
 // product-management page.
-function PMAddFab({ bottom, onPress }: { bottom: number; onPress: () => void }) {
+export function PMAddFab({ bottom, onPress }: { bottom: number; onPress: () => void }) {
   const [pressed, setPressed] = useState(false);
   return (
     <View style={{ position: "absolute", right: 16, bottom, borderRadius: 30, shadowColor: BRAND_GREEN, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 14 }}>
@@ -4633,7 +4791,7 @@ function PMActionSheet({
   );
 }
 
-function DocSection({ kind }: { kind: DocKind }) {
+export function DocSection({ kind, showSearch = true }: { kind: DocKind; showSearch?: boolean }) {
   const nav = useNavigation<Nav>();
   const docs = kind === "qt" ? QUOTATIONS : kind === "pr" ? PURCHASE_REQUESTS : PURCHASE_ORDERS_DOC;
   const [filter, setFilter] = useState<string>("all");
@@ -4655,7 +4813,8 @@ function DocSection({ kind }: { kind: DocKind }) {
 
   return (
     <View style={{ gap: 14 }}>
-      {/* Search */}
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopDocSearch) */}
+      {showSearch ? (
       <View
         className="flex-row items-center"
         style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
@@ -4671,6 +4830,7 @@ function DocSection({ kind }: { kind: DocKind }) {
           <Search size={16} color="white" />
         </View>
       </View>
+      ) : null}
 
       {/* Filter pills — full-bleed so the row scrolls edge-to-edge (not cropped) */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
@@ -4708,21 +4868,25 @@ function DocSection({ kind }: { kind: DocKind }) {
   );
 }
 
-// B2B document card (PR / PO) — compact summary; tap to open the full detail
-// sheet. (All line-items + company info live on the detail page now.)
-function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; onOpenDetail: () => void }) {
+// Priority chip colors — same as the customer B2BDocsScreen (PRIORITY_STYLE).
+const DOC_PRIORITY_STYLE: Record<string, { bg: string; color: string }> = {
+  Low: { bg: "#f3f4f6", color: "#6b7280" },
+  Normal: { bg: "rgba(59,130,246,0.10)", color: "#2563eb" },
+  High: { bg: "rgba(245,158,11,0.10)", color: "#d97706" },
+  Urgent: { bg: "rgba(239,68,68,0.10)", color: "#dc2626" },
+};
+const DOC_KIND_ICON: Record<DocKind, typeof FileText> = { qt: FileText, pr: ClipboardList, po: FileCheck2 };
+
+// B2B document card (PR / PO) — same layout language as the customer
+// B2BDocsScreen card: icon + doc id + status pill, meta chips + date,
+// requester block, item preview rows, green total.
+export function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; onOpenDetail: () => void }) {
   const cfg = DOC_STATUS[kind][doc.status];
   const accent = cfg.color;
-  const subtotal = docSubtotal(doc);
-  const vat = Math.round(subtotal * 0.07);
-  const total = subtotal + vat;
-  const needLabel = kind === "po" ? "ส่ง" : "ภายใน";
-
-  const Chip = ({ text, color = TEXT_SECONDARY, bg = SURFACE_GRAY }: { text: string; color?: string; bg?: string }) => (
-    <View style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-      <Text style={{ fontSize: 10.5, fontWeight: "600", color }}>{text}</Text>
-    </View>
-  );
+  const total = docSubtotal(doc);
+  const Icon = DOC_KIND_ICON[kind];
+  const prio = doc.priority ? DOC_PRIORITY_STYLE[doc.priority] ?? DOC_PRIORITY_STYLE.Normal : null;
+  const shown = doc.items.slice(0, 2);
 
   return (
     <Pressable
@@ -4730,48 +4894,72 @@ function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: DocKind; o
       className="active:opacity-90"
       style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}
     >
-      {/* Row 1: supplier + date + open-detail chevron (one row) */}
-      <View className="flex-row items-center" style={{ gap: 8 }}>
-        <Building2 size={16} color={BRAND_GREEN} strokeWidth={2.2} />
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>
-          {doc.company}
-        </Text>
-        <Text style={{ fontSize: 11.5, color: TEXT_DISABLED }}>{doc.date}</Text>
-        <ChevronRight size={16} color={TEXT_MUTED} />
+      {/* Header — kind icon + doc id (bold) + status pill (customer card) */}
+      <View className="flex-row items-center" style={{ gap: 10 }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+          <Icon size={14} color="#fff" strokeWidth={2.4} />
+        </View>
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{doc.id}</Text>
+        <View style={{ backgroundColor: accent + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: accent }}>{cfg.label}</Text>
+        </View>
       </View>
 
-      {/* Row 2: doc id + status / ภายใน / เครดิต tag pills */}
-      <View className="flex-row items-center" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-        <Text style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: "500", marginRight: 2 }}>{doc.id}</Text>
-        <View style={{ backgroundColor: accent + "1a", paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}>
-          <Text style={{ fontSize: 10.5, fontWeight: "700", color: accent }}>{cfg.label}</Text>
-        </View>
-        {doc.needBy ? (
-          <Chip text={`${needLabel} ${doc.needBy}`} color="#319754" bg="rgba(49,151,84,0.1)" />
-        ) : null}
-        <Chip text={doc.paymentTerms} color="#d97706" bg="rgba(245,158,11,0.12)" />
+      {/* Meta — priority chip left · date right (needBy / payment terms live
+          on the detail page, not the card) */}
+      <View className="flex-row items-center justify-between" style={{ marginTop: 8, gap: 8 }}>
+        {prio && doc.priority ? (
+          <View className="flex-row items-center" style={{ gap: 3, backgroundColor: prio.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+            {doc.priority === "Urgent" ? <AlertCircle size={10} color={prio.color} strokeWidth={2.6} /> : null}
+            <Text style={{ fontSize: 10.5, fontWeight: "700", color: prio.color }}>{doc.priority}</Text>
+          </View>
+        ) : (
+          <View />
+        )}
+        <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>{doc.date}</Text>
       </View>
 
       <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
 
-      {/* Cost summary */}
-      <View style={{ gap: 6 }}>
-        <View className="flex-row items-center justify-between">
-          <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>รวมค่าสินค้า ({doc.items.length} รายการ)</Text>
-          <Text style={{ fontSize: 13, color: TEXT_SECONDARY }}>{fmtTHBShort(subtotal)}</Text>
+      {/* Requester — company / contact person / phone */}
+      <View className="flex-row items-center" style={{ gap: 10, marginBottom: 12 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+          <Building2 size={16} color={BRAND_GREEN} strokeWidth={2.2} />
         </View>
-        <View className="flex-row items-center justify-between">
-          <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>VAT 7%</Text>
-          <Text style={{ fontSize: 13, color: TEXT_SECONDARY }}>{fmtTHBShort(vat)}</Text>
-        </View>
-        {/* Divider separating the grand total */}
-        <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 6 }} />
-        <View className="flex-row items-center justify-between">
-          <Text style={{ fontSize: 14, color: TEXT_PRIMARY, fontWeight: "700" }}>ยอดรวม</Text>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: "#ef4444" }}>{fmtTHBShort(total)}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: "#000" }} numberOfLines={1}>{doc.company}</Text>
+          <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }} numberOfLines={1}>
+            {doc.contact}{doc.phone ? ` · ${doc.phone}` : ""}
+          </Text>
         </View>
       </View>
 
+      {/* Items preview — first two, customer-card rows */}
+      <View style={{ gap: 12 }}>
+        {shown.map((item, i) => (
+          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>{item.name}</Text>
+              <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>
+                จำนวน {fmtNum(item.qty)} {item.unit}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{fmtTHBShort(docLineTotal(item))}</Text>
+          </View>
+        ))}
+        {doc.items.length > 2 ? (
+          <Text style={{ fontSize: 12, color: TEXT_MUTED, textAlign: "center" }}>+ อีก {doc.items.length - 2} รายการ</Text>
+        ) : null}
+      </View>
+
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
+
+      {/* Total — muted label left, green total right (customer card sizes) */}
+      <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>ยอดรวม</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: BRAND_GREEN }}>{fmtTHBShort(total)}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -5060,7 +5248,7 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
 // ===================== ORDERS SECTION =====================
 // Mobile port of the web OrdersTab: filter pills (horizontal scroll) + search,
 // then a stack of order cards filtered by the active tab + query.
-function OrdersSection() {
+export function OrdersSection({ showSearch = true }: { showSearch?: boolean }) {
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
   const [query, setQuery] = useState("");
 
@@ -5080,7 +5268,9 @@ function OrdersSection() {
 
   return (
     <View style={{ gap: 14 }}>
-      {/* Search */}
+      {/* Search — hidden on the pushed จัดการคำสั่งซื้อ page (its app-bar search
+          button opens the ShopOrderSearch page instead) */}
+      {showSearch ? (
       <View
         className="flex-row items-center"
         style={{
@@ -5114,6 +5304,7 @@ function OrdersSection() {
           <Search size={16} color="white" />
         </View>
       </View>
+      ) : null}
 
       {/* Filter pills — full-bleed horizontal scroll (Fitts: 36px tall) */}
       <ScrollView
@@ -5200,10 +5391,12 @@ function OrdersSection() {
 }
 
 // Order card — same visual language as the buyer "คำสั่งซื้อของฉัน" screen, with
-// seller-side data (customer + delivery slip instead of shop + timeline).
-// Laws: Jakob's (matches the buyer card), Progressive Disclosure (slip + extra
-// items behind the toggle), Von Restorff (one filled forward CTA), Fitts (38px).
-function OrderCard({ order }: { order: ShopOrder }) {
+// seller-side data (customer + delivery slip instead of shop + timeline). The
+// delivery slip is always visible (owner needs it at a glance to fulfil); only
+// extra items collapse ("ดูอีก N รายการ"). Laws: Jakob's (matches the buyer
+// card), Von Restorff (one filled forward CTA), Fitts (38px).
+export function OrderCard({ order }: { order: ShopOrder }) {
+  const nav = useNavigation<Nav>();
   const cfg = ORDER_STATUS_CFG[order.status];
   const accent = cfg.pillBg;
   const total = orderTotal(order);
@@ -5215,30 +5408,37 @@ function OrderCard({ order }: { order: ShopOrder }) {
     label,
     variant,
     Icon,
+    onPress,
   }: {
     label: string;
     variant: "primary" | "outline" | "danger" | "amber";
     Icon?: typeof BarChart3;
+    onPress?: () => void;
   }) => {
     const s = {
       primary: { bg: BRAND_GREEN, border: BRAND_GREEN, text: "#fff" },
-      amber: { bg: "#f7931d", border: "#f7931d", text: "#fff" },
+      amber: { bg: "transparent", border: "#f59e0b", text: "#f59e0b" },
       outline: { bg: "transparent", border: BRAND_GREEN, text: BRAND_GREEN },
       danger: { bg: "transparent", border: "#ef4444", text: "#ef4444" },
     }[variant];
     return (
       <Pressable
+        onPress={onPress}
         className="flex-row items-center justify-center active:opacity-80"
         style={{ height: 38, paddingHorizontal: 16, borderRadius: 999, backgroundColor: s.bg, borderWidth: 1, borderColor: s.border, gap: 5 }}
       >
-        {Icon ? <Icon size={15} color={s.text} strokeWidth={2.2} {...(variant === "amber" ? { fill: "#fff" } : {})} /> : null}
+        {Icon ? <Icon size={15} color={s.text} strokeWidth={2.2} {...(variant === "amber" ? { fill: "#f59e0b" } : {})} /> : null}
         <Text style={{ fontSize: 13, fontWeight: "600", color: s.text }}>{label}</Text>
       </Pressable>
     );
   };
 
   return (
-    <View style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}>
+    <Pressable
+      onPress={() => nav.navigate("ShopOrderDetail", { orderId: order.id })}
+      className="active:opacity-90"
+      style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}
+    >
       {/* Customer + status badge (top-right) */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
@@ -5252,15 +5452,10 @@ function OrderCard({ order }: { order: ShopOrder }) {
         </View>
       </View>
 
-      {/* Order id · date + detail toggle */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-        <Text style={{ fontSize: 11.5, color: TEXT_MUTED, flex: 1 }} numberOfLines={1}>
-          {order.id}  ·  {order.date}
-        </Text>
-        <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={6} className="flex-row items-center active:opacity-60" style={{ gap: 2 }}>
-          <Text style={{ fontSize: 12, color: BRAND_GREEN, fontWeight: "500" }}>{expanded ? "ย่อ" : "รายละเอียด"}</Text>
-          {expanded ? <ChevronUp size={14} color={BRAND_GREEN} strokeWidth={2.4} /> : <ChevronDown size={14} color={BRAND_GREEN} strokeWidth={2.4} />}
-        </Pressable>
+      {/* Order id (left) · date (right) */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6, gap: 8 }}>
+        <Text style={{ fontSize: 11.5, color: TEXT_MUTED, flexShrink: 1 }} numberOfLines={1}>{order.id}</Text>
+        <Text style={{ fontSize: 11.5, color: TEXT_MUTED }} numberOfLines={1}>{order.date}</Text>
       </View>
 
       <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
@@ -5292,34 +5487,32 @@ function OrderCard({ order }: { order: ShopOrder }) {
         ) : null}
       </View>
 
-      {/* Delivery slip (expanded) */}
-      {expanded ? (
-        <View style={{ borderTopWidth: 1, borderTopColor: "#f0f0f0", marginTop: 12, paddingTop: 12, gap: 10 }}>
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <View
-              className="flex-row items-center"
-              style={{ backgroundColor: "rgba(49,151,84,0.1)", paddingLeft: 8, paddingRight: 10, paddingVertical: 4, borderRadius: 999, gap: 5 }}
-            >
-              {order.shippingMethod === "รับที่ร้าน" ? <Store size={12} color={BRAND_GREEN} /> : <Truck size={12} color={BRAND_GREEN} />}
-              <Text style={{ fontSize: 11, fontWeight: "600", color: BRAND_GREEN }}>{order.shippingMethod}</Text>
+      {/* Delivery slip — always visible */}
+      <View style={{ borderTopWidth: 1, borderTopColor: "#f0f0f0", marginTop: 12, paddingTop: 12, gap: 10 }}>
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "rgba(49,151,84,0.1)", paddingLeft: 8, paddingRight: 10, paddingVertical: 4, borderRadius: 999, gap: 5 }}
+          >
+            {order.shippingMethod === "รับที่ร้าน" ? <Store size={12} color={BRAND_GREEN} /> : <Truck size={12} color={BRAND_GREEN} />}
+            <Text style={{ fontSize: 11, fontWeight: "600", color: BRAND_GREEN }}>{order.shippingMethod}</Text>
+          </View>
+          {order.trackingNumber ? (
+            <View className="flex-row items-center" style={{ gap: 4, marginLeft: "auto" }}>
+              <Package size={12} color={TEXT_MUTED} />
+              <Text style={{ fontSize: 11, fontWeight: "500", color: TEXT_MUTED }}>{order.trackingNumber}</Text>
             </View>
-            {order.trackingNumber ? (
-              <View className="flex-row items-center" style={{ gap: 4, marginLeft: "auto" }}>
-                <Package size={12} color={TEXT_MUTED} />
-                <Text style={{ fontSize: 11, fontWeight: "500", color: TEXT_MUTED }}>{order.trackingNumber}</Text>
-              </View>
-            ) : null}
-          </View>
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <MapPin size={15} color={BRAND_GREEN} />
-            <Text style={{ flex: 1, fontSize: 12.5, color: TEXT_SECONDARY, lineHeight: 18 }}>{order.address}</Text>
-          </View>
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <MessageCircle size={15} color={BRAND_GREEN} />
-            <Text style={{ fontSize: 12.5, color: TEXT_SECONDARY }}>{order.phone}</Text>
-          </View>
+          ) : null}
         </View>
-      ) : null}
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <MapPin size={15} color={BRAND_GREEN} />
+          <Text style={{ flex: 1, fontSize: 12.5, color: TEXT_SECONDARY, lineHeight: 18 }}>{order.address}</Text>
+        </View>
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <MessageCircle size={15} color={BRAND_GREEN} />
+          <Text style={{ fontSize: 12.5, color: TEXT_SECONDARY }}>{order.phone}</Text>
+        </View>
+      </View>
 
       <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
 
@@ -5331,34 +5524,25 @@ function OrderCard({ order }: { order: ShopOrder }) {
         </View>
         <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
           {order.status === "pending_payment" ? (
-            <>
-              <Btn label="ติดต่อ" variant="outline" Icon={MessageCircle} />
-              <Btn label="ยกเลิก" variant="danger" Icon={Ban} />
-            </>
+            <Btn label="ยกเลิก" variant="danger" onPress={() => nav.navigate("CancelOrder", { orderId: order.id })} />
           ) : null}
           {order.status === "pending_verify" ? (
-            <>
-              <Btn label="ยกเลิก" variant="danger" Icon={Ban} />
-              <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} />
-            </>
+            <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} />
           ) : null}
           {order.status === "ready_ship" ? (
-            <>
-              <Btn label="ติดต่อ" variant="outline" Icon={MessageCircle} />
-              <Btn label="ยืนยันจัดส่ง" variant="primary" Icon={Truck} />
-            </>
+            <Btn label="ยืนยันจัดส่ง" variant="primary" Icon={Truck} onPress={() => nav.navigate("ConfirmShip", { orderId: order.id })} />
           ) : null}
-          {order.status === "shipping" ? <Btn label="ติดต่อลูกค้า" variant="outline" Icon={MessageCircle} /> : null}
-          {order.status === "shipped" ? (
-            <>
-              <Btn label="ติดต่อ" variant="outline" Icon={MessageCircle} />
-              {order.reviewScore ? <Btn label={`รีวิว ${order.reviewScore}/5`} variant="amber" Icon={Star} /> : null}
-            </>
+          {order.status === "shipped" && order.reviewScore ? (
+            <Btn
+              label={`รีวิว ${order.reviewScore}/5`}
+              variant="amber"
+              Icon={Star}
+              onPress={() => nav.navigate("ShopOrderReview", { orderId: order.id })}
+            />
           ) : null}
-          {order.status === "cancelled" ? <Btn label="บล็อกลูกค้า" variant="danger" Icon={Ban} /> : null}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

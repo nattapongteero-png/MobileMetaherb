@@ -422,8 +422,9 @@ export function HerbalMarketDetailScreen() {
         })}
         scrollEventThrottle={16}
       >
-        {/* Preview = view-only: block taps on content (scroll + close still work) */}
-        <View pointerEvents={preview ? "none" : "auto"}>
+        {/* Content stays interactive even in owner preview — gallery swipe, image
+            viewer + option picker all work; only the buy/chat bar is hidden. */}
+        <View>
         {/* Stretchy hero — scrolls away on scroll-up; zooms in on pull-down (iOS) */}
         <Animated.View
           style={{
@@ -890,18 +891,11 @@ export function HerbalMarketDetailScreen() {
       <SafeAreaView edges={["top"]} pointerEvents="box-none" style={{ position: "absolute", top: 0, left: 0, right: 0 }}>
         <View
           className="flex-row items-center justify-between"
-          style={{ paddingHorizontal: preview ? 16 : 12, paddingTop: preview ? 14 : 6, paddingBottom: 8 }}
+          style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 8 }}
           pointerEvents="box-none"
         >
-          {preview ? (
-            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 14, height: 44, alignItems: "center", justifyContent: "center" }}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 44, paddingHorizontal: 18, borderRadius: 22, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>ตัวอย่างที่แสดงหน้าขาย</Text>
-              </GlassView>
-            </View>
-          ) : null}
-          <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel={preview ? "ปิด" : "ย้อนกลับ"}>
-            {preview ? <X size={22} color="#1a1a1a" strokeWidth={2.6} /> : <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />}
+          <GlassIconButton onPress={() => nav.canGoBack() && nav.goBack()} accessibilityLabel="ย้อนกลับ">
+            <ChevronLeft size={22} color="#1a1a1a" strokeWidth={2.4} />
           </GlassIconButton>
 
           <View className="flex-row" style={{ gap: 8 }}>
@@ -928,11 +922,9 @@ export function HerbalMarketDetailScreen() {
               </Animated.View>
             )}
 
-            {!preview && (
-              <GlassIconButton accessibilityLabel="แชร์">
-                <Share2 size={20} color="#1a1a1a" />
-              </GlassIconButton>
-            )}
+            <GlassIconButton accessibilityLabel="แชร์">
+              <Share2 size={20} color="#1a1a1a" />
+            </GlassIconButton>
           </View>
         </View>
       </SafeAreaView>

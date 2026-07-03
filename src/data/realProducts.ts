@@ -155,10 +155,10 @@ ROWS.forEach((r) => {
 // generic name); the rest are hidden and only appear as detail-page options.
 export const REAL_PRODUCTS: CatalogProduct[] = ROWS.filter((r) => !MERGED_AWAY_IDS.has(r.id)).map(
   (r, i) => {
-    // Per-shop ownership: split the catalog two ways by index so every product
-    // belongs to exactly one of the two non-flagship shops (METAHERB Store keeps
-    // its own curated SHOP_PRODUCTS list and is never sourced from here).
-    const shop = i % 2 === 0 ? "บ้านสมุนไพรไทย" : "กรีนลีฟ ออร์แกนิก";
+    // Per-shop ownership: split the catalog EVENLY three ways by index so every
+    // product belongs to exactly one shop — METAHERB Store included, so each of
+    // the three shops gets ~1/3 of the storefront catalog.
+    const shop = ["METAHERB Store", "บ้านสมุนไพรไทย", "กรีนลีฟ ออร์แกนิก"][i % 3];
     const raw = RAW_PRODUCT_BY_ID[r.id];
     const group = GROUP_BY_ID[r.id];
     if (!group) return { ...raw, shop };

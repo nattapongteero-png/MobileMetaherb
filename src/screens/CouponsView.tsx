@@ -13,7 +13,7 @@
  * Popover / ticket-mask are dropped for plain View/Pressable + BottomSheet.
  */
 import { useMemo, useState } from "react";
-import { View, Text, TextInput, ScrollView, Pressable, Alert } from "react-native";
+import { View, Text, TextInput, ScrollView, Pressable } from "react-native";
 import {
   ClipboardList,
   Check,
@@ -23,23 +23,16 @@ import {
   Calendar,
   Percent,
   Truck,
-  Pencil,
   Ticket,
-  Trash2,
   type LucideIcon,
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { BottomSheet } from "../components/BottomSheet";
-import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   useAllCoupons,
   computedCouponStatus,
-  removeCoupon,
-  toggleCoupon,
   fmtCouponThaiDateTime,
-  fmtCouponDiscount,
   type Coupon,
   type CouponStatus,
 } from "../data/ownerCoupons";
@@ -57,6 +50,8 @@ function statusConfig(status: CouponStatus): { label: string; color: string; Ico
   return { label: "ปิดใช้งาน", color: "#737373", Icon: Ban };
 }
 
+// Standard filter chip — same pill language as the orders / quotations /
+// PR pages (white pill + border, count badge; active = solid green).
 function FilterPill({
   label,
   count,
@@ -75,27 +70,17 @@ function FilterPill({
       onPress={onPress}
       className="flex-row items-center active:opacity-80"
       style={{
-        height: 32,
-        paddingLeft: 6,
-        paddingRight: 10,
+        height: 36,
+        paddingHorizontal: 14,
         borderRadius: 999,
         gap: 6,
-        backgroundColor: active ? BRAND_GREEN : "transparent",
+        backgroundColor: active ? BRAND_GREEN : "white",
+        borderWidth: 1,
+        borderColor: active ? BRAND_GREEN : DIVIDER_GRAY,
       }}
     >
-      <View
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: active ? "rgba(255,255,255,0.22)" : "#d6eadd",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon size={12} color={active ? "#fff" : BRAND_GREEN} strokeWidth={2.4} />
-      </View>
-      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "#fff" : TEXT_SECONDARY }}>
+      <Icon size={14} color={active ? "white" : TEXT_MUTED} />
+      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>
         {label}
       </Text>
       <View
@@ -104,127 +89,101 @@ function FilterPill({
           height: 18,
           paddingHorizontal: 5,
           borderRadius: 9,
-          backgroundColor: active ? "rgba(255,255,255,0.25)" : RED,
           alignItems: "center",
           justifyContent: "center",
+          backgroundColor: active ? "rgba(255,255,255,0.25)" : "#f5f5f5",
         }}
       >
-        <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{count}</Text>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count}</Text>
       </View>
     </Pressable>
   );
 }
 
-/** Full-width ticket card — green stub (icon + "โค้ดส่วนลด") | perforated seam | details. */
-function CouponCard({ c, onMenu }: { c: Coupon; onMenu: () => void }) {
+/** Coupon ticket — the web desktop ticket widget: colored 80px stub (icon +
+ *  โค้ดส่วนลด/โค้ดส่งฟรี) | notched perforation + dashed seam | white body with
+ *  name / conditions / expiry only. Tap opens the coupon detail page. */
+export function CouponCard({ c, onPress }: { c: Coupon; onPress: () => void }) {
+  const isFreeship = c.discountType === "freeship";
   const status = computedCouponStatus(c);
-  const isInactive = status !== "active";
   const st = statusConfig(status);
-  const dis = fmtCouponDiscount(c);
-  const STUB_W = 104;
+  // Expired / disabled tickets go gray (stub + seam follow stubColor).
+  const isInactive = status !== "active";
+  const stubColor = isInactive ? "#9ca3af" : isFreeship ? "#3b82f6" : BRAND_GREEN;
 
-  const conds: string[] = [];
-  if (c.minOrder && c.minOrder > 0) conds.push(`ขั้นต่ำ ฿${c.minOrder.toLocaleString()}`);
+  // Conditions line — web logic: min order (or "ไม่มีขั้นต่ำ") + member/first-order flags.
+  const conds: string[] = [c.minOrder && c.minOrder > 0 ? `ขั้นต่ำ ฿${c.minOrder.toLocaleString()}` : "ไม่มีขั้นต่ำ"];
   if (c.membersOnly) conds.push("สมาชิก");
   if (c.firstOrderOnly) conds.push("ออเดอร์แรก");
-  const metaLine = conds.join(" · ") || "ไม่มีเงื่อนไข";
+  const metaLine = conds.join(" · ");
 
   return (
-    <View
-      style={{
-        borderRadius: 16,
-        backgroundColor: "#fff",
-        opacity: isInactive ? 0.85 : 1,
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 3,
-      }}
-    >
     <Pressable
-      onPress={onMenu}
+      onPress={onPress}
       className="flex-row active:opacity-90"
       style={{
-        borderRadius: 16,
-        overflow: "hidden",
+        borderRadius: 12,
+        minHeight: 88,
         backgroundColor: "#fff",
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
       }}
     >
-      {/* Left green stub */}
-      <View style={{ width: STUB_W, backgroundColor: dis.color, alignItems: "center", justifyContent: "center", paddingVertical: 18, gap: 8 }}>
-        <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center" }}>
-          {c.discountType === "baht" ? (
-            <Text style={{ fontSize: 22, fontWeight: "800", color: "#fff" }}>฿</Text>
-          ) : c.discountType === "freeship" ? (
-            <Truck size={24} color="#fff" strokeWidth={2.4} />
-          ) : (
-            <Percent size={24} color="#fff" strokeWidth={2.6} />
-          )}
-        </View>
-        <Text style={{ fontSize: 11, fontWeight: "600", color: "#fff" }}>{c.discountType === "freeship" ? "โค้ดส่งฟรี" : "โค้ดส่วนลด"}</Text>
-      </View>
-
-      {/* Perforated seam — dashed line + top/bottom notches punched out */}
-      <View style={{ position: "absolute", left: STUB_W - 8, top: -8, width: 16, height: 16, borderRadius: 8, backgroundColor: "#fafafa" }} />
-      <View style={{ position: "absolute", left: STUB_W - 8, bottom: -8, width: 16, height: 16, borderRadius: 8, backgroundColor: "#fafafa" }} />
-      <View style={{ position: "absolute", left: STUB_W, top: 12, bottom: 12, borderLeftWidth: 1, borderColor: "rgba(255,255,255,0.5)", borderStyle: "dashed" }} />
-
-      {/* Status badge — top-left corner (over the green stub) */}
+      {/* Left stub — 80px, colored per coupon type */}
       <View
-        className="flex-row items-center"
-        style={{ position: "absolute", top: 8, left: 8, zIndex: 10, gap: 3, paddingLeft: 6, paddingRight: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: "#fff" }}
+        style={{
+          width: 80,
+          borderTopLeftRadius: 12,
+          borderBottomLeftRadius: 12,
+          backgroundColor: stubColor,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: 16,
+          paddingHorizontal: 12,
+          gap: 6,
+        }}
       >
-        <st.Icon size={10} color={st.color} strokeWidth={2.4} />
-        <Text style={{ fontSize: 10, fontWeight: "600", color: st.color }}>{st.label}</Text>
+        {isFreeship ? <Truck size={24} color="#fff" strokeWidth={2.4} /> : <Percent size={24} color="#fff" strokeWidth={2.4} />}
+        <Text style={{ fontSize: 10, fontWeight: "500", color: "#fff" }}>{isFreeship ? "โค้ดส่งฟรี" : "โค้ดส่วนลด"}</Text>
       </View>
 
-      {/* Right details */}
-      <View style={{ flex: 1, padding: 14, justifyContent: "center", gap: 6 }}>
-        <Text numberOfLines={2} style={{ fontSize: 15, fontWeight: "700", color: "#1a1a1a", lineHeight: 20 }}>{c.name}</Text>
-        {/* Code chip — dashed, tabular so the coupon code is always visible */}
-        <View
-          className="flex-row items-center"
-          style={{ alignSelf: "flex-start", gap: 5, paddingLeft: 8, paddingRight: 10, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", borderColor: `${dis.color}66` }}
-        >
-          <Ticket size={11} color={dis.color} strokeWidth={2.4} />
-          <Text style={{ fontSize: 12, fontWeight: "700", letterSpacing: 1, color: "#1a1a1a", fontVariant: ["tabular-nums"] }}>{c.code}</Text>
+      {/* Body — name / conditions / expiry (per the approved reference) */}
+      <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 7, paddingLeft: 20, paddingRight: 16, paddingVertical: 12 }}>
+        {/* Dashed perforation seam */}
+        <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 10, bottom: 10, borderLeftWidth: 2, borderStyle: "dashed", borderColor: stubColor + "40" }} />
+        {/* Title + status pill (same row, pill flush right) */}
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#1a1a1a" }}>{c.name}</Text>
+          <View
+            className="flex-row items-center"
+            style={{ gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: st.color + "1a" }}
+          >
+            <st.Icon size={10} color={st.color} strokeWidth={2.4} />
+            <Text style={{ fontSize: 10.5, fontWeight: "600", color: st.color }}>{st.label}</Text>
+          </View>
         </View>
-        {/* discount value + used/limit */}
-        <View className="flex-row items-center" style={{ gap: 10 }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: dis.color }}>{c.discountType === "freeship" ? dis.label : `ลด ${dis.label}`}</Text>
-          <Text style={{ fontSize: 11.5, color: "#9ca3af" }}>·</Text>
-          <Text style={{ fontSize: 11.5, color: "#4b5563" }}>
-            ใช้แล้ว {c.used}
-            {c.usageLimit && c.usageLimit > 0 ? `/${c.usageLimit}` : " · ไม่จำกัด"}
-          </Text>
-        </View>
-        <Text numberOfLines={1} style={{ fontSize: 12.5, color: "#4b5563" }}>{metaLine}</Text>
-        <View className="flex-row items-center" style={{ gap: 6 }}>
-          <Calendar size={13} color="#9ca3af" strokeWidth={2.2} />
-          <Text style={{ fontSize: 12, color: "#4b5563" }}>หมดอายุ {fmtCouponThaiDateTime(c.endsAt)}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 11, color: "#6b7280" }}>{metaLine}</Text>
+        <View className="flex-row items-center" style={{ gap: 4 }}>
+          <Calendar size={14} color="#6b7280" strokeWidth={2.2} />
+          <Text style={{ fontSize: 11, color: "#6b7280" }}>หมดอายุ {fmtCouponThaiDateTime(c.endsAt)}</Text>
         </View>
       </View>
-    </Pressable>
-    </View>
-  );
-}
 
-function SheetAction({ Icon, label, onPress, danger }: { Icon: LucideIcon; label: string; onPress: () => void; danger?: boolean }) {
-  return (
-    <Pressable onPress={onPress} className="flex-row items-center active:opacity-60" style={{ paddingVertical: 13, gap: 12 }}>
-      <Icon size={18} color={danger ? RED : TEXT_MUTED} strokeWidth={2.2} />
-      <Text style={{ fontSize: 14, fontWeight: "500", color: danger ? RED : TEXT_PRIMARY }}>{label}</Text>
+      {/* Perforation notches — punched at the stub boundary (page bg circles) */}
+      <View pointerEvents="none" style={{ position: "absolute", left: 73, top: -7, width: 14, height: 14, borderRadius: 7, backgroundColor: "#fafafa" }} />
+      <View pointerEvents="none" style={{ position: "absolute", left: 73, bottom: -7, width: 14, height: 14, borderRadius: 7, backgroundColor: "#fafafa" }} />
     </Pressable>
   );
 }
 
-export function CouponsOwnerSection() {
+export function CouponsOwnerSection({ showSearch = true }: { showSearch?: boolean }) {
   const nav = useNavigation<Nav>();
   const coupons = useAllCoupons();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
-  const [sheetFor, setSheetFor] = useState<Coupon | null>(null);
 
   const countBy = (s: CouponStatus) => coupons.filter((c) => computedCouponStatus(c) === s).length;
 
@@ -243,55 +202,10 @@ export function CouponsOwnerSection() {
     { key: "disabled", label: "ปิดใช้งาน", count: countBy("disabled"), Icon: Ban },
   ];
 
-  const onDelete = (c: Coupon) => {
-    setSheetFor(null);
-    Alert.alert("ลบคูปอง", `ลบคูปอง "${c.code}"?`, [
-      { text: "ยกเลิก", style: "cancel" },
-      {
-        text: "ลบ",
-        style: "destructive",
-        onPress: () => {
-          removeCoupon(c.id);
-          showToast(`ลบ: ${c.code}`, "info");
-        },
-      },
-    ]);
-  };
-
-  const onToggle = (c: Coupon) => {
-    setSheetFor(null);
-    toggleCoupon(c.id);
-    showToast(c.status === "disabled" ? `เปิดใช้งาน: ${c.code}` : `ปิดใช้งาน: ${c.code}`);
-  };
-
   return (
     <View style={{ gap: 16 }}>
-      {/* Filter pills — white rounded container; scroller clipped to the pill shape */}
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 999,
-          padding: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 1,
-        }}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ borderRadius: 999, overflow: "hidden" }}
-          contentContainerStyle={{ gap: 4, alignItems: "center" }}
-        >
-          {pills.map((p) => (
-            <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Search box */}
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopCouponSearch) */}
+      {showSearch ? (
       <View
         style={{
           flexDirection: "row",
@@ -314,6 +228,19 @@ export function CouponsOwnerSection() {
           <Search size={16} color="#fff" />
         </View>
       </View>
+      ) : null}
+
+      {/* Filter chips — full-bleed scroll row, same as the other list pages */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -16 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
+      >
+        {pills.map((p) => (
+          <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
+        ))}
+      </ScrollView>
 
       {/* Card grid / empty state */}
       {filtered.length === 0 ? (
@@ -334,30 +261,10 @@ export function CouponsOwnerSection() {
       ) : (
         <View style={{ gap: 12 }}>
           {filtered.map((c) => (
-            <CouponCard key={c.id} c={c} onMenu={() => setSheetFor(c)} />
+            <CouponCard key={c.id} c={c} onPress={() => nav.navigate("ShopCouponDetail", { couponId: c.id })} />
           ))}
         </View>
       )}
-
-      {/* Per-coupon action sheet */}
-      <BottomSheet visible={!!sheetFor} onClose={() => setSheetFor(null)} centerTitle title={sheetFor?.code ?? ""} minHeightRatio={0.32} maxHeightRatio={0.55}>
-        {sheetFor ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 2 }}>
-            <SheetAction
-              Icon={Pencil}
-              label="แก้ไข"
-              onPress={() => {
-                const id = sheetFor.id;
-                setSheetFor(null);
-                nav.navigate("CouponCreate", { editId: id });
-              }}
-            />
-            <SheetAction Icon={Ban} label={sheetFor.status === "disabled" ? "เปิดใช้งาน" : "ปิดใช้งาน"} onPress={() => onToggle(sheetFor)} />
-            <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginVertical: 4 }} />
-            <SheetAction Icon={Trash2} label="ลบ" danger onPress={() => onDelete(sheetFor)} />
-          </View>
-        ) : null}
-      </BottomSheet>
     </View>
   );
 }

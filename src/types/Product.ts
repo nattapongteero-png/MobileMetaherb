@@ -20,4 +20,6 @@ export type Product = {
   soldPercent?: number;
   /** Owning shop's display name — drives multi-shop seller attribution. */
   shop?: string;
+  /** Selectable options ported from the web (e.g. ["ตัวเลือก 1", "ตัวเลือก 2"]). */
+  options?: string[];
 };

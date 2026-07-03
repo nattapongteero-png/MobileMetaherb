@@ -24,6 +24,25 @@ export const CATEGORIES: Category[] = [
   { key: "gift", label: "ของชำร่วย & ของขวัญ" },
 ];
 
+// Web-parity taxonomy — the web catalog (../Metaherb/src/app/data/products.ts)
+// files every product under 4 Thai categories. Each mobile CategoryKey folds
+// into exactly one of them (verified product-by-product against the web data),
+// so shop-facing surfaces (shop profile chips, owner console lists) show the
+// same category names as the web shop pages.
+export const WEB_CATEGORY_LABEL: Record<CategoryKey, string> = {
+  food: "อาหาร",
+  health: "อาหาร",
+  raw: "สมุนไพร",
+  herbal: "สมุนไพร",
+  aroma: "เครื่องหอม",
+  gift: "ชุดของขวัญ",
+};
+
+/** Web category name for a product's category value (codes pass Thai labels through). */
+export function webCategoryLabel(category: string): string {
+  return (WEB_CATEGORY_LABEL as Record<string, string>)[category] ?? category;
+}
+
 // Product form/type — a second taxonomy, independent of category.
 export type TypeKey = "capsule" | "powder" | "beverage" | "aroma" | "gift" | "food";
 

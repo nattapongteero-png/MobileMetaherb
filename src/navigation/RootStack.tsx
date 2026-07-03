@@ -19,6 +19,7 @@ import { TrueMoneyLinkScreen } from "../screens/TrueMoneyLinkScreen";
 import { NotificationScreen } from "../screens/NotificationScreen";
 import { ShopNotificationScreen } from "../screens/ShopNotificationScreen";
 import { ShopScreen } from "../screens/ShopScreen";
+import { ShopSearchScreen } from "../screens/ShopSearchScreen";
 import { ShopSortScreen } from "../screens/ShopSortScreen";
 import { ShopHerbalFilterScreen } from "../screens/ShopHerbalFilterScreen";
 import type { SortKey } from "../data/shopSort";
@@ -97,7 +98,21 @@ import { ShopNotificationsScreen } from "../screens/ShopNotificationsScreen";
 import { ShopShippingScreen } from "../screens/ShopShippingScreen";
 import { ShopPayoutScreen } from "../screens/ShopPayoutScreen";
 import { ShopComplaintDetailScreen } from "../screens/ShopComplaintDetailScreen";
+import { ComplaintDecideScreen } from "../screens/ComplaintDecideScreen";
+import { ShopComplaintSearchScreen } from "../screens/ShopComplaintSearchScreen";
 import { ShopComplaintsScreen } from "../screens/ShopComplaintsView";
+import { ShopProductsScreen } from "../screens/ShopProductsScreen";
+import { ShopOrdersScreen } from "../screens/ShopOrdersScreen";
+import { ShopOrderSearchScreen } from "../screens/ShopOrderSearchScreen";
+import { ShopOrderDetailScreen } from "../screens/ShopOrderDetailScreen";
+import { CancelOrderScreen } from "../screens/CancelOrderScreen";
+import { ConfirmShipScreen } from "../screens/ConfirmShipScreen";
+import { ShopOrderReviewScreen } from "../screens/ShopOrderReviewScreen";
+import { ShopQuoteSearchScreen } from "../screens/ShopQuoteSearchScreen";
+import { ShopDocSearchScreen } from "../screens/ShopDocSearchScreen";
+import { ShopCouponSearchScreen } from "../screens/ShopCouponSearchScreen";
+import { ShopCouponDetailScreen } from "../screens/ShopCouponDetailScreen";
+import { ShopSectionScreen } from "../screens/ShopSectionScreen";
 import { ShopReportScreen } from "../screens/ShopReportView";
 import { ShopManagerChatScreen } from "../screens/ShopManagerChatScreen";
 import { CafeScreen } from "../screens/CafeScreen";
@@ -202,7 +217,21 @@ export type RootStackParamList = {
   ShopShipping: undefined;
   ShopPayout: undefined;
   ShopComplaintDetail: { id: string };
+  ComplaintDecide: { complaintId: string };
+  ShopComplaintSearch: undefined;
   ShopComplaints: undefined;
+  ShopProducts: undefined;
+  ShopOrders: undefined;
+  ShopOrderSearch: undefined;
+  ShopOrderDetail: { orderId: string };
+  CancelOrder: { orderId: string; onConfirm?: (reason: string, note: string) => void };
+  ConfirmShip: { orderId: string; onConfirm?: (tracking: string) => void };
+  ShopOrderReview: { orderId: string };
+  ShopQuoteSearch: undefined;
+  ShopDocSearch: { kind: DocKind };
+  ShopCouponSearch: undefined;
+  ShopCouponDetail: { couponId: string };
+  ShopSection: { section: string };
   ShopReport: { kind: "sales" | "customers" | "products" | "market" };
   ShopManagerChat: undefined;
   Cafe: undefined;
@@ -231,6 +260,7 @@ export type RootStackParamList = {
   Notification: undefined;
   ShopNotification: undefined;
   Shop: { shopName?: string; sort?: SortKey; category?: string; herbalSort?: HerbalSortKey; herbalCategory?: string } | undefined;
+  ShopSearch: { shopName?: string } | undefined;
   ShopSort: { current?: SortKey; category?: string; categories?: string[] } | undefined;
   ShopHerbalFilter: { sort?: HerbalSortKey; category?: string; categories?: string[] } | undefined;
 };
@@ -416,7 +446,21 @@ export function RootStack() {
       <Stack.Screen name="ShopShipping" component={ShopShippingScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopPayout" component={ShopPayoutScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopComplaintDetail" component={ShopComplaintDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ComplaintDecide" component={ComplaintDecideScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopComplaintSearch" component={ShopComplaintSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopComplaints" component={ShopComplaintsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopProducts" component={ShopProductsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopOrders" component={ShopOrdersScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopOrderSearch" component={ShopOrderSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopOrderDetail" component={ShopOrderDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CancelOrder" component={CancelOrderScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ConfirmShip" component={ConfirmShipScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopOrderReview" component={ShopOrderReviewScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopQuoteSearch" component={ShopQuoteSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopDocSearch" component={ShopDocSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopCouponSearch" component={ShopCouponSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopCouponDetail" component={ShopCouponDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopSection" component={ShopSectionScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopReport" component={ShopReportScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopManagerChat" component={ShopManagerChatScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="Cafe" component={CafeScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
@@ -489,6 +533,11 @@ export function RootStack() {
         name="Shop"
         component={ShopScreen}
         options={{ animation: "slide_from_right" }}
+      />
+      <Stack.Screen
+        name="ShopSearch"
+        component={ShopSearchScreen}
+        options={{ headerShown: false, animation: "slide_from_right" }}
       />
       <Stack.Screen
         name="ShopSort"

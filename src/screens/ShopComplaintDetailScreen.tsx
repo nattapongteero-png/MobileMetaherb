@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { View, Text, Pressable, Image, TextInput, ScrollView, Linking, Modal, Dimensions } from "react-native";
+import { View, Text, Pressable, Image, ScrollView, Linking, Modal, Dimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -9,27 +9,20 @@ import {
   FileText,
   Package,
   ClipboardList,
-  MessageCircle,
   Camera,
   Mail,
   Phone,
-  Check,
-  RotateCcw,
-  PackageCheck,
-  Ban,
   Play,
   X,
   type LucideIcon,
 } from "lucide-react-native";
+import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { GlassIconButton } from "../components/GlassIconButton";
+import { BottomFade } from "../components/BottomFade";
 import { StatusPill } from "./ShopComplaintsView";
 import { COMPLAINT_TYPES } from "../data/complaintTypes";
-import {
-  STATUS_COLOR,
-  TYPE_LABEL,
-  TYPE_COLOR,
-  type ComplaintStatus,
-} from "../data/shopComplaints";
+import { STATUS_LABEL, STATUS_COLOR, TYPE_LABEL, TYPE_COLOR } from "../data/shopComplaints";
 import { useComplaints } from "../context/ComplaintContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -61,25 +54,15 @@ function Field({ label, value, valueColor }: { label: string; value: string; val
   );
 }
 
-const DECISIONS: Array<{ key: ComplaintStatus; label: string; Icon: LucideIcon }> = [
-  { key: "acknowledged", label: "ยืนยันรับแจ้งปัญหา", Icon: Check },
-  { key: "refund_full", label: "คืนเงินเต็มจำนวน", Icon: RotateCcw },
-  { key: "refund_partial", label: "คืนเงินบางส่วน", Icon: PackageCheck },
-  { key: "rejected", label: "ปฏิเสธ", Icon: Ban },
-];
-
 /** เรื่องร้องเรียน — owner detail subpage (decision + reply). */
 export function ShopComplaintDetailScreen() {
   const nav = useNavigation<Nav>();
   const { id } = useRoute<DetailRoute>().params;
   const insets = useSafeAreaInsets();
-  const { complaints, setDecision, setNote } = useComplaints();
+  const { complaints } = useComplaints();
   const c = complaints.find((x) => x.id === id);
 
   // Hooks must run on every render — declare before any early return.
-  const [decision, setDecisionState] = useState<ComplaintStatus | null>(null);
-  const [partial, setPartial] = useState(String(c?.refundAmount ?? c?.amount ?? 0));
-  const [note, setNoteState] = useState(c?.note ?? "");
   const [viewer, setViewer] = useState<number | null>(null);
   const screenW = Dimensions.get("window").width;
 
@@ -98,25 +81,28 @@ export function ShopComplaintDetailScreen() {
   const TypeIcon = COMPLAINT_TYPES[c.type].Icon;
   const tc = TYPE_COLOR[c.type];
 
-  const save = () => {
-    if (!decision) return;
-    const refundAmount =
-      decision === "refund_partial"
-        ? Math.min(c.amount, parseInt(partial || "0", 10) || 0)
-        : decision === "refund_full"
-        ? c.amount
-        : undefined;
-    setDecision(c.id, decision, { refundAmount });
-    nav.canGoBack() && nav.goBack();
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title={c.id} subtitle={`ส่งคำร้องเมื่อ ${c.createdAt}`} onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <SubPageHeader
+        title={c.id}
+        subtitle={`ส่งคำร้องเมื่อ ${c.createdAt}`}
+        onBack={() => nav.canGoBack() && nav.goBack()}
+        showSearch={false}
+        rightSlot={
+          <View className="flex-row items-center" style={{ gap: 10 }}>
+            <GlassIconButton onPress={() => Linking.openURL(`mailto:${c.customerEmail}`)} accessibilityLabel="ส่งอีเมลหาลูกค้า">
+              <Mail size={19} color="#0088ff" strokeWidth={2.2} />
+            </GlassIconButton>
+            <GlassIconButton onPress={() => Linking.openURL(`tel:${c.customerPhone}`)} accessibilityLabel="โทรหาลูกค้า">
+              <Phone size={19} color={BRAND_GREEN} strokeWidth={2.2} />
+            </GlassIconButton>
+          </View>
+        }
+      />
 
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
           {/* Status summary */}
           <Section>
             <View className="flex-row items-center" style={{ gap: 10 }}>
@@ -130,6 +116,41 @@ export function ShopComplaintDetailScreen() {
               <StatusPill status={c.status} />
             </View>
           </Section>
+
+          {/* Decision result — appears once the shop has decided */}
+          {c.status !== "pending" ? (
+            <Section title="ผลการตัดสิน" Icon={ClipboardList}>
+              <View style={{ gap: 12 }}>
+                <View
+                  className="flex-row items-center"
+                  style={{ gap: 10, backgroundColor: STATUS_COLOR[c.status] + "14", borderRadius: 14, padding: 12 }}
+                >
+                  <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: STATUS_COLOR[c.status] + "22", alignItems: "center", justifyContent: "center" }}>
+                    <ClipboardList size={17} color={STATUS_COLOR[c.status]} strokeWidth={2.2} />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14.5, fontWeight: "700", color: STATUS_COLOR[c.status] }}>
+                    {STATUS_LABEL[c.status]}
+                  </Text>
+                </View>
+                {c.status === "refund_full" || c.status === "refund_partial" ? (
+                  <View className="flex-row items-center justify-between">
+                    <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>ยอดคืนเงิน</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "800", color: BRAND_GREEN_DARK }}>
+                      ฿{(c.refundAmount ?? c.amount).toLocaleString()}
+                    </Text>
+                  </View>
+                ) : null}
+                {c.note ? (
+                  <View>
+                    <Text style={{ fontSize: 12, color: TEXT_MUTED, marginBottom: 6 }}>หมายเหตุถึงลูกค้า</Text>
+                    <View style={{ backgroundColor: "#f7f7f7", borderRadius: 12, padding: 12 }}>
+                      <Text style={{ fontSize: 13, color: "#333", lineHeight: 20 }}>{c.note}</Text>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </Section>
+          ) : null}
 
           {/* Complaint info */}
           <Section title="รายละเอียดคำร้องเรียน" Icon={FileText}>
@@ -189,74 +210,41 @@ export function ShopComplaintDetailScreen() {
             </View>
           </Section>
 
-          {/* Note + contact */}
-          <Section title="หมายเหตุถึงลูกค้า" Icon={MessageCircle}>
-            <TextInput
-              value={note}
-              onChangeText={setNoteState}
-              onBlur={() => setNote(c.id, note)}
-              placeholder="เขียนข้อความถึงลูกค้า..."
-              placeholderTextColor="#a3a3a3"
-              multiline
-              style={{ minHeight: 80, backgroundColor: "#f7f7f7", borderRadius: 12, padding: 12, fontSize: 13, color: "#1a1a1a", textAlignVertical: "top" }}
-            />
-            <View className="flex-row" style={{ gap: 10, marginTop: 10 }}>
-              <Pressable onPress={() => Linking.openURL(`mailto:${c.customerEmail}`)} className="flex-row items-center justify-center active:opacity-80" style={{ flex: 1, height: 42, borderRadius: 999, backgroundColor: "#0088ff", gap: 6 }}>
-                <Mail size={15} color="#fff" strokeWidth={2.2} />
-                <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12.5 }}>ส่งอีเมล</Text>
-              </Pressable>
-              <Pressable onPress={() => Linking.openURL(`tel:${c.customerPhone}`)} className="flex-row items-center justify-center active:opacity-80" style={{ flex: 1, height: 42, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 6 }}>
-                <Phone size={15} color="#fff" strokeWidth={2.2} />
-                <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12.5 }}>โทรหา</Text>
-              </Pressable>
-            </View>
-          </Section>
-
-          {/* Decision */}
-          <Section title="การตัดสินคำร้องเรียน" Icon={ClipboardList}>
-            <View style={{ gap: 8 }}>
-              {DECISIONS.map((o) => {
-                const sel = decision === o.key;
-                const color = STATUS_COLOR[o.key];
-                return (
-                  <Pressable
-                    key={o.key}
-                    onPress={() => setDecisionState(o.key)}
-                    className="flex-row items-center active:opacity-80"
-                    style={{ gap: 10, padding: 11, borderRadius: 999, backgroundColor: sel ? color + "1a" : "transparent" }}
-                  >
-                    <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: sel ? color : color + "22", alignItems: "center", justifyContent: "center" }}>
-                      <o.Icon size={16} color={sel ? "#fff" : color} strokeWidth={2.4} />
-                    </View>
-                    <Text style={{ flex: 1, fontSize: 13.5, fontWeight: "600", color: sel ? color : "#262626" }}>{o.label}</Text>
-                    <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: sel ? color : "#d4d4d4", alignItems: "center", justifyContent: "center" }}>
-                      {sel ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-
-              {decision === "refund_partial" ? (
-                <View className="flex-row items-center" style={{ gap: 8, backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 16, height: 48 }}>
-                  <Text style={{ fontSize: 15, color: "#737373" }}>฿</Text>
-                  <TextInput value={partial} onChangeText={(t) => setPartial(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" style={{ flex: 1, fontSize: 15, color: "#1a1a1a" }} />
-                  <Text style={{ fontSize: 11.5, color: TEXT_MUTED }}>ไม่เกิน ฿{c.amount.toLocaleString()}</Text>
-                </View>
-              ) : null}
-
-              <Pressable
-                onPress={save}
-                disabled={!decision}
-                className="items-center justify-center active:opacity-80"
-                style={{ height: 46, borderRadius: 999, backgroundColor: decision ? BRAND_GREEN : "#d4d4d4", marginTop: 4 }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>บันทึกสถานะ</Text>
-              </Pressable>
-            </View>
-          </Section>
         </ScrollView>
         <LinearGradient pointerEvents="none" colors={["#fafafa", "rgba(250,250,250,0)"]} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 16 }} />
+        <BottomFade />
       </View>
+
+      {/* Floating Liquid Glass bar — decide CTA; gone once a decision is made */}
+      {c.status === "pending" ? (
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+        <View
+          style={{
+            borderRadius: 34,
+            shadowColor: "#0a3d22",
+            shadowOffset: { width: 0, height: 9 },
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            elevation: 14,
+          }}
+        >
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
+          >
+            <Pressable
+              onPress={() => nav.navigate("ComplaintDecide", { complaintId: c.id })}
+              className="flex-row items-center justify-center active:opacity-90"
+              style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}
+            >
+              <ClipboardList size={18} color="#fff" strokeWidth={2.4} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>ตัดสินคำร้องเรียน</Text>
+            </Pressable>
+          </GlassView>
+        </View>
+      </View>
+      ) : null}
 
       {/* Full-screen evidence viewer — swipe through, tap ✕ to close */}
       <Modal visible={viewer !== null} transparent animationType="fade" onRequestClose={() => setViewer(null)}>

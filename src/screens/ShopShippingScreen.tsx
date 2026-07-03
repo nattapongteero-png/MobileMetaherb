@@ -21,8 +21,6 @@ import {
   MapPin,
   Wallet,
   Settings as SettingsIcon,
-  Minus,
-  Plus,
   AlertTriangle,
   ChevronRight,
   ShieldCheck,
@@ -34,6 +32,7 @@ import {
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassSelect } from "../components/GlassSelect";
+import { NumberStepper } from "../components/NumberStepper";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, TEXT_SECONDARY } from "../theme/tokens";
 
 // ── Carriers (ported from web initialCarriers) ──────────────────────────────
@@ -110,55 +109,6 @@ function Field({
       <Text style={labelStyle}>{label}</Text>
       {children}
       {hint ? <Text style={hintStyle}>{hint}</Text> : null}
-    </View>
-  );
-}
-
-/**
- * Number stepper — a pill row with a − button (left), the centered tabular
- * number, and a ＋ button (right). Mirrors the web StepperInput (step 50,
- * clamped at ≥0).
- */
-function StepperInput({
-  value,
-  onChange,
-  step = 50,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-}) {
-  const dec = () => onChange(Math.max(0, value - step));
-  const inc = () => onChange(value + step);
-  const set = (t: string) => {
-    const n = Number(t.replace(/[^0-9]/g, ""));
-    onChange(Number.isNaN(n) ? 0 : Math.max(0, n));
-  };
-  return (
-    <View
-      className="flex-row items-center"
-      style={{ height: 50, backgroundColor: "#f5f5f5", borderRadius: 999, paddingLeft: 18, paddingRight: 5, gap: 10 }}
-    >
-      {/* Number input — fills the left (web layout) */}
-      <TextInput
-        value={String(value)}
-        onChangeText={set}
-        keyboardType="number-pad"
-        style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#374151", fontVariant: ["tabular-nums"], paddingVertical: 0 }}
-      />
-      {/* Segmented −/＋ control on the right, with a center separator */}
-      <View
-        className="flex-row items-center"
-        style={{ width: 96, height: 36, borderRadius: 999, overflow: "hidden", backgroundColor: "rgba(116,116,128,0.10)" }}
-      >
-        <Pressable onPress={dec} className="active:opacity-60" style={{ flex: 1, height: "100%", alignItems: "center", justifyContent: "center" }}>
-          <Minus size={18} color="#1a1a1a" strokeWidth={2.6} />
-        </Pressable>
-        <View style={{ width: 1, height: 20, backgroundColor: "rgba(60,60,67,0.3)" }} />
-        <Pressable onPress={inc} className="active:opacity-60" style={{ flex: 1, height: "100%", alignItems: "center", justifyContent: "center" }}>
-          <Plus size={18} color="#1a1a1a" strokeWidth={2.6} />
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -483,13 +433,13 @@ export function ShopShippingScreen() {
           <SheetHeader title="แก้ไขค่าจัดส่งเริ่มต้น" onClose={() => setDefaultsSheet(false)} onSave={saveDefaults} />
           <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
             <Field label="ส่งฟรีเมื่อซื้อครบ (฿)" hint="0 = ปิดใช้งานส่งฟรี">
-              <StepperInput value={dFree} onChange={setDFree} />
+              <NumberStepper value={dFree} onChange={setDFree} step={50} />
             </Field>
             <Field label="ค่าจัดส่งเริ่มต้น (฿)" hint="ใช้เมื่อยังไม่ได้ตั้งค่าขนส่งรายเจ้า">
-              <StepperInput value={dBase} onChange={setDBase} step={5} />
+              <NumberStepper value={dBase} onChange={setDBase} step={5} />
             </Field>
             <Field label="น้ำหนักเริ่มต้น (กรัม)" hint="ใช้กับสินค้าที่ยังไม่ได้กรอกน้ำหนัก">
-              <StepperInput value={dWeight} onChange={setDWeight} step={50} />
+              <NumberStepper value={dWeight} onChange={setDWeight} step={50} />
             </Field>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -616,7 +566,7 @@ export function ShopShippingScreen() {
             <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
               <ToggleRow label="เปิดใช้งาน COD" icon={<Wallet size={16} color="#ff9500" strokeWidth={2.4} />} value={codDraft.enabled} onValueChange={(v) => setCodDraft({ ...codDraft, enabled: v })} />
               <Field label="ค่าธรรมเนียม COD (฿)" hint="คิดเพิ่มจากยอดสินค้าเมื่อลูกค้าเลือก COD">
-                <StepperInput value={codDraft.fee} onChange={(v) => setCodDraft({ ...codDraft, fee: v })} step={5} />
+                <NumberStepper value={codDraft.fee} onChange={(v) => setCodDraft({ ...codDraft, fee: v })} step={5} />
               </Field>
               <View className="flex-row items-start" style={{ gap: 10, backgroundColor: "rgba(255,149,0,0.05)", borderWidth: 1, borderColor: "rgba(255,149,0,0.2)", borderRadius: 14, padding: 12 }}>
                 <AlertTriangle size={16} color="#ff9500" strokeWidth={2.2} style={{ marginTop: 1 }} />
