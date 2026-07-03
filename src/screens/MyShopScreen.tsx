@@ -4031,12 +4031,15 @@ function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; la
 
 // Flash product card — ported from Figma: green header (image + name + price/
 // discount/date pills) over a white footer (progress ring + sold/remaining/revenue).
-export function FlashProductCard({ p, onMenu }: { p: FlashProduct; onMenu: () => void }) {
+export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onMenu: () => void; dateText?: string }) {
   // Full date + time, web-style (e.g. "08 พ.ค. 69 00:00 - 09 พ.ค. 69 23:59").
+  // Uses the product's own period; falls back to `dateText` (the event's period)
+  // only when the product has no date yet (e.g. just added).
   const clean = (s: string) => s.replace(" - ", " ").trim();
   const sd = clean(p.startText);
   const ed = clean(p.endText);
-  const dateRange = !ed || sd === ed ? sd : `${sd} - ${ed}`;
+  const own = !sd ? "" : !ed || sd === ed ? sd : `${sd} - ${ed}`;
+  const dateRange = own || dateText || "";
   const st = FLASH_STATUS_CFG[p.status]; // base tint + date color follow the status
   const statusLabel = p.status === "active" ? "กำลังขาย" : p.status === "soldout" ? "สินค้าหมด" : "ล่วงหน้า";
   // Measure the widest status label so every card's status block is the same, snug width.

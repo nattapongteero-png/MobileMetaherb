@@ -76,7 +76,7 @@ export function FlashEventDetailScreen() {
 
             {/* Joined product cards (same style as the Flash Sale store) */}
             {products.map((p) => (
-              <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />
+              <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} dateText={params.dateRange} />
             ))}
           </>
         ) : (
