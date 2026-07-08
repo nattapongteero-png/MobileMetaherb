@@ -36,13 +36,12 @@ import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import { useCart, type CartItem } from "../context/CartContext";
 import { getShop } from "../data/shops";
 import type { Product } from "../types/Product";
+import { appWidth, isTablet } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
 /** Build a navigable Product from a cart line so tapping a row opens its detail
  *  page. The cart stores only a subset of Product fields, so rating is borrowed
@@ -75,6 +74,11 @@ type CartItemRowProps = {
 
 /** A single cart line — shared by the per-shop sections and the out-of-stock
  *  section. Out-of-stock items render disabled (no checkbox/stepper, dimmed). */
+// Line-item thumbnail — larger on iPad so the photo doesn't look lost in the
+// wider row. Checkbox padding keeps it vertically centered against the image.
+const ITEM_IMG = isTablet() ? 110 : 76;
+const CHECKBOX_PAD_TOP = Math.round(ITEM_IMG / 2) - 11;
+
 function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove }: CartItemRowProps) {
   return (
     <View
@@ -90,7 +94,7 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
           onPress={onToggle}
           hitSlop={14}
           disabled={!item.inStock}
-          style={{ paddingTop: 28, paddingBottom: 4 }}
+          style={{ paddingTop: CHECKBOX_PAD_TOP, paddingBottom: 4 }}
         >
           <Checkbox checked={selected} disabled={!item.inStock} />
         </Pressable>
@@ -98,7 +102,7 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
           onPress={onOpen}
           className="active:opacity-80"
           accessibilityLabel={`ดูรายละเอียด ${item.name}`}
-          style={{ width: 76, height: 76, borderRadius: 8, backgroundColor: "#f5f5f5", overflow: "hidden" }}
+          style={{ width: ITEM_IMG, height: ITEM_IMG, borderRadius: 8, backgroundColor: "#f5f5f5", overflow: "hidden" }}
         >
           <Image
             source={item.image}
@@ -106,6 +110,8 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
             resizeMode="cover"
           />
         </Pressable>
+        {/* Content column stretches to the image height; on iPad the qty/price
+            row is pushed to the bottom so it lines up with the taller photo. */}
         <View style={{ flex: 1 }}>
           <View className="flex-row" style={{ gap: 8 }}>
             <Pressable onPress={onOpen} className="active:opacity-60" style={{ flex: 1 }}>
@@ -130,7 +136,10 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
           </View>
 
           {/* In-stock: qty stepper + price. Out-of-stock: status tag + price. */}
-          <View className="flex-row items-center justify-between" style={{ marginTop: 10 }}>
+          <View
+            className="flex-row items-center justify-between"
+            style={isTablet() ? { marginTop: "auto", paddingTop: 10 } : { marginTop: 10 }}
+          >
             {item.inStock ? (
               <QtyStepper quantity={item.quantity} onChange={onQty} />
             ) : (

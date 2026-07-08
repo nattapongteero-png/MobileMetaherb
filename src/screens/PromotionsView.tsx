@@ -39,6 +39,7 @@ import {
   type PromoStatus,
 } from "../data/promotions";
 import { BRAND_GREEN, DIVIDER_GRAY, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { gridCardWidth, isTablet } from "../theme/layout";
 
 type FilterKey = "all" | PromoStatus;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -198,11 +199,9 @@ export function PromotionsOwnerSection({ showSearch = true }: { showSearch?: boo
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
 
-  // 2-col grid: floor to avoid flex-wrap breakage (per project convention).
-  const cardWidth = useMemo(() => {
-    const { width } = require("react-native").Dimensions.get("window");
-    return Math.floor((width - 32 - 12) / 2);
-  }, []);
+  // Floor to avoid flex-wrap breakage (per project convention).
+  // iPad shows 3 promo cards per row (they're wider than product cards).
+  const cardWidth = useMemo(() => gridCardWidth(isTablet() ? 3 : 2), []);
 
   const countBy = (s: PromoStatus) => promotions.filter((p) => computedStatus(p) === s).length;
 

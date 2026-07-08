@@ -1,0 +1,67 @@
+diff --git a/node_modules/react-native-bottom-tabs/ios/TabViewImpl.swift b/node_modules/react-native-bottom-tabs/ios/TabViewImpl.swift
+index 14732fd..1a3e3af 100644
+--- a/node_modules/react-native-bottom-tabs/ios/TabViewImpl.swift
++++ b/node_modules/react-native-bottom-tabs/ios/TabViewImpl.swift
+@@ -44,6 +44,7 @@ struct TabViewImpl: View {
+ 
+   var body: some View {
+     tabContent
++      .forceCompactTabBarOnPad()
+       .tabBarMinimizeBehavior(props.minimizeBehavior)
+       #if !os(tvOS) && !os(macOS) && !os(visionOS)
+         .onTabItemEvent { index, identifier, isLongPress in
+@@ -62,6 +63,14 @@ struct TabViewImpl: View {
+         }
+       #endif
+       .introspectTabView { tabController in
++        #if os(iOS)
++          // Pair with forceCompactTabBarOnPad(): the UIKit tab bar also has to
++          // see compact width traits, otherwise iPad lays items out inline
++          // (icon beside label). Compact traits give the stacked iPhone layout.
++          if UIDevice.current.userInterfaceIdiom == .pad, #available(iOS 17.0, *) {
++            tabController.traitOverrides.horizontalSizeClass = .compact
++          }
++        #endif
+         #if !os(macOS)
+           tabController.view.backgroundColor = .clear
+           tabController.viewControllers?.forEach { $0.view.backgroundColor = .clear }
+@@ -208,6 +217,16 @@ struct TabViewImpl: View {
+     itemAppearance.normal.titleTextAttributes = attributes
+     itemAppearance.selected.titleTextAttributes = selectedAttributes(props: props)
+ 
++    #if os(iOS)
++      // iPad (forced-compact) stacks labels too tight under the icons —
++      // push titles down for breathing room.
++      if UIDevice.current.userInterfaceIdiom == .pad {
++        let titleOffset = UIOffset(horizontal: 0, vertical: 6)
++        itemAppearance.normal.titlePositionAdjustment = titleOffset
++        itemAppearance.selected.titlePositionAdjustment = titleOffset
++      }
++    #endif
++
+     // Apply item appearance to all layouts
+     appearance.stackedLayoutAppearance = itemAppearance
+     appearance.inlineLayoutAppearance = itemAppearance
+@@ -550,3 +569,22 @@ extension View {
+     }
+   }
+ }
++
++
++extension View {
++  /// iPadOS 18+ renders TabView's bar at the top (or as a sidebar). The app
++  /// wants the iPhone-style bottom tab bar everywhere, so force the compact
++  /// horizontal size class for the tab view subtree on pads.
++  @ViewBuilder
++  func forceCompactTabBarOnPad() -> some View {
++    #if os(iOS)
++      if UIDevice.current.userInterfaceIdiom == .pad {
++        self.environment(\.horizontalSizeClass, .compact)
++      } else {
++        self
++      }
++    #else
++      self
++    #endif
++  }
++}

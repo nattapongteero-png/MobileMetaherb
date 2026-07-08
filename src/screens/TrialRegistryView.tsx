@@ -16,7 +16,6 @@ import {
   Ban,
   Search,
   Coins,
-  MoreHorizontal,
   Pencil,
   Eye,
   Trash2,
@@ -129,10 +128,11 @@ function ProductCard({
   return (
     <Pressable
       onPress={onOpen}
+      onLongPress={onMenu}
       className="active:opacity-80"
       style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14, gap: 12 }}
     >
-      {/* Product identity + action menu */}
+      {/* Product identity — long-press opens the action sheet */}
       <View className="flex-row items-center" style={{ gap: 12 }}>
         <Image
           source={source}
@@ -143,14 +143,6 @@ function ProductCard({
           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: TEXT_PRIMARY }}>{p.name}</Text>
           <Text numberOfLines={1} style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{p.tagline}</Text>
         </View>
-        <Pressable
-          onPress={onMenu}
-          hitSlop={8}
-          className="active:opacity-70"
-          style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(120,120,128,0.12)", alignItems: "center", justifyContent: "center" }}
-        >
-          <MoreHorizontal size={16} color={TEXT_SECONDARY} />
-        </Pressable>
       </View>
 
       {/* Category + status */}
@@ -194,7 +186,7 @@ function ProductCard({
   );
 }
 
-export function TrialRegistryOwnerSection() {
+export function TrialRegistryOwnerSection({ showSearch = true }: { showSearch?: boolean } = {}) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -309,8 +301,10 @@ export function TrialRegistryOwnerSection() {
         })}
       </ScrollView>
 
-      {/* Search (shared) */}
-      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อสินค้า, หมวดหมู่..." />
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopTrialSearch) */}
+      {showSearch ? (
+        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อสินค้า, หมวดหมู่..." />
+      ) : null}
 
       {/* Card list / empty state */}
       {filtered.length === 0 ? (
@@ -379,3 +373,7 @@ function SheetAction({
     </Pressable>
   );
 }
+
+// Shared with ShopTrialSearchScreen — the pushed search page renders the same
+// cards + action sheet rows over the same open/closed logic.
+export { ProductCard as TrialRegistryCard, SheetAction as TrialSheetAction, isClosedAuto as trialClosedAuto };

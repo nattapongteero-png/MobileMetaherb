@@ -6,8 +6,11 @@
  */
 import { useEffect, useMemo } from "react";
 import { Animated, Dimensions, Easing, StyleSheet } from "react-native";
+import { appWidth } from "../theme/layout";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+// Width clamps to the app frame — tablets center a 430pt canvas (App.tsx).
+const SCREEN_W = appWidth();
+const SCREEN_H = Dimensions.get("window").height;
 const GLYPHS = ["⭐", "🌟", "✨"];
 
 export function FallingStars({ count = 22, onDone }: { count?: number; onDone?: () => void }) {

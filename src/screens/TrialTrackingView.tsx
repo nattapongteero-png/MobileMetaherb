@@ -20,13 +20,13 @@
 
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FlaskConical, CircleAlert, Clock, Check, Ban } from "lucide-react-native";
 
-import { BottomSheet } from "../components/BottomSheet";
 import { SearchBar } from "../components/SearchBar";
 import {
   RegistrationCard,
-  EvalSummary,
   FilterPill,
   type ApplicantsProduct,
 } from "./trialDetail/TrialDetailApplicants";
@@ -38,6 +38,7 @@ import {
 } from "../data/ownerTrialRegistrations";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useAddedTrials } from "../data/trialDrafts";
+import type { RootStackParamList } from "../navigation/RootStack";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN } from "../theme/tokens";
 
@@ -48,7 +49,8 @@ function fallbackProduct(trialId: string): ApplicantsProduct {
   return { id: trialId, name: trialId, tagline: "", category: "", image: "", rewardPoints: 0 };
 }
 
-export function TrialTrackingOwnerSection() {
+export function TrialTrackingOwnerSection({ showSearch = true }: { showSearch?: boolean } = {}) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Owner-added trials merged on top of the static catalog — for product lookup.
   const added = useAddedTrials();
   const catalog = useMemo<TrialProduct[]>(
@@ -65,7 +67,6 @@ export function TrialTrackingOwnerSection() {
 
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
-  const [evalReg, setEvalReg] = useState<Registration | null>(null);
 
   const countByStatus = (s: RegistrationStatus) =>
     regs.filter((r) => getRegistrationStatus(r) === s).length;
@@ -97,6 +98,10 @@ export function TrialTrackingOwnerSection() {
     showToast(`อนุมัติคำขอของ "${reg.name || "ผู้สมัคร"}" เรียบร้อย`);
   };
 
+  // Silent state update — the caller (list Alert / detail page) confirms first.
+  const doReject = (reg: Registration) =>
+    setRegs((prev) => prev.map((r) => (matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r)));
+
   const reject = (reg: Registration) => {
     Alert.alert("ปฏิเสธคำขอ", `ปฏิเสธคำขอของ "${reg.name || "ผู้สมัคร"}"?`, [
       { text: "ยกเลิก", style: "cancel" },
@@ -104,9 +109,7 @@ export function TrialTrackingOwnerSection() {
         text: "ปฏิเสธ",
         style: "destructive",
         onPress: () => {
-          setRegs((prev) =>
-            prev.map((r) => (matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r)),
-          );
+          doReject(reg);
           showToast("ปฏิเสธคำขอเรียบร้อย", "info");
         },
       },
@@ -123,40 +126,30 @@ export function TrialTrackingOwnerSection() {
 
   return (
     <View style={{ gap: 16 }}>
-      {/* Filter pills (horizontally scrollable on a phone) */}
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 999,
-          padding: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 1,
-        }}
+      {/* Status filter — standalone chips (white pill + border + count badge),
+          full-bleed scroll row like the other list pages' filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -16 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: "center" }}
       >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ borderRadius: 999, overflow: "hidden" }}
-          contentContainerStyle={{ gap: 4, alignItems: "center" }}
-        >
-          {pills.map((p) => (
-            <FilterPill
-              key={p.key}
-              label={p.label}
-              count={p.count}
-              Icon={p.Icon}
-              active={filter === p.key}
-              onPress={() => setFilter(p.key)}
-            />
-          ))}
-        </ScrollView>
-      </View>
+        {pills.map((p) => (
+          <FilterPill
+            key={p.key}
+            label={p.label}
+            count={p.count}
+            Icon={p.Icon}
+            active={filter === p.key}
+            onPress={() => setFilter(p.key)}
+          />
+        ))}
+      </ScrollView>
 
-      {/* Search box (shared) */}
-      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopTrialTrackingSearch) */}
+      {showSearch ? (
+        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
+      ) : null}
 
       {/* Card list / empty state */}
       {filtered.length === 0 ? (
@@ -183,21 +176,19 @@ export function TrialTrackingOwnerSection() {
               product={productFor(r.trialId)}
               onApprove={() => approve(r)}
               onReject={() => reject(r)}
-              onViewEval={() => setEvalReg(r)}
+              onViewEval={() => nav.navigate("OwnerTrialEvalAnswers", { reg: r, product: productFor(r.trialId) })}
+              onPress={() =>
+                nav.navigate("OwnerTrialRequestDetail", {
+                  reg: r,
+                  product: productFor(r.trialId),
+                  onApprove: () => approve(r),
+                  onReject: () => doReject(r),
+                })
+              }
             />
           ))}
         </View>
       )}
-
-      {/* Read-only evaluation sheet */}
-      <BottomSheet
-        centerTitle
-        visible={!!evalReg}
-        onClose={() => setEvalReg(null)}
-        title="แบบประเมินจากผู้ทดสอบ"
-      >
-        {evalReg && <EvalSummary reg={evalReg} product={productFor(evalReg.trialId)} />}
-      </BottomSheet>
     </View>
   );
 }

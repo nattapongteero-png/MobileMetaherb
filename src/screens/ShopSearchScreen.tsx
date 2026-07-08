@@ -11,13 +11,12 @@ import type { RootStackParamList } from "../navigation/RootStack";
 import { REAL_PRODUCTS } from "../data/realProducts";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { ProductsGrid } from "./ShopScreen";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
 // In-shop search — pushed from the shop profile's app-bar search button.
 // One box covers everything the shop sells: regular products AND Herbal
@@ -133,7 +132,7 @@ export function ShopSearchScreen() {
                     <MaterialCard
                       key={m.id}
                       m={m}
-                      width={(SCREEN_WIDTH - 16 * 2 - 14) / 2}
+                      width={gridCardWidth(gridColumns(190, 32, 14), 32, 14)}
                       onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id })}
                     />
                   ))}

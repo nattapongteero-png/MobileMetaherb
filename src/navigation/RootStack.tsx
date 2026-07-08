@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { NavigatorScreenParams } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@bottom-tabs/react-navigation";
+import { isTablet } from "../theme/layout";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { HomeScreen } from "../screens/HomeScreen";
@@ -92,7 +93,17 @@ import type { MarketDoc, DocKind } from "../screens/MyShopScreen";
 import { ShopDocDetailScreen } from "../screens/ShopDocDetailScreen";
 import { AddProductScreen } from "../screens/AddProductScreen";
 import { FlashAddProductScreen } from "../screens/FlashAddProductScreen";
-import type { FlashProduct } from "../screens/MyShopScreen";
+import type { FlashProduct, PMStatus } from "../screens/MyShopScreen";
+import { ShopProductFilterScreen } from "../screens/ShopProductFilterScreen";
+import { ShopTrialSearchScreen } from "../screens/ShopTrialSearchScreen";
+import { ShopTrialTrackingSearchScreen } from "../screens/ShopTrialTrackingSearchScreen";
+import { OwnerTrialRequestDetailScreen } from "../screens/OwnerTrialRequestDetailScreen";
+import { OwnerTrialEvalAnswersScreen } from "../screens/OwnerTrialEvalAnswersScreen";
+import type { Registration as OwnerRegistration } from "../data/ownerTrialRegistrations";
+import type { ApplicantsProduct } from "../screens/trialDetail/TrialDetailApplicants";
+import { TrialEvalBuilderScreen } from "../screens/TrialEvalBuilderScreen";
+import { TrialEvalPreviewScreen } from "../screens/TrialEvalPreviewScreen";
+import type { TestObjective } from "../data/ownerTrialRegistrations";
 import { FlashEventDetailScreen } from "../screens/FlashEventDetailScreen";
 import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
 import { ShopAccountScreen } from "../screens/ShopAccountScreen";
@@ -189,7 +200,7 @@ export type RootStackParamList = {
   TrialSuccess: { productName: string; rewardPoints: number };
   TrialRequestDetail: { id: string };
   TrialEval: { id: string; kind: "pre" | "post" };
-  TrialRegistryDetail: { id: string };
+  TrialRegistryDetail: { id: string; initialTab?: "overview" | "applicants" | "info" };
   TrialAddProduct: { editId?: string } | undefined;
   PromotionCreate: { editId?: string } | undefined;
   CouponCreate: { editId?: string } | undefined;
@@ -246,7 +257,37 @@ export type RootStackParamList = {
   PromoProductPicker: { excludeIds: string[]; onDone?: (ids: string[]) => void };
   OptionPicker: { title: string; options: string[]; value?: string; searchPlaceholder?: string; onSelect?: (v: string) => void };
   ShopProductManageSearch: undefined;
+  ShopTrialSearch: undefined;
+  ShopTrialTrackingSearch: undefined;
+  OwnerTrialRequestDetail: {
+    reg: OwnerRegistration;
+    product: ApplicantsProduct;
+    onApprove?: () => void;
+    onReject?: () => void;
+  };
+  OwnerTrialEvalAnswers: { reg: OwnerRegistration; product: ApplicantsProduct };
+  TrialEvalBuilder: {
+    category: string;
+    objectives: TestObjective[];
+    phases: ("baseline" | "after_full")[];
+    evaluationDays: number;
+    onDone?: (r: { objectives: TestObjective[]; phases: ("baseline" | "after_full")[]; evaluationDays: number }) => void;
+  };
+  TrialEvalPreview: {
+    category: string;
+    objectives: TestObjective[];
+    phases: ("baseline" | "after_full")[];
+    evaluationDays: number;
+    onEdit?: () => void;
+  };
   ShopProductDetail: { productId: string; type: "regular" | "material" };
+  ShopProductFilter: {
+    status: "all" | PMStatus;
+    productType: "regular" | "material";
+    /** Per-type status counts so the sheet's rows show live numbers. */
+    counts: Record<"regular" | "material", Record<"all" | PMStatus, number>>;
+    onApply?: (status: "all" | PMStatus, productType: "regular" | "material") => void;
+  };
   ShopCouponDetail: { couponId: string };
   ShopSection: { section: string; initialFilter?: string };
   ShopReport: { kind: "sales" | "customers" | "products" | "market" };
@@ -318,6 +359,11 @@ function MainTabs() {
       // Don't let the iOS 26 tab bar minimize on scroll — it leaves labels
       // half-collapsed (sunk to the bottom) when navigating between screens.
       minimizeBehavior="never"
+      // iPad renders tab labels big/bold by default — pin them to the compact
+      // phone look (small + medium weight). Phones keep the system default.
+      {...(isTablet()
+        ? { tabLabelStyle: { fontSize: 11, fontFamily: "IBMPlexSansThaiLooped_500Medium" } }
+        : null)}
       // Eagerly mount every tab (default lazy:true leaves non-focused tabs blank
       // under iOS 26 + New Arch).
       screenOptions={{ lazy: false }}
@@ -330,12 +376,13 @@ function MainTabs() {
       <Tab.Screen
         name="TrialProducts"
         component={TrialTab}
-        options={{ title: "ทดลอง", tabBarIcon: () => ({ sfSymbol: "shippingbox.fill" }) }}
+        // iPad has room for the full name; phones keep the short label.
+        options={{ title: isTablet() ? "ผลิตภัณฑ์ทดสอบ" : "ทดลอง", tabBarIcon: () => ({ sfSymbol: "shippingbox.fill" }) }}
       />
       <Tab.Screen
         name="HerbalMarket"
         component={HerbalTab}
-        options={{ title: "Market", tabBarIcon: () => ({ sfSymbol: "leaf.fill" }) }}
+        options={{ title: isTablet() ? "Herbal Market" : "Market", tabBarIcon: () => ({ sfSymbol: "leaf.fill" }) }}
       />
       <Tab.Screen
         name="Account"
@@ -485,6 +532,13 @@ export function RootStack() {
       <Stack.Screen name="ShopProductManageSearch" component={ShopProductManageSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopCouponDetail" component={ShopCouponDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopProductDetail" component={ShopProductDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopProductFilter" component={ShopProductFilterScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="ShopTrialSearch" component={ShopTrialSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopTrialTrackingSearch" component={ShopTrialTrackingSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="OwnerTrialRequestDetail" component={OwnerTrialRequestDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="OwnerTrialEvalAnswers" component={OwnerTrialEvalAnswersScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="TrialEvalBuilder" component={TrialEvalBuilderScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="TrialEvalPreview" component={TrialEvalPreviewScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="ShopSection" component={ShopSectionScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopReport" component={ShopReportScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopManagerChat" component={ShopManagerChatScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

@@ -44,13 +44,12 @@ import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOPS, getShop } from "../data/shops";
 import { REAL_PRODUCTS } from "../data/realProducts";
 import { useSeller } from "../context/SellerContext";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
 // Layout maths — the banner extends exactly to the vertical center of the
 // shop avatar inside the card, so the green region "hugs" the profile pic.
@@ -635,7 +634,7 @@ export function ShopScreen() {
                   <MaterialCard
                     key={m.id}
                     m={m}
-                    width={(SCREEN_WIDTH - 16 * 2 - 14) / 2}
+                    width={gridCardWidth(gridColumns(190, 32, 14), 32, 14)}
                     onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id })}
                   />
                 ))}
@@ -754,7 +753,8 @@ function Divider() {
 export function ProductsGrid({ products, preview }: { products: Product[]; preview?: boolean }) {
   // Match HomeScreen's 2-col grid (gap 12, horizontal padding 16) so card
   // dimensions are identical across screens.
-  const cardWidth = (SCREEN_WIDTH - 16 * 2 - 12) / 2;
+  // Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+  const cardWidth = gridCardWidth(gridColumns(190, 32, 12), 32, 12);
 
   if (products.length === 0) {
     return (

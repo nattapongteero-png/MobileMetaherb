@@ -10,6 +10,7 @@ import { BottomFade } from "../components/BottomFade";
 import { ARTICLES, VIDEOS, type Article, type VideoItem } from "../data/articles";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth, gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Tab = "articles" | "videos";
@@ -17,12 +18,13 @@ type Tab = "articles" | "videos";
 const ACCENT = "#af6f08"; // amber accent from the web blog
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
-const VIDEO_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const VIDEO_WIDTH = gridCardWidth(gridColumns(190, 32, 12), 32, 12);
 const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 5) / 4); // 4:5 portrait
+// Article cards — 2-per-row on tablets.
+const ARTICLE_CARD_WIDTH = gridCardWidth(2, 32, 12);
 
 function Pill({ children, style }: { children: React.ReactNode; style?: object }) {
   return (
@@ -38,23 +40,24 @@ function Pill({ children, style }: { children: React.ReactNode; style?: object }
 }
 
 function ArticleCard({ a, onPress }: { a: Article; onPress: () => void }) {
+  // iPad — taller card + bigger cover (same treatment as the Home article rail).
+  const tablet = isTablet();
   return (
     <Pressable
       onPress={onPress}
       className="active:opacity-90"
       style={{
         flexDirection: "row",
-        height: 132,
+        height: tablet ? 200 : 132,
         backgroundColor: "#ffffff",
         borderRadius: 16,
         borderWidth: 1,
         borderColor: "#d4d4d4",
         overflow: "hidden",
-        marginBottom: 12,
       }}
     >
       {/* Image left with view + date overlays */}
-      <View style={{ width: 130 }}>
+      <View style={{ width: tablet ? 175 : 130 }}>
         <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
         <View style={{ flex: 1, justifyContent: "space-between", padding: 8 }}>
           <Pill style={{ alignSelf: "flex-start" }}>
@@ -68,11 +71,11 @@ function ArticleCard({ a, onPress }: { a: Article; onPress: () => void }) {
       </View>
 
       {/* Content right (no category) — vertically centered, 10px spacing */}
-      <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12 }}>
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a", lineHeight: 19 }} numberOfLines={1}>
+      <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: tablet ? 14 : 12 }}>
+        <Text style={{ fontSize: tablet ? 15 : 14, fontWeight: "600", color: "#0a0a0a", lineHeight: tablet ? 21 : 19 }} numberOfLines={tablet ? 2 : 1}>
           {a.title}
         </Text>
-        <Text style={{ fontSize: 12, color: TEXT_SECONDARY, lineHeight: 17, marginTop: 4 }} numberOfLines={2}>
+        <Text style={{ fontSize: tablet ? 12.5 : 12, color: TEXT_SECONDARY, lineHeight: tablet ? 18 : 17, marginTop: 4 }} numberOfLines={tablet ? 3 : 2}>
           {a.desc}
         </Text>
         <View
@@ -220,9 +223,14 @@ export function KnowledgeScreen() {
           scrollEventThrottle={16}
         >
           {tab === "articles" ? (
-            ARTICLES.map((a) => (
-              <ArticleCard key={a.id} a={a} onPress={() => nav.navigate("ArticleDetail", { article: a })} />
-            ))
+            // Phones: single column. iPad: 2-per-row wrap grid.
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              {ARTICLES.map((a) => (
+                <View key={a.id} style={{ width: isTablet() ? ARTICLE_CARD_WIDTH : "100%" }}>
+                  <ArticleCard a={a} onPress={() => nav.navigate("ArticleDetail", { article: a })} />
+                </View>
+              ))}
+            </View>
           ) : (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
               {VIDEOS.map((v) => (

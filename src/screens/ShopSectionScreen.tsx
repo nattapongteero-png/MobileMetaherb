@@ -81,6 +81,20 @@ export function ShopSectionScreen() {
             >
               <Search size={20} color="#1a1a1a" />
             </GlassIconButton>
+          ) : section === "trials_products" ? (
+            <GlassIconButton
+              onPress={() => nav.navigate("ShopTrialSearch")}
+              accessibilityLabel="ค้นหาสินค้าทดลอง"
+            >
+              <Search size={20} color="#1a1a1a" />
+            </GlassIconButton>
+          ) : section === "trials_tracking" ? (
+            <GlassIconButton
+              onPress={() => nav.navigate("ShopTrialTrackingSearch")}
+              accessibilityLabel="ค้นหาคำขอทดลอง"
+            >
+              <Search size={20} color="#1a1a1a" />
+            </GlassIconButton>
           ) : undefined
         }
       />
@@ -93,8 +107,8 @@ export function ShopSectionScreen() {
           {section === "hm_quotations" ? <QuotationSection showSearch={false} initialFilter={initialFilter} /> : null}
           {section === "hm_pr" ? <DocSection kind="pr" showSearch={false} /> : null}
           {section === "hm_po" ? <DocSection kind="po" showSearch={false} /> : null}
-          {section === "trials_products" ? <TrialRegistryOwnerSection /> : null}
-          {section === "trials_tracking" ? <TrialTrackingOwnerSection /> : null}
+          {section === "trials_products" ? <TrialRegistryOwnerSection showSearch={false} /> : null}
+          {section === "trials_tracking" ? <TrialTrackingOwnerSection showSearch={false} /> : null}
           {section === "promotions" ? <PromotionsOwnerSection showSearch={false} /> : null}
           {section === "coupons" ? <CouponsOwnerSection showSearch={false} /> : null}
         </ScrollView>

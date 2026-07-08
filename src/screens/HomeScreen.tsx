@@ -41,16 +41,13 @@ import { MATERIALS, type HerbalMaterial } from "./HerbalMarketScreen";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useCart } from "../context/CartContext";
 import { useProductFilter, type KindFilter } from "../context/ProductFilterContext";
+import { appWidth, gridColumns, gridCardWidth, isTablet, tabletSearchBarWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// On web cap viewport at mobile size so layout that uses SCREEN_WIDTH
-// (cards, banner aspect, paged scroll) renders like the phone build.
-const MOBILE_MAX_WIDTH = 430;
-const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, MOBILE_MAX_WIDTH)
-    : Dimensions.get("window").width;
+// appWidth: full window on native (tablet rails add columns via gridColumns);
+// web stays capped to the 430 demo frame.
+const SCREEN_WIDTH = appWidth();
 
 type Category =
   | { label: string; image: number; color: string }
@@ -157,11 +154,14 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Generic 2-per-page horizontal pager with the animated dot indicator —
- * the same UX as the Flash Sale / Recommended product rows. Used by the
+ * Generic horizontal pager with the animated dot indicator — the same UX as
+ * the Flash Sale / Recommended product rows. Phones page 2 cards at a time
+ * (the original design); tablets fit more columns per page via gridColumns so
+ * the rails stay dense instead of stretching two giant cards. Used by the
  * product rails AND the ตลาดสมุนไพร / ผลิตภัณฑ์ทดสอบ teasers so paging feels
  * identical across the home page (Jakob's Law).
  */
+const RAIL_PER_PAGE = gridColumns(190, HORIZONTAL_PADDING * 2, CARD_GAP);
 function PagedPairs<T>({
   data,
   keyOf,
@@ -172,10 +172,8 @@ function PagedPairs<T>({
   renderCard: (item: T, width: number) => React.ReactNode;
 }) {
   const scrollX = useRef(new Animated.Value(0)).current;
-  const cardWidth = Math.floor(
-    (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2,
-  );
-  const pages = chunk(data, 2);
+  const cardWidth = gridCardWidth(RAIL_PER_PAGE, HORIZONTAL_PADDING * 2, CARD_GAP);
+  const pages = chunk(data, RAIL_PER_PAGE);
 
   return (
     <View>
@@ -189,7 +187,7 @@ function PagedPairs<T>({
         )}
         scrollEventThrottle={16}
       >
-        {pages.map((pair, pageIdx) => (
+        {pages.map((page, pageIdx) => (
           <View
             key={`page-${pageIdx}`}
             style={{
@@ -200,10 +198,15 @@ function PagedPairs<T>({
               gap: CARD_GAP,
             }}
           >
-            {pair.map((it) => (
+            {page.map((it) => (
               <View key={keyOf(it)}>{renderCard(it, cardWidth)}</View>
             ))}
-            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+            {/* Pad the last page so remaining cards keep their column width */}
+            {page.length < RAIL_PER_PAGE
+              ? Array.from({ length: RAIL_PER_PAGE - page.length }).map((_, i) => (
+                  <View key={`pad-${i}`} style={{ width: cardWidth }} />
+                ))
+              : null}
           </View>
         ))}
       </Animated.ScrollView>
@@ -266,6 +269,10 @@ function PagedArticles({
   onOpen: (a: Article) => void;
 }) {
   const scrollX = useRef(new Animated.Value(0)).current;
+  // iPad shows two article cards per page; phones keep the single full-width row.
+  const perPage = isTablet() ? 2 : 1;
+  const pages = chunk(articles, perPage);
+  const itemWidth = Math.floor((SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP * (perPage - 1)) / perPage);
   return (
     <View>
       <Animated.ScrollView
@@ -278,21 +285,30 @@ function PagedArticles({
         )}
         scrollEventThrottle={16}
       >
-        {articles.map((a) => (
+        {pages.map((page, pageIdx) => (
           <View
-            key={a.id}
-            style={{ width: SCREEN_WIDTH, paddingHorizontal: HORIZONTAL_PADDING }}
+            key={`article-page-${pageIdx}`}
+            style={{ width: SCREEN_WIDTH, paddingHorizontal: HORIZONTAL_PADDING, flexDirection: "row", gap: CARD_GAP }}
           >
-            <ArticleRow a={a} onPress={() => onOpen(a)} />
+            {page.map((a) => (
+              <View key={a.id} style={{ width: itemWidth }}>
+                <ArticleRow a={a} onPress={() => onOpen(a)} />
+              </View>
+            ))}
+            {page.length < perPage
+              ? Array.from({ length: perPage - page.length }).map((_, i) => (
+                  <View key={`pad-${i}`} style={{ width: itemWidth }} />
+                ))
+              : null}
           </View>
         ))}
       </Animated.ScrollView>
-      {articles.length > 1 ? (
+      {pages.length > 1 ? (
         <View
           className="flex-row items-center justify-center mt-3"
           style={{ gap: 6 }}
         >
-          {articles.map((_, i) => {
+          {pages.map((_, i) => {
             const inputRange = [
               (i - 1) * SCREEN_WIDTH,
               i * SCREEN_WIDTH,
@@ -534,14 +550,16 @@ function ArticleOverlayPill({ children }: { children: React.ReactNode }) {
 // Article card styled to match the หน้าสาระความรู้ (Knowledge) blog cards:
 // wide image on the left with views + date overlaid, content centered on the right.
 function ArticleRow({ a, onPress }: { a: Article; onPress: () => void }) {
+  // iPad — taller card + bigger cover so the artwork suits the wider layout.
+  const tablet = isTablet();
   return (
     <Pressable
       onPress={onPress}
       className="active:opacity-90"
-      style={{ flexDirection: "row", height: 132, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden" }}
+      style={{ flexDirection: "row", height: tablet ? 200 : 132, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden" }}
     >
       {/* Image left with views (top) + date (bottom) overlay pills. */}
-      <View style={{ width: 130 }}>
+      <View style={{ width: tablet ? 175 : 130 }}>
         <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
         <View style={{ flex: 1, justifyContent: "space-between", padding: 8 }}>
           <ArticleOverlayPill>
@@ -554,10 +572,10 @@ function ArticleRow({ a, onPress }: { a: Article; onPress: () => void }) {
         </View>
       </View>
 
-      {/* Content right — title (1 line), desc (2 lines), อ่านเพิ่มเติม pinned bottom. */}
-      <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 12 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a", lineHeight: 19 }}>{a.title}</Text>
-        <Text numberOfLines={2} style={{ fontSize: 12, color: "#525252", lineHeight: 17, marginTop: 4 }}>{a.desc}</Text>
+      {/* Content right — title (1 line), desc (2-3 lines), อ่านเพิ่มเติม pinned bottom. */}
+      <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: tablet ? 14 : 12 }}>
+        <Text numberOfLines={tablet ? 2 : 1} style={{ fontSize: tablet ? 15 : 14, fontWeight: "600", color: "#0a0a0a", lineHeight: tablet ? 21 : 19 }}>{a.title}</Text>
+        <Text numberOfLines={tablet ? 3 : 2} style={{ fontSize: tablet ? 12.5 : 12, color: "#525252", lineHeight: tablet ? 18 : 17, marginTop: 4 }}>{a.desc}</Text>
         <View
           className="flex-row items-center self-start"
           style={{ gap: 4, marginTop: "auto", backgroundColor: "rgba(175,111,8,0.1)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 }}
@@ -775,7 +793,7 @@ export function HomeScreen() {
               style={{ width: 44, height: 44 }}
               resizeMode="contain"
             />
-            <View className="flex-1">
+            <View className={isTablet() ? "" : "flex-1"}>
               <Text
                 style={{
                   color: "white",
@@ -799,6 +817,10 @@ export function HomeScreen() {
                 สมุนไพรไทยเพื่อสุขภาพดี
               </Text>
             </View>
+
+            {/* Push the action buttons to the right on tablets (title lost
+                its flex-1; the search floats centered as an overlay below). */}
+            {isTablet() ? <View style={{ flex: 1 }} /> : null}
 
             {/* เมต้า AI — left of the bell */}
             <GlassIconButton
@@ -824,12 +846,48 @@ export function HomeScreen() {
               count={cartCount}
               accessibilityLabel="ตะกร้าสินค้า"
             />
+
+            {/* iPad — search floats dead-center of the top row; phones keep
+                the dedicated row below. */}
+            {isTablet() ? (
+              <View
+                pointerEvents="box-none"
+                style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
+              >
+                <View
+                  className="flex-row items-center rounded-full px-4"
+                  style={{
+                    width: tabletSearchBarWidth(),
+                    height: 42,
+                    backgroundColor: "#ffffff",
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                  }}
+                >
+                  <Search size={17} color="#319754" />
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="ค้นหาสินค้า, สมุนไพร, ร้านค้า..."
+                    placeholderTextColor="#a3a3a3"
+                    returnKeyType="search"
+                    style={{ flex: 1, marginLeft: 8, fontSize: 13, color: "#374151" }}
+                  />
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
 
+        {/* iPad — extra green breathing room under the header (the search row
+            moved up into the top row, so give some space back). */}
+        {isTablet() ? <View style={{ height: 28 }} /> : null}
+
         {/* Search row — full-width search bar that hides on scroll-down and
-            returns on scroll-up. */}
-        <Animated.View style={{ height: searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
+            returns on scroll-up. iPad puts the search in the top row instead. */}
+        <Animated.View style={{ height: isTablet() ? 0 : searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
         <View
           style={{
             paddingLeft: 12,
@@ -885,8 +943,11 @@ export function HomeScreen() {
             are the same height (no layout shift on swipe). Chosen to match
             the majority of banner images (banner_14, banner_15 = 3.825:1). */}
         {(() => {
-          const HERO_HEIGHT = 120; // fixed hero (top) banner height
-          const SIDE_HEIGHT = 70; // fixed side (bottom) banner height
+          // Heights scale with width at the phone design's aspect ratios
+          // (398×120 hero, 194×70 side) so bigger screens enlarge the banners
+          // proportionally instead of cropping them thinner.
+          const HERO_HEIGHT = Math.round((bannerInnerWidth * 120) / 398);
+          const SIDE_HEIGHT = Math.round((((bannerInnerWidth - 10) / 2) * 70) / 194);
           return (
             <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 10 }}>
               {/* Hero carousel — FlatList paging gives a smooth slide
@@ -996,66 +1057,71 @@ export function HomeScreen() {
         })()}
 
         {/* Categories — horizontal scroll, no title; items peek off-screen on the right
-            to signal scrollability without an explicit hint. */}
-        <View style={{ paddingTop: 16, paddingBottom: 16 }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              // Pressable is 70px wide and items-center; the 56px circle sits
-              // with 7px slack on each side. Subtract that 7 so the first
-              // circle's left edge lands at x=16, aligning with section
-              // headers above/below. Gap between items stays 14.
-              paddingLeft: 9,
-              paddingRight: 9,
-              gap: 14,
-            }}
-            decelerationRate="fast"
-          >
-            {CATEGORIES.map((c) => (
-              <Pressable
-                key={c.label}
-                className="items-center active:opacity-60"
-                // Width 70 + gap 14 → on a 390px screen 4 items fit fully and the
-                // 5th peeks ~50% off the right edge, giving a clear scroll cue.
-                style={{ width: 70, gap: 8 }}
+            to signal scrollability without an explicit hint. Tablets get
+            larger tiles (bigger circle/icon/label) to match the wider canvas. */}
+        {(() => {
+          const tablet = isTablet();
+          const ITEM_W = tablet ? 96 : 70;
+          const CIRCLE = tablet ? 56 : 40;
+          const ICON = tablet ? 34 : 26;
+          const IMG = tablet ? 44 : 32;
+          // Align the first circle's left edge at x=16 (slack = item padding
+          // around the circle), matching the section headers above/below.
+          const edgePad = Math.max(0, 16 - (ITEM_W - CIRCLE) / 2);
+          return (
+            <View style={{ paddingTop: 16, paddingBottom: 16 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: edgePad, paddingRight: edgePad, gap: 14 }}
+                decelerationRate="fast"
               >
-                <View
-                  className="rounded-full items-center justify-center overflow-hidden"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    backgroundColor: c.color + "1a",
-                    borderWidth: 0.5,
-                    borderColor: c.color + "33",
-                  }}
-                >
-                  {"image" in c ? (
-                    <Image
-                      source={c.image}
-                      style={{ width: 32, height: 32 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <c.Icon size={26} color={c.color} />
-                  )}
-                </View>
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontSize: 11,
-                    color: "#525252",
-                    includeFontPadding: false,
-                    lineHeight: 16,
-                    textAlign: "center",
-                  }}
-                >
-                  {c.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+                {CATEGORIES.map((c) => (
+                  <Pressable
+                    key={c.label}
+                    className="items-center active:opacity-60"
+                    // Width 70 + gap 14 → on a 390px screen 4 items fit fully and the
+                    // 5th peeks ~50% off the right edge, giving a clear scroll cue.
+                    style={{ width: ITEM_W, gap: 8 }}
+                  >
+                    <View
+                      className="rounded-full items-center justify-center overflow-hidden"
+                      style={{
+                        width: CIRCLE,
+                        height: CIRCLE,
+                        backgroundColor: c.color + "1a",
+                        borderWidth: 0.5,
+                        borderColor: c.color + "33",
+                      }}
+                    >
+                      {"image" in c ? (
+                        <Image
+                          source={c.image}
+                          style={{ width: IMG, height: IMG }}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <c.Icon size={ICON} color={c.color} />
+                      )}
+                    </View>
+                    <Text
+                      numberOfLines={2}
+                      style={{
+                        fontSize: tablet ? 12.5 : 11,
+                        color: "#525252",
+                        includeFontPadding: false,
+                        lineHeight: tablet ? 18 : 16,
+                        textAlign: "center",
+                      }}
+                    >
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          );
+        })()}
 
         {/* Recommended section (paged 2-per-page) */}
         <View className="mb-4 bg-white py-4">

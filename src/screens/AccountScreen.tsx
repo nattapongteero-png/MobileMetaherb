@@ -36,6 +36,8 @@ import {
   Bell,
   Crown,
   Camera,
+  PackageCheck,
+  CircleCheckBig,
   type LucideIcon,
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
@@ -46,6 +48,7 @@ import { useChat } from "../context/ChatContext";
 import { useSeller } from "../context/SellerContext";
 import type { OrderStatus } from "../data/orders";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { isTablet } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -72,14 +75,18 @@ const POINTS = 1250;
 const ACTIVE_COUPONS = COUPONS.filter((c) => c.status === "active").length;
 const groupNum = (n: number) => n.toLocaleString("en-US");
 
-type OrderTab = "all" | "pending_group" | "preparing" | "shipped";
+type OrderTab = "all" | "pending_group" | "preparing" | "shipped" | "delivered" | "completed";
 // `status` drives the live count (from OrderContext); `tab` is the filter opened on tap.
 const ORDER_STATUS: { label: string; Icon: LucideIcon; status: OrderStatus; tint: string; bg: string; tab: OrderTab }[] = [
   { label: "รอชำระเงิน", Icon: Wallet, status: "pending_payment", tint: "#f97316", bg: "rgba(249,115,22,0.12)", tab: "pending_group" },
   { label: "รอตรวจสอบ", Icon: ClipboardCheck, status: "pending_verify", tint: "#0ea5e9", bg: "rgba(14,165,233,0.12)", tab: "pending_group" },
   { label: "รอจัดส่ง", Icon: Package, status: "preparing", tint: "#a855f7", bg: "rgba(168,85,247,0.12)", tab: "preparing" },
   { label: "จัดส่งแล้ว", Icon: Truck, status: "shipped", tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)", tab: "shipped" },
+  // iPad only — the wider card fits 6 tiles (colors from STATUS_COLOR in data/orders).
+  { label: "ได้รับสินค้าแล้ว", Icon: PackageCheck, status: "delivered", tint: "#0d9488", bg: "rgba(13,148,136,0.12)", tab: "delivered" },
+  { label: "สำเร็จ", Icon: CircleCheckBig, status: "completed", tint: "#16a34a", bg: "rgba(22,163,74,0.12)", tab: "completed" },
 ];
+const VISIBLE_ORDER_STATUS = isTablet() ? ORDER_STATUS : ORDER_STATUS.slice(0, 4);
 
 function Card({ children, style }: { children: ReactNode; style?: object }) {
   return (
@@ -441,7 +448,7 @@ export function AccountScreen() {
               </Pressable>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              {ORDER_STATUS.map((s) => {
+              {VISIBLE_ORDER_STATUS.map((s) => {
                 const count = countByStatus(s.status);
                 return (
                 <Pressable key={s.label} onPress={() => openOrders(s.tab)} className="items-center active:opacity-70" style={{ flex: 1, gap: 7 }}>

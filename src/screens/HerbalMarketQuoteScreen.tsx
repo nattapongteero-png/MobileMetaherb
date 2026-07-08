@@ -53,11 +53,16 @@ const CERT_OPTIONS = ["ทั่วไป", "Organic", "GAP", "GMP", "ISO", "HAL
 // Materials come from the canonical HerbalMarketScreen list (local photos) so
 // the quote always matches the card/detail the user came from.
 import { MATERIALS } from "./HerbalMarketScreen";
+import { appWidth, isTablet } from "../theme/layout";
 
 /** Resolve a local bundled image (require → number) or remote URL string. */
 function imgSource(src: number | string | undefined): any {
   return typeof src === "number" ? src : { uri: src };
 }
+
+// Product thumbnails — larger on iPad (same treatment as the cart rows).
+const MATERIAL_IMG = isTablet() ? 96 : 64; // single-material header row
+const LINE_IMG = isTablet() ? 80 : 52; // bulk cart-line rows
 
 const PILL_INPUT = {
   backgroundColor: "#f5f5f5",
@@ -369,7 +374,7 @@ export function HerbalMarketQuoteScreen() {
 
   const qtyNum = Number(qty) || 0;
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const docScale = (Dimensions.get("window").width - 32) / DOC_WIDTH;
+  const docScale = (appWidth() - 32) / DOC_WIDTH;
   const insets = useSafeAreaInsets();
 
   // One quotation document per supplier in bulk mode (web parity: docs[]). Single
@@ -729,12 +734,12 @@ export function HerbalMarketQuoteScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
       >
         {/* Single mode: the material being quoted. Bulk mode: the selected cart lines. */}
         {!isBulk ? (
           <View style={{ ...SECTION, flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+            <View style={{ width: MATERIAL_IMG, height: MATERIAL_IMG, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
               <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
             </View>
             <View style={{ flex: 1 }}>
@@ -761,7 +766,7 @@ export function HerbalMarketQuoteScreen() {
             <View style={{ gap: 16 }}>
               {quoteItems.map((q) => (
                 <View key={q.id} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <View style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+                  <View style={{ width: LINE_IMG, height: LINE_IMG, borderRadius: 12, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
                     <Image source={q.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
@@ -899,20 +904,24 @@ export function HerbalMarketQuoteScreen() {
         />
       </View>
 
-      {/* Fixed bottom action (Fitts's Law: full-width pill anchored at thumb reach). */}
-      <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#fafafa", borderTopWidth: 1, borderTopColor: "#ececed" }}>
-        <View style={{ padding: 16 }}>
-          <Pressable
-            onPress={handlePreview}
-            className="items-center justify-center active:opacity-80"
-            style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50 }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-              ดูตัวอย่างใบขอเสนอราคา{isBulk ? ` (${quoteItems.length} รายการ)` : ""}
-            </Text>
-          </Pressable>
+      {/* Floating Liquid Glass action bar — same as the other create pages
+          (Fitts's Law: full-width pill anchored at thumb reach). */}
+      <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+        <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+            <Pressable
+              onPress={handlePreview}
+              className="flex-row items-center justify-center active:opacity-90"
+              style={{ flex: 1, height: 50, borderRadius: 999, gap: 8, backgroundColor: BRAND_GREEN }}
+            >
+              <ClipboardList size={17} color="#fff" strokeWidth={2.6} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+                ดูตัวอย่างใบขอเสนอราคา{isBulk ? ` (${quoteItems.length} รายการ)` : ""}
+              </Text>
+            </Pressable>
+          </GlassView>
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }

@@ -18,6 +18,7 @@ import {
   MapPin,
   Beaker,
 } from "lucide-react-native";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 import {
   BRAND_GREEN,
   BRAND_GREEN_DARK,
@@ -28,9 +29,8 @@ import {
 
 // 2-column grid: full width minus 16px page padding each side minus the gap.
 const HERBAL_GRID_GAP = 14;
-const HERBAL_CARD_WIDTH = Math.floor(
-  (Dimensions.get("window").width - 16 * 2 - HERBAL_GRID_GAP) / 2,
-);
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const HERBAL_CARD_WIDTH = gridCardWidth(gridColumns(190, 32, HERBAL_GRID_GAP), 32, HERBAL_GRID_GAP);
 
 /* ===== Types (ported from web data/herbalMaterials.ts) ===== */
 type MaterialCategory =

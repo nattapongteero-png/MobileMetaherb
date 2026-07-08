@@ -19,12 +19,15 @@ import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import { CAFE_MENU } from "../data/cafeMenu";
+import { appWidth, isTablet } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Rt = RouteProp<RootStackParamList, "CafeItemDetail">;
 const baht = (n: number) => "฿" + n.toLocaleString();
-const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_WIDTH = appWidth();
 const SCREEN_HEIGHT = Dimensions.get("window").height;
+// Hero height — square on phones; shortened on iPad (same as the other detail pages).
+const HERO_H = isTablet() ? Math.round(SCREEN_WIDTH * 0.75) : SCREEN_WIDTH;
 
 const SWEET = ["ไม่หวาน", "หวานน้อย", "หวานปกติ", "หวานมาก"];
 const SWEET_DEFAULT = 2;
@@ -58,8 +61,8 @@ export function CafeItemDetailScreen() {
 
   // Stretchy hero — zooms in on pull-down instead of leaving a gap.
   const scrollY = useRef(new Animated.Value(0)).current;
-  const heroScale = scrollY.interpolate({ inputRange: [-SCREEN_WIDTH, 0], outputRange: [2, 1], extrapolateLeft: "extend", extrapolateRight: "clamp" });
-  const heroTranslateY = scrollY.interpolate({ inputRange: [-SCREEN_WIDTH, 0], outputRange: [-SCREEN_WIDTH / 2, 0], extrapolateLeft: "extend", extrapolateRight: "clamp" });
+  const heroScale = scrollY.interpolate({ inputRange: [-HERO_H, 0], outputRange: [2, 1], extrapolateLeft: "extend", extrapolateRight: "clamp" });
+  const heroTranslateY = scrollY.interpolate({ inputRange: [-HERO_H, 0], outputRange: [-HERO_H / 2, 0], extrapolateLeft: "extend", extrapolateRight: "clamp" });
 
   const unitPrice = item.price + (item.hasMilk ? MILK[milk].price : 0) + (item.hasShot ? SHOT[shot].price : 0);
   const total = unitPrice * qty;
@@ -96,7 +99,7 @@ export function CafeItemDetailScreen() {
         scrollEventThrottle={16}
       >
         {/* Full-bleed square hero — zooms on pull-down */}
-        <Animated.View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: "#f0f0f0", transform: [{ translateY: heroTranslateY }, { scale: heroScale }] }}>
+        <Animated.View style={{ width: SCREEN_WIDTH, height: HERO_H, backgroundColor: "#f0f0f0", transform: [{ translateY: heroTranslateY }, { scale: heroScale }] }}>
           <Pressable onPress={() => setViewerOpen(true)} style={{ width: "100%", height: "100%" }}>
             <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
           </Pressable>

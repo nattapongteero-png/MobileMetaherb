@@ -12,6 +12,7 @@ import { BottomFade } from "../components/BottomFade";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { PromoCard } from "./PromotionsView";
 import { useAllPromotions } from "../data/promotions";
+import { gridCardWidth, isTablet } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -23,8 +24,8 @@ export function ShopPromotionSearchScreen() {
   const promotions = useAllPromotions();
   const [query, setQuery] = useState("");
 
-  // 2-col grid: floor to avoid flex-wrap breakage (per project convention).
-  const cardWidth = useMemo(() => Math.floor((Dimensions.get("window").width - 32 - 12) / 2), []);
+  // Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+  const cardWidth = useMemo(() => gridCardWidth(isTablet() ? 3 : 2), []);
 
   const q = query.trim().toLowerCase();
   const results = useMemo(

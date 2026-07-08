@@ -18,6 +18,7 @@ import {
 } from "lucide-react-native";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import { useCart, type CartItem } from "../context/CartContext";
+import { appWidth } from "../theme/layout";
 
 // Route params are typed locally so the screen renders standalone before the
 // route is registered. `id` -> single material PR; `ids` -> bulk (cart) PR seeded
@@ -175,7 +176,7 @@ function ErpInfoTooltip() {
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ x: 0, y: 0, h: 0 });
   const ref = useRef<RNView>(null);
-  const screenW = Dimensions.get("window").width;
+  const screenW = appWidth();
   const cardW = Math.min(290, screenW - 32);
 
   const show = () => {
