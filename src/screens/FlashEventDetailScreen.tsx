@@ -3,8 +3,8 @@
  * Sale event's terms sheet. Ported from the web FlashEventDetail (isNewJoin):
  * countdown + empty state ("ยังไม่มีสินค้าเข้าร่วม") + a button to add products.
  */
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import { useRef, useState } from "react";
+import { View, Text, ScrollView, Pressable, type GestureResponderEvent } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -13,7 +13,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { Package, Plus } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { FlashProductCard, FlashActionSheet, FlashSummaryCard, FLASH_PRODUCTS, type FlashProduct } from "./MyShopScreen";
+import { FlashProductCard, FlashCardMenu, FlashSummaryCard, FLASH_PRODUCTS, type FlashProduct } from "./MyShopScreen";
+import { cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_PRIMARY } from "../theme/tokens";
@@ -28,6 +29,15 @@ export function FlashEventDetailScreen() {
   // Already-joined events open with their products; a fresh join starts empty.
   const [products, setProducts] = useState<FlashProduct[]>(() => (params.joined ? FLASH_PRODUCTS.slice(0, 5) : []));
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<CardMenuAnchor | null>(null);
+  const rootRef = useRef<View>(null);
+  const openMenu = (p: FlashProduct, e: GestureResponderEvent) => {
+    const { pageX, pageY } = e.nativeEvent;
+    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
+      setMenuAnchor(cardMenuAnchor(pageX, pageY, rx, ry, rw, rh));
+      setMenuFor(p);
+    });
+  };
   const openAdd = () =>
     nav.navigate("FlashAddProduct", {
       eventDate: params.dateRange, // event period is fixed — no date inputs on the add page
@@ -39,7 +49,7 @@ export function FlashEventDetailScreen() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+    <View ref={rootRef} className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader
         title={params.name}
@@ -58,7 +68,7 @@ export function FlashEventDetailScreen() {
 
             {/* Joined product cards (same style as the Flash Sale store) */}
             {products.map((p) => (
-              <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} dateText={params.dateRange} />
+              <FlashProductCard key={p.id} p={p} onMenu={(e) => openMenu(p, e)} dateText={params.dateRange} />
             ))}
           </>
         ) : (
@@ -96,9 +106,10 @@ export function FlashEventDetailScreen() {
         </>
       ) : null}
 
-      {/* 3-dot menu — same bottom sheet as the Flash Sale store */}
-      <FlashActionSheet
+      {/* 3-dot menu — same anchored morph card as the Flash Sale store */}
+      <FlashCardMenu
         product={menuFor}
+        anchor={menuAnchor}
         onClose={() => setMenuFor(null)}
         onRemove={removeProduct}
         onEdit={(p) =>

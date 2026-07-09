@@ -144,6 +144,84 @@ export function sortProducts(list: SalesProduct[], sort: ProductSort): SalesProd
   }
 }
 
+/* ---------- Grouped product-sales table (web parity) ----------
+ * The web table groups sale lines under the period's time buckets
+ * (day → hours, month → weeks, …) with a per-group summary column:
+ * n รายการ · units, ยอดขาย, GP, สุทธิ, กำไร. Lines are generated
+ * deterministically from the product list so every period/tab combination
+ * renders stable mock data. */
+
+export type SaleLine = {
+  p: SalesProduct;
+  qty: number;
+  price: number;    // unit price
+  discount: number; // ส่วนลด (0 = none)
+  sales: number;    // qty×price − discount
+  gp: number;       // platform GP cut (7%)
+  net: number;      // ร้านรับสุทธิ
+  cost: number;
+  profit: number;   // net − cost
+  margin: number;   // % of sales
+};
+
+export type SalesGroup = {
+  label: string;
+  lines: SaleLine[];
+  units: number;
+  sales: number;
+  gp: number;
+  net: number;
+  cost: number;
+  profit: number;
+  margin: number;
+};
+
+export function groupedSales(period: Period, list: SalesProduct[]): SalesGroup[] {
+  const buckets = REPORT_DATA[period].filter((b) => b.sales > 0);
+  return buckets.map((b, gi) => {
+    const count = Math.min(list.length, 3 + ((gi + list.length) % 3));
+    const lines: SaleLine[] = [];
+    for (let k = 0; k < count; k++) {
+      const p = list[(gi * 2 + k) % list.length];
+      const price = Math.max(1, Math.round(p.sales / p.qty));
+      const qty = Math.max(1, Math.round((p.qty * (0.6 + ((gi + k) % 4) * 0.2)) / buckets.length));
+      const gross = price * qty;
+      const discount = (gi + k) % 3 === 0 ? Math.round(gross * 0.05) : 0;
+      const sales = gross - discount;
+      const gp = Math.round(sales * GP_RATE);
+      const net = sales - gp;
+      const cost = Math.round((p.cost / p.qty) * qty);
+      const profit = net - cost;
+      lines.push({ p, qty, price, discount, sales, gp, net, cost, profit, margin: sales > 0 ? (profit / sales) * 100 : 0 });
+    }
+    const sum = (f: (l: SaleLine) => number) => lines.reduce((s, l) => s + f(l), 0);
+    const sales = sum((l) => l.sales);
+    const profit = sum((l) => l.profit);
+    return {
+      label: b.label,
+      lines,
+      units: sum((l) => l.qty),
+      sales,
+      gp: sum((l) => l.gp),
+      net: sum((l) => l.net),
+      cost: sum((l) => l.cost),
+      profit,
+      margin: sales > 0 ? (profit / sales) * 100 : 0,
+    };
+  });
+}
+
+/** เรียงในกลุ่ม — same sort keys as the flat table, applied per group. */
+export function sortLines(lines: SaleLine[], sort: ProductSort): SaleLine[] {
+  const arr = [...lines];
+  switch (sort) {
+    case "sales_asc": return arr.sort((a, b) => a.sales - b.sales);
+    case "qty_desc": return arr.sort((a, b) => b.qty - a.qty);
+    case "margin_desc": return arr.sort((a, b) => b.margin - a.margin);
+    default: return arr.sort((a, b) => b.sales - a.sales);
+  }
+}
+
 export const sumField = (rows: Point[], key: SeriesKey) => rows.reduce((s, r) => s + (r[key] as number), 0);
 
 /* ---------- Customer report ---------- */

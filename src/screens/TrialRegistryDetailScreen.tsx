@@ -34,7 +34,8 @@ import {
   MoreVertical,
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
-import { BottomSheet } from "../components/BottomSheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -132,6 +133,7 @@ export function TrialRegistryDetailScreen() {
   ];
   const ratingText = avgRating > 0 ? avgRating.toFixed(1) : "—";
   const [menuOpen, setMenuOpen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
@@ -306,36 +308,12 @@ export function TrialRegistryDetailScreen() {
         <BottomFade />
       </View>
 
-      {/* Action menu sheet */}
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} centerTitle title="จัดการสินค้าทดลอง" minHeightRatio={0.3} maxHeightRatio={0.5}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 2 }}>
-          <Pressable
-            onPress={() => { setMenuOpen(false); editProduct(); }}
-            className="flex-row items-center active:opacity-60"
-            style={{ paddingVertical: 13, gap: 12 }}
-          >
-            <Pencil size={18} color={TEXT_MUTED} strokeWidth={2.2} />
-            <Text style={{ fontSize: 14, fontWeight: "500", color: TEXT_PRIMARY }}>แก้ไขข้อมูลสินค้า</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => { setMenuOpen(false); exportData(); }}
-            className="flex-row items-center active:opacity-60"
-            style={{ paddingVertical: 13, gap: 12 }}
-          >
-            <Download size={18} color={TEXT_MUTED} strokeWidth={2.2} />
-            <Text style={{ fontSize: 14, fontWeight: "500", color: TEXT_PRIMARY }}>ส่งออกข้อมูล</Text>
-          </Pressable>
-          <View style={{ height: 1, backgroundColor: DIVIDER_GRAY, marginVertical: 4 }} />
-          <Pressable
-            onPress={() => { setMenuOpen(false); deleteProduct(); }}
-            className="flex-row items-center active:opacity-60"
-            style={{ paddingVertical: 13, gap: 12 }}
-          >
-            <Trash2 size={18} color="#ff3b30" strokeWidth={2.2} />
-            <Text style={{ fontSize: 14, fontWeight: "500", color: "#ff3b30" }}>ลบสินค้าทดลอง</Text>
-          </Pressable>
-        </View>
-      </BottomSheet>
+      {/* App-bar ⋯ menu — iOS morph card (same as coupon/promotion detail) */}
+      <AppleMenu visible={menuOpen} onClose={() => setMenuOpen(false)} anchorTop={insets.top + 6} menuHeight={160}>
+        <AppleMenuItem label="แก้ไขข้อมูลสินค้า" Icon={Pencil} onPress={() => { setMenuOpen(false); editProduct(); }} />
+        <AppleMenuItem label="ส่งออกข้อมูล" Icon={Download} onPress={() => { setMenuOpen(false); exportData(); }} />
+        <AppleMenuItem label="ลบสินค้าทดลอง" Icon={Trash2} danger onPress={() => { setMenuOpen(false); deleteProduct(); }} />
+      </AppleMenu>
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Switch,
   Alert,
+  type GestureResponderEvent,
 } from "react-native";
 import {
   FlaskConical,
@@ -25,7 +26,9 @@ import {
 } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { BottomSheet } from "../components/BottomSheet";
+import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
+import { cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
+import { StickyFilterList } from "../components/StickyFilterList";
 import { SearchBar } from "../components/SearchBar";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useAddedTrials } from "../data/trialDrafts";
@@ -116,7 +119,7 @@ function ProductCard({
 }: {
   p: TrialProduct;
   closed: boolean;
-  onMenu: () => void;
+  onMenu: (e: GestureResponderEvent) => void;
   onOpen: () => void;
 }) {
   const taken = seatsTaken(p);
@@ -194,7 +197,7 @@ function ProductCard({
   );
 }
 
-export function TrialRegistryOwnerSection() {
+export function TrialRegistryOwnerSection({ insetsBottom = 24 }: { insetsBottom?: number } = {}) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -202,6 +205,16 @@ export function TrialRegistryOwnerSection() {
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [manualClosed, setManualClosed] = useState<Record<string, boolean>>({});
   const [sheetFor, setSheetFor] = useState<TrialProduct | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<CardMenuAnchor | null>(null);
+  const rootRef = useRef<View>(null);
+  // ⋯ menu = iOS morph card anchored at the tap (app-wide AppleMenu pattern).
+  const openMenu = (p: TrialProduct, e: GestureResponderEvent) => {
+    const { pageX, pageY } = e.nativeEvent;
+    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
+      setMenuAnchor(cardMenuAnchor(pageX, pageY, rx, ry, rw, rh));
+      setSheetFor(p);
+    });
+  };
 
   const added = useAddedTrials();
   const list = useMemo(
@@ -261,34 +274,36 @@ export function TrialRegistryOwnerSection() {
   };
 
   return (
-    <View style={{ gap: 14 }}>
-      {/* Subtitle (add button moved to a floating FAB in MyShopScreen). The big
-          "สินค้าทดลอง" title is rendered by OverviewTab. */}
-      <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>จัดการสินค้าทดลอง รับสมัคร และติดตามคำตอบจาก Tester</Text>
+    <View ref={rootRef} style={{ flex: 1 }}>
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      contentGap={14}
+      header={
+        <View style={{ gap: 14 }}>
+          {/* Subtitle (add button moved to a floating FAB). */}
+          <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>จัดการสินค้าทดลอง รับสมัคร และติดตามคำตอบจาก Tester</Text>
 
-      {/* Stat cards — 5 metrics, horizontal scroll (web KPI strip parity).
-          Full-bleed (negative margin cancels the parent's 16px padding) so the
-          next card peeks at the screen edge — a visible "scroll for more" hint. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
-        {STAT_CARDS.map((s) => (
-          <View key={s.label} style={{ width: 150, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#e5e7eb", padding: 14, gap: 6 }}>
-            <View className="flex-row items-center justify-between">
-              <Text style={{ fontSize: 11.5, color: "#6b7280", fontWeight: "500" }}>{s.label}</Text>
-              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: `${s.accent}15`, alignItems: "center", justifyContent: "center" }}>
-                <s.Icon size={14} color={s.accent} strokeWidth={2.4} />
+          {/* Stat cards — 5 metrics, horizontal scroll (web KPI strip parity). Full-bleed. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
+            {STAT_CARDS.map((s) => (
+              <View key={s.label} style={{ width: 150, backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#e5e7eb", padding: 14, gap: 6 }}>
+                <View className="flex-row items-center justify-between">
+                  <Text style={{ fontSize: 11.5, color: "#6b7280", fontWeight: "500" }}>{s.label}</Text>
+                  <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: `${s.accent}15`, alignItems: "center", justifyContent: "center" }}>
+                    <s.Icon size={14} color={s.accent} strokeWidth={2.4} />
+                  </View>
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: "700", color: "#1a1a1a" }}>
+                  {s.value}
+                  <Text style={{ fontSize: 11, color: "#6b7280", fontWeight: "500" }}> {s.suffix}</Text>
+                </Text>
               </View>
-            </View>
-            <Text style={{ fontSize: 20, fontWeight: "700", color: "#1a1a1a" }}>
-              {s.value}
-              <Text style={{ fontSize: 11, color: "#6b7280", fontWeight: "500" }}> {s.suffix}</Text>
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
-
-      {/* Filter chips — full-bleed so the last chip peeks at the screen edge. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {FILTERS.map((t) => {
+            ))}
+          </ScrollView>
+        </View>
+      }
+      filters={FILTERS.map((t) => {
           const active = filter === t.key;
           return (
             <Pressable
@@ -307,8 +322,7 @@ export function TrialRegistryOwnerSection() {
             </Pressable>
           );
         })}
-      </ScrollView>
-
+    >
       {/* Search (shared) */}
       <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อสินค้า, หมวดหมู่..." />
 
@@ -328,18 +342,28 @@ export function TrialRegistryOwnerSection() {
       ) : (
         <View style={{ gap: 12 }}>
           {filtered.map((p) => (
-            <ProductCard key={p.id} p={p} closed={isClosed(p)} onMenu={() => setSheetFor(p)} onOpen={() => nav.navigate("TrialRegistryDetail", { id: p.id })} />
+            <ProductCard key={p.id} p={p} closed={isClosed(p)} onMenu={(e) => openMenu(p, e)} onOpen={() => nav.navigate("TrialRegistryDetail", { id: p.id })} />
           ))}
         </View>
       )}
 
-      {/* Per-product action sheet (replaces the web row "⋯" popover) */}
-      <BottomSheet visible={!!sheetFor} onClose={() => setSheetFor(null)} centerTitle title={sheetFor?.name ?? ""} minHeightRatio={0.1} maxHeightRatio={0.6}>
+    </StickyFilterList>
+
+      {/* Per-product ⋯ menu (replaces the web row "⋯" popover) — anchored morph card */}
+      <AppleMenu
+        visible={!!sheetFor && !!menuAnchor}
+        onClose={() => setSheetFor(null)}
+        anchorTop={menuAnchor?.top}
+        anchorBottom={menuAnchor?.bottom}
+        right={menuAnchor?.right ?? 12}
+        originSize={30}
+        menuHeight={208}
+      >
         {sheetFor ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 4, gap: 4 }}>
-            {/* เปิดรับสมัคร toggle */}
-            <View className="flex-row items-center justify-between" style={{ paddingVertical: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: "500", color: TEXT_PRIMARY }}>เปิดรับสมัคร</Text>
+          <>
+            {/* เปิดรับสมัคร toggle — menu stays open so the flip is visible */}
+            <View className="flex-row items-center" style={{ height: 48, paddingHorizontal: 18, gap: 14 }}>
+              <Text style={{ flex: 1, fontSize: 16, color: "#1a1a1a" }}>เปิดรับสมัคร</Text>
               <Switch
                 value={!isClosed(sheetFor)}
                 onValueChange={(on) => setManualClosed((m) => ({ ...m, [sheetFor.id]: !on }))}
@@ -348,34 +372,13 @@ export function TrialRegistryOwnerSection() {
                 ios_backgroundColor="#e9e9ea"
               />
             </View>
-            <View style={{ height: 1, backgroundColor: DIVIDER_GRAY }} />
-            <SheetAction Icon={Pencil} label="แก้ไข" onPress={() => { const id = sheetFor.id; setSheetFor(null); nav.navigate("TrialAddProduct", { editId: id }); }} />
-            <SheetAction Icon={Eye} label="ดูรายละเอียด" onPress={() => { const id = sheetFor.id; setSheetFor(null); nav.navigate("TrialRegistryDetail", { id }); }} />
-            <View style={{ height: 1, backgroundColor: DIVIDER_GRAY }} />
-            <SheetAction Icon={Trash2} label="ลบ" danger onPress={() => removeProduct(sheetFor)} />
-          </View>
+            <AppleMenuItem label="แก้ไข" Icon={Pencil} onPress={() => { const id = sheetFor.id; setSheetFor(null); nav.navigate("TrialAddProduct", { editId: id }); }} />
+            <AppleMenuItem label="ดูรายละเอียด" Icon={Eye} onPress={() => { const id = sheetFor.id; setSheetFor(null); nav.navigate("TrialRegistryDetail", { id }); }} />
+            <AppleMenuItem label="ลบ" Icon={Trash2} danger onPress={() => removeProduct(sheetFor)} />
+          </>
         ) : null}
-      </BottomSheet>
+      </AppleMenu>
     </View>
   );
 }
 
-function SheetAction({
-  Icon,
-  label,
-  onPress,
-  danger,
-}: {
-  Icon: typeof Pencil;
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  const color = danger ? "#ff3b30" : TEXT_PRIMARY;
-  return (
-    <Pressable onPress={onPress} className="flex-row items-center active:opacity-60" style={{ paddingVertical: 13, gap: 12 }}>
-      <Icon size={18} color={danger ? "#ff3b30" : TEXT_MUTED} strokeWidth={2.2} />
-      <Text style={{ fontSize: 14, fontWeight: "500", color }}>{label}</Text>
-    </Pressable>
-  );
-}

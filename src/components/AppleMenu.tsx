@@ -23,6 +23,7 @@ export function AppleMenu({
   anchorBottom,
   right = 12,
   originSize = 44,
+  menuHeight = MENU_H,
   children,
 }: {
   visible: boolean;
@@ -35,6 +36,8 @@ export function AppleMenu({
   right?: number;
   /** Trigger diameter the card scales up from. */
   originSize?: number;
+  /** Approx card height (rows × 48 + 16) — keeps the pinned corner accurate. */
+  menuHeight?: number;
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -74,7 +77,7 @@ export function AppleMenu({
             {
               translateY: anim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [(fromBottom ? 1 : -1) * (MENU_H / 2) * (1 - s0), 0],
+                outputRange: [(fromBottom ? 1 : -1) * (menuHeight / 2) * (1 - s0), 0],
               }),
             },
             { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [s0, 1] }) },
@@ -119,4 +122,15 @@ export function AppleMenuItem({
       <Text style={{ flex: 1, fontSize: 16, color }}>{label}</Text>
     </Pressable>
   );
+}
+
+/** Anchor for a card/press-point menu. */
+export type CardMenuAnchor = { top?: number; bottom?: number; right: number };
+
+/** Convert a tap's window coords to an AppleMenu anchor inside a host view —
+ *  opens downward, or upward when the tap sits low on screen. */
+export function cardMenuAnchor(pageX: number, pageY: number, rx: number, ry: number, rw: number, rh: number): CardMenuAnchor {
+  const right = Math.max(12, rx + rw - pageX - 14);
+  const localY = pageY - ry;
+  return localY > rh * 0.55 ? { bottom: rh - localY + 10, right } : { top: localY + 10, right };
 }

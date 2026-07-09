@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View, type GestureResponderEvent } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,11 +7,12 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronLeft, PackageX, Search, X } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
 import { EmptyState } from "../components/EmptyState";
 import { BottomFade } from "../components/BottomFade";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
-  PMActionSheet,
+  PMCardMenu,
   PMCard,
   PM_STATUS_COLOR,
   usePMProducts,
@@ -34,6 +35,15 @@ export function ShopProductManageSearchScreen() {
   const regular = usePMProducts("regular");
   const material = usePMProducts("material");
   const [menuFor, setMenuFor] = useState<{ p: PMProduct; type: "regular" | "material" } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<CardMenuAnchor | null>(null);
+  const rootRef = useRef<View>(null);
+  const openMenu = (p: PMProduct, type: "regular" | "material", e: GestureResponderEvent) => {
+    const { pageX, pageY } = e.nativeEvent;
+    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
+      setMenuAnchor(cardMenuAnchor(pageX, pageY, rx, ry, rw, rh));
+      setMenuFor({ p, type });
+    });
+  };
 
   const q = query.trim().toLowerCase();
   const match = (p: PMProduct) => !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
@@ -45,7 +55,7 @@ export function ShopProductManageSearchScreen() {
     nav.navigate("ShopProductDetail", { productId: p.id, type });
 
   return (
-    <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
+    <View ref={rootRef} className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SafeAreaView edges={["top"]}>
         {/* App bar — back button + search pill */}
@@ -108,7 +118,7 @@ export function ShopProductManageSearchScreen() {
               <>
                 <SectionHeader label="ผลิตภัณฑ์" count={regularResults.length} />
                 {regularResults.map((p) => (
-                  <PMCard key={p.id} p={p} onMenu={() => setMenuFor({ p, type: "regular" })} onPreview={() => openDetail(p, "regular")} />
+                  <PMCard key={p.id} p={p} onMenu={(e) => openMenu(p, "regular", e)} onPreview={() => openDetail(p, "regular")} />
                 ))}
               </>
             ) : null}
@@ -116,7 +126,7 @@ export function ShopProductManageSearchScreen() {
               <>
                 <SectionHeader label="วัตถุดิบ Herbal" count={materialResults.length} topGap={regularResults.length > 0 ? 10 : 0} />
                 {materialResults.map((p) => (
-                  <PMCard key={p.id} p={p} onMenu={() => setMenuFor({ p, type: "material" })} onPreview={() => openDetail(p, "material")} />
+                  <PMCard key={p.id} p={p} onMenu={(e) => openMenu(p, "material", e)} onPreview={() => openDetail(p, "material")} />
                 ))}
               </>
             ) : null}
@@ -132,9 +142,10 @@ export function ShopProductManageSearchScreen() {
       <BottomFade />
       </View>
 
-      {/* Long-press action menu — same sheet as the จัดการสินค้า list */}
-      <PMActionSheet
+      {/* Long-press ⋯ menu — same anchored morph card as the จัดการสินค้า list */}
+      <PMCardMenu
         product={menuFor?.p ?? null}
+        anchor={menuAnchor}
         onClose={() => setMenuFor(null)}
         onToggle={(prod) => {
           if (!menuFor) return;

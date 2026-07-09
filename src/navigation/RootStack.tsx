@@ -92,6 +92,7 @@ import type { MarketDoc, DocKind } from "../screens/MyShopScreen";
 import { ShopDocDetailScreen } from "../screens/ShopDocDetailScreen";
 import { AddProductScreen } from "../screens/AddProductScreen";
 import { FlashAddProductScreen } from "../screens/FlashAddProductScreen";
+import { FlashSelectEventScreen } from "../screens/FlashSelectEventScreen";
 import type { FlashProduct } from "../screens/MyShopScreen";
 import { FlashEventDetailScreen } from "../screens/FlashEventDetailScreen";
 import { MyShopMenuScreen } from "../screens/MyShopMenuScreen";
@@ -115,6 +116,7 @@ import { ShopQuoteSearchScreen } from "../screens/ShopQuoteSearchScreen";
 import { ShopDocSearchScreen } from "../screens/ShopDocSearchScreen";
 import { ShopCouponSearchScreen } from "../screens/ShopCouponSearchScreen";
 import { ShopPromotionSearchScreen } from "../screens/ShopPromotionSearchScreen";
+import { ShopFlashSearchScreen } from "../screens/ShopFlashSearchScreen";
 import { ShopPromotionDetailScreen } from "../screens/ShopPromotionDetailScreen";
 import { PromoProductPickerScreen } from "../screens/PromoProductPickerScreen";
 import { OptionPickerScreen } from "../screens/OptionPickerScreen";
@@ -152,7 +154,9 @@ export type RootStackParamList = {
   ProductDetail: { product: Product; preview?: boolean };
   ProductPreview: { product: Product; preview?: boolean };
   AddProduct: { mode: "regular" | "material" };
-  FlashAddProduct: { onDone?: (p: FlashProduct) => void; eventDate?: string; edit?: FlashProduct } | undefined;
+  FlashAddProduct: { onDone?: (p: FlashProduct) => void; eventDate?: string; edit?: FlashProduct; preselect?: FlashProduct } | undefined;
+  // eventId undefined = added to the SHOP's own flash sale (no app round).
+  FlashSelectEvent: { onPicked?: (p: FlashProduct, eventId: string | undefined, running: boolean) => void; preselect?: FlashProduct } | undefined;
   FlashEventDetail: { name: string; dateRange: string; joined?: boolean };
   ArticleDetail: { article: Article };
   Orders: { initialTab?: OrderStatus | "all" | "pending_group" } | undefined;
@@ -242,6 +246,7 @@ export type RootStackParamList = {
   ShopDocSearch: { kind: DocKind };
   ShopCouponSearch: undefined;
   ShopPromotionSearch: undefined;
+  ShopFlashSearch: undefined;
   ShopPromotionDetail: { promotionId: string };
   PromoProductPicker: { excludeIds: string[]; onDone?: (ids: string[]) => void };
   OptionPicker: { title: string; options: string[]; value?: string; searchPlaceholder?: string; onSelect?: (v: string) => void };
@@ -457,6 +462,7 @@ export function RootStack() {
       <Stack.Screen name="ShopDocDetail" component={ShopDocDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="FlashAddProduct" component={FlashAddProductScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="FlashSelectEvent" component={FlashSelectEventScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="FlashEventDetail" component={FlashEventDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="MyShopMenu" component={MyShopMenuScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="ShopAccount" component={ShopAccountScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
@@ -479,6 +485,7 @@ export function RootStack() {
       <Stack.Screen name="ShopDocSearch" component={ShopDocSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopCouponSearch" component={ShopCouponSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopPromotionSearch" component={ShopPromotionSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopFlashSearch" component={ShopFlashSearchScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopPromotionDetail" component={ShopPromotionDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="PromoProductPicker" component={PromoProductPickerScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="OptionPicker" component={OptionPickerScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />

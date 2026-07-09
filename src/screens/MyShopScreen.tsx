@@ -19,8 +19,10 @@ import {
   type TextStyle,
   type ScrollViewProps,
   type LayoutChangeEvent,
+  type GestureResponderEvent,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
+  type ImageSourcePropType,
 } from "react-native";
 import { GestureHandlerRootView, GestureDetector, Gesture, ScrollView as GHScrollView } from "react-native-gesture-handler";
 import Reanimated, { runOnJS, useSharedValue, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
@@ -101,11 +103,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassView } from "expo-glass-effect";
+import { BlurView } from "expo-blur";
+import { Wheel, WheelHighlight, WheelFades } from "../components/WheelPicker";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomSheet } from "../components/BottomSheet";
 import { Skeleton } from "../components/Skeleton";
+import { StickyFilterList } from "../components/StickyFilterList";
 import { SegmentedTabs } from "../components/SegmentedTabs";
-import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
+import { AppleMenu, AppleMenuItem, cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
 import { useAllPromotions, computedStatus as promoStatus } from "../data/promotions";
 import { showToast } from "../components/Toast";
 import { GlassDatePicker } from "../components/GlassDatePicker";
@@ -125,7 +130,7 @@ import { TrialRegistryOwnerSection } from "./TrialRegistryView";
 import { TrialTrackingOwnerSection } from "./TrialTrackingView";
 import { PromotionsOwnerSection } from "./PromotionsView";
 import { CouponsOwnerSection } from "./CouponsView";
-import { SalesDatePicker, type DateSel } from "../components/SalesDatePicker";
+import { SalesDatePicker, type DateRange } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
@@ -626,10 +631,6 @@ export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
   };
 });
 
-const GRADE_ACCENT: Record<string, string> = {
-  พรีเมียม: "#d97706", คัดสรร: "#475569", มาตรฐาน: "#c2410c", ทั่วไป: "#047857", ประหยัด: "#475569",
-};
-
 export const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
   const status: PMStatus = m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
   return {
@@ -637,8 +638,8 @@ export const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
     name: m.name,
     category: m.category,
     image: m.image as number,
-    type: `วัตถุดิบ · ${m.grade}`,
-    typeColor: GRADE_ACCENT[m.grade] ?? "#0088ff",
+    type: "วัตถุดิบ",
+    typeColor: "#475569",
     priceText: `฿ ${m.pricePerKg.toLocaleString()} / กก.`,
     stockText: `${m.stock.toLocaleString()} กก.`,
     status,
@@ -696,12 +697,41 @@ export function usePMProducts(type: "regular" | "material"): PMProduct[] {
 // ===================== FLASH SALE (sidebar → Flash Sale) ====================
 // Ported from the web FlashSaleTab: platform events + the shop's joined products.
 type FlashEventStatus = "join" | "pending" | "active" | "ended";
-type FlashEvent = { id: string; name: string; status: FlashEventStatus; itemCount: number; dateRange: string; hms?: [number, number, number] };
-const FLASH_EVENTS: FlashEvent[] = [
-  { id: "fe1", name: "Flash Sale 7.1", status: "active", itemCount: 3, dateRange: "1-3 ก.ค. 69", hms: [39, 5, 53] },
-  { id: "fe2", name: "Flash Sale 12.12", status: "join", itemCount: 0, dateRange: "12 ธ.ค. 69" },
-  { id: "fe3", name: "Flash Sale 11.11", status: "join", itemCount: 0, dateRange: "11 พ.ย. 69" },
-  { id: "fe4", name: "Flash Sale 10.10", status: "join", itemCount: 0, dateRange: "10 ต.ค. 69" },
+export type FlashEvent = {
+  id: string; name: string; status: FlashEventStatus; itemCount: number; dateRange: string;
+  /** Which month/year (พ.ศ.) the round runs in — drives the เดือน/ปี filter. */
+  month: number; year: number;
+  hms?: [number, number, number];
+};
+
+// Live countdown boxes (HH:MM:SS) — ticks down every second from the mock
+// starting point; clamps at 00:00:00.
+function CountdownTimer({ hms }: { hms: [number, number, number] }) {
+  const [secs, setSecs] = useState(hms[0] * 3600 + hms[1] * 60 + hms[2]);
+  useEffect(() => {
+    const id = setInterval(() => setSecs((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const parts = [Math.floor(secs / 3600), Math.floor((secs % 3600) / 60), secs % 60];
+  return (
+    <View className="flex-row items-center" style={{ gap: 3 }}>
+      {parts.map((n, i) => (
+        <View key={i} className="flex-row items-center" style={{ gap: 3 }}>
+          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "#bc1b06", alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{String(n).padStart(2, "0")}</Text>
+          </View>
+          {i < 2 ? <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.9)" }}>:</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+export const FLASH_EVENTS: FlashEvent[] = [
+  { id: "fe1", name: "Flash Sale 7.1", status: "active", itemCount: 2, dateRange: "1-3 ก.ค. 69", month: 7, year: 2569, hms: [39, 5, 53] },
+  { id: "fe5", name: "Flash Sale 7.7", status: "join", itemCount: 0, dateRange: "7 ก.ค. 69", month: 7, year: 2569 },
+  { id: "fe2", name: "Flash Sale 12.12", status: "pending", itemCount: 1, dateRange: "12 ธ.ค. 69", month: 12, year: 2569 },
+  { id: "fe3", name: "Flash Sale 11.11", status: "join", itemCount: 0, dateRange: "11 พ.ย. 69", month: 11, year: 2569 },
+  { id: "fe4", name: "Flash Sale 10.10", status: "join", itemCount: 0, dateRange: "10 ต.ค. 69", month: 10, year: 2569 },
 ];
 
 type FlashStatus = "active" | "scheduled" | "soldout";
@@ -713,6 +743,8 @@ export type FlashProduct = {
   discountText?: string;
   total: number; sold: number; remaining: number; revenue: number;
   status: FlashStatus; timeRange: string; startText: string; endText: string;
+  /** Which flash event this product is joined to (FLASH_EVENTS id). */
+  eventId?: string;
 };
 const FLASH_STATUS_CFG: Record<FlashStatus, { label: string; color: string }> = {
   active: { label: "กำลังขาย", color: "#319754" },
@@ -723,18 +755,64 @@ const FLASH_STATUS_CFG: Record<FlashStatus, { label: string; color: string }> = 
 // isFlashSale flags): normal/flash prices and the discount % mirror the card's
 // strikethrough + "ลด N%" pill, and sold tracks the same deterministic
 // soldPercent that drives the card's progress bar.
-const FLASH_QUOTA: Record<string, number> = { "1": 300, "9": 300, "33": 150 };
-export const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.filter((p) => p.isFlashSale).map((p) => {
-  const total = FLASH_QUOTA[p.id] ?? 200;
-  const sold = Math.round((total * (p.soldPercent ?? 50)) / 100);
-  const startText = "01 ก.ค. 69 - 00:00"; // Flash Sale 7.1 window (fe1)
-  const endText = "03 ก.ค. 69 - 23:59";
+// Per-product mock state — assigned BY POSITION (catalog ids shift with the
+// shop split, so ids can't be hardcoded): one of each lifecycle so every
+// filter has data — active (running 7.1), soldout (quota gone, ฿ discount),
+// scheduled (joined to the upcoming 12.12).
+const FLASH_STATES: { total: number; soldPct: number; status: FlashStatus; eventId: string; start: string; end: string; bahtDiscount?: boolean }[] = [
+  { total: 300, soldPct: 62,  status: "active",    eventId: "fe1", start: "01 ก.ค. 69 - 00:00", end: "03 ก.ค. 69 - 23:59" },
+  { total: 300, soldPct: 100, status: "soldout",   eventId: "fe1", start: "01 ก.ค. 69 - 00:00", end: "03 ก.ค. 69 - 23:59", bahtDiscount: true },
+  { total: 150, soldPct: 0,   status: "scheduled", eventId: "fe2", start: "12 ธ.ค. 69 - 00:00", end: "12 ธ.ค. 69 - 23:59" },
+];
+export const FLASH_PRODUCTS: FlashProduct[] = SHOP_PRODUCTS.filter((p) => p.isFlashSale).map((p, i) => {
+  const st = FLASH_STATES[i % FLASH_STATES.length];
+  const sold = Math.round((st.total * st.soldPct) / 100);
+  const normalPrice = p.originalPrice ?? p.price;
   return {
     id: p.id, name: p.name, image: p.image as number,
-    normalPrice: p.originalPrice ?? p.price, flashPrice: p.price, discount: p.discountPercent ?? 0,
+    normalPrice, flashPrice: p.price, discount: p.discountPercent ?? 0,
+    // ฿-type discount renders its pill as "-฿n" (owner picked baht, not %)
+    discountText: st.bahtDiscount ? `-฿${(normalPrice - p.price).toLocaleString()}` : undefined,
+    total: st.total, sold, remaining: Math.max(0, st.total - sold), revenue: p.price * sold,
+    status: st.status, timeRange: `${st.start} – ${st.end}`,
+    startText: st.start, endText: st.end,
+    eventId: st.eventId,
+  };
+});
+
+// Shop-RUN flash sale (ร้านจัดเอง) — the green summary card. Distinct from the
+// APP's rounds above: no eventId (that field marks an app round) and the shop
+// picks its own dates. Assigned by position: the first 2 non-flash catalog
+// items are in the shop's own flash, the rest stay not-joined candidates.
+const SHOP_FLASH_STATES = [
+  { total: 200, soldPct: 48, discount: 15 },
+  { total: 120, soldPct: 70, discount: 20 },
+];
+const NON_FLASH_CATALOG = SHOP_PRODUCTS.filter((p) => !p.isFlashSale);
+export const SHOP_FLASH_PRODUCTS: FlashProduct[] = NON_FLASH_CATALOG.slice(0, SHOP_FLASH_STATES.length).map((p, i) => {
+  const st = SHOP_FLASH_STATES[i];
+  const flashPrice = Math.round(p.price * (1 - st.discount / 100));
+  const sold = Math.round((st.total * st.soldPct) / 100);
+  return {
+    id: p.id, name: p.name, image: p.image as number,
+    normalPrice: p.price, flashPrice, discount: st.discount,
+    total: st.total, sold, remaining: Math.max(0, st.total - sold), revenue: flashPrice * sold,
+    status: "active" as FlashStatus,
+    timeRange: "01 ก.ค. 69 - 00:00 – 31 ก.ค. 69 - 23:59",
+    startText: "01 ก.ค. 69 - 00:00", endText: "31 ก.ค. 69 - 23:59",
+  };
+});
+
+// Not in ANY flash sale — gray candidate cards in the shop-flash view whose ⋯
+// menu is the add entry.
+export const NON_FLASH_PRODUCTS: FlashProduct[] = NON_FLASH_CATALOG.slice(SHOP_FLASH_STATES.length).map((p, i) => {
+  const total = 240 + i * 60;
+  const sold = Math.round(total * (0.35 + (i % 3) * 0.15));
+  return {
+    id: p.id, name: p.name, image: p.image as number,
+    normalPrice: p.price, flashPrice: p.price, discount: 0,
     total, sold, remaining: Math.max(0, total - sold), revenue: p.price * sold,
-    status: "active" as FlashStatus, timeRange: `${startText} – ${endText}`,
-    startText, endText,
+    status: "active" as FlashStatus, timeRange: "—", startText: "", endText: "",
   };
 });
 
@@ -2546,9 +2624,10 @@ function OverviewTab({
   const { month, year, day } = cal;
   // Sales-report scope — lifted so its date picker can ride on the page title row.
   const [salesPeriod, setSalesPeriod] = useState<Period>("daily");
-  const [salesDate, setSalesDate] = useState<DateSel>(() => {
+  const [salesDate, setSalesDate] = useState<DateRange>(() => {
     const d = new Date();
-    return { day: d.getDate(), month: d.getMonth(), year: d.getFullYear() + 543 };
+    const today = { day: d.getDate(), month: d.getMonth(), year: d.getFullYear() + 543 };
+    return { start: today, end: today }; // start === end → single-point scope
   });
 
   // ----- Top-level KPI: depend on the selected month (monthly) or whole year.
@@ -3684,7 +3763,7 @@ const QT_TABS = [
 
 // ใบเสนอราคา — status filter chips + web-matching cards. The pushed subpage
 // hides the inline search (its app-bar button opens ShopQuoteSearch instead).
-export function QuotationSection({ showSearch = true, initialFilter }: { showSearch?: boolean; initialFilter?: string }) {
+export function QuotationSection({ showSearch = true, initialFilter, insetsBottom = 24 }: { showSearch?: boolean; initialFilter?: string; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof QT_TABS)[number]["id"]>(
@@ -3705,43 +3784,30 @@ export function QuotationSection({ showSearch = true, initialFilter }: { showSea
     );
   });
   return (
-    <View style={{ gap: 14 }}>
-      {/* Search — hidden on the pushed subpage (app-bar button → ShopQuoteSearch) */}
-      {showSearch ? (
-      <View
-        className="flex-row items-center"
-        style={{
-          backgroundColor: "white",
-          borderWidth: 1,
-          borderColor: DIVIDER_GRAY,
-          borderRadius: 999,
-          height: 44,
-          paddingLeft: 16,
-          paddingRight: 6,
-          gap: 8,
-        }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-          placeholder="ค้นหาเลขใบเสนอ ชื่อลูกค้า หรือสินค้า"
-          placeholderTextColor={TEXT_DISABLED}
-          value={query}
-          onChangeText={setQuery}
-        />
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="white" />
-        </View>
-      </View>
-      ) : null}
-
-      {/* Status filter chips — same pill language as the orders list (Fitts: 36px) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginHorizontal: -16 }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-      >
-        {QT_TABS.map((tb) => {
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      contentGap={14}
+      header={
+        showSearch ? (
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
+          >
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+              placeholder="ค้นหาเลขใบเสนอ ชื่อลูกค้า หรือสินค้า"
+              placeholderTextColor={TEXT_DISABLED}
+              value={query}
+              onChangeText={setQuery}
+            />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+              <Search size={16} color="white" />
+            </View>
+          </View>
+        ) : undefined
+      }
+      filters={QT_TABS.map((tb) => {
           const active = filter === tb.id;
           const c = count(tb.id);
           return (
@@ -3779,8 +3845,7 @@ export function QuotationSection({ showSearch = true, initialFilter }: { showSea
             </Pressable>
           );
         })}
-      </ScrollView>
-
+    >
       {visible.length === 0 ? (
         <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 10 }}>
           <ClipboardList size={40} color={BORDER_GRAY} strokeWidth={1.5} />
@@ -3789,7 +3854,7 @@ export function QuotationSection({ showSearch = true, initialFilter }: { showSea
       ) : (
         visible.map((d) => <QuotationCard key={d.id} doc={d} onOpenDetail={() => nav.navigate("ShopDocDetail", { doc: d, kind: "qt" })} />)
       )}
-    </View>
+    </StickyFilterList>
   );
 }
 
@@ -3911,12 +3976,15 @@ function PMCardSkeleton() {
 
 // ===================== FLASH SALE SECTION =====================
 const FLASH_RED = "#e62e05";
+// "ขายแล้ว" indicator orange (web flash gradient's orange stop) — the sold
+// dot + progress ring read as flash urgency, not the brand green.
+const FLASH_ORANGE = "#f97316";
 const FLASH_ICON = require("../../assets/flash/flash.png");
 const FLASH_COIN = require("../../assets/wallet-illust.png");
 const FLASH_TERMS_IMG = require("../../assets/flash/terms.png");
 
 // Platform event card — red (or gray if ended) gradient + status + item count.
-function FlashEventCard({ ev, onPress }: { ev: FlashEvent; onPress?: () => void }) {
+export function FlashEventCard({ ev, onPress, width = 230 }: { ev: FlashEvent; onPress?: () => void; width?: number | "100%" }) {
   const ended = ev.status === "ended";
   const Badge = () => {
     if (ev.status === "join") {
@@ -3927,18 +3995,7 @@ function FlashEventCard({ ev, onPress }: { ev: FlashEvent; onPress?: () => void 
       );
     }
     if (ev.status === "active" && ev.hms) {
-      return (
-        <View className="flex-row items-center" style={{ gap: 4 }}>
-          {ev.hms.map((n, i) => (
-            <View key={i} className="flex-row items-center" style={{ gap: 4 }}>
-              <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "#bc1b06", alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{String(n).padStart(2, "0")}</Text>
-              </View>
-              {i < 2 ? <Text style={{ fontSize: 14, fontWeight: "400", color: "#0a0a0a" }}>:</Text> : null}
-            </View>
-          ))}
-        </View>
-      );
+      return <CountdownTimer hms={ev.hms} />;
     }
     const label = ev.status === "pending" ? "เข้าร่วมแล้ว · รอเวลา" : "สิ้นสุดแล้ว";
     return (
@@ -3952,7 +4009,7 @@ function FlashEventCard({ ev, onPress }: { ev: FlashEvent; onPress?: () => void 
       onPress={onPress}
       disabled={!onPress}
       className={onPress ? "active:opacity-90" : undefined}
-      style={{ width: 230, borderRadius: 20, overflow: "hidden", shadowColor: ended ? "#525252" : FLASH_RED, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 12 }}
+      style={{ width, borderRadius: 20, overflow: "hidden", shadowColor: ended ? "#525252" : FLASH_RED, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 12 }}
     >
       <LinearGradient
         colors={ended ? ["rgba(115,115,115,0.85)", "#525252"] : ["rgba(230,46,5,0.82)", "#e62e05"]}
@@ -3989,7 +4046,7 @@ const FS_MUTED = "rgba(0,0,0,0.6)"; // stat labels / units
 const FS_DOT_GRAY = "#cdcdcd";     // "remaining" dot
 
 // Sold ring — white arc = sold/total over a translucent track (on the dark-green footer).
-function FlashRing({ pct, size }: { pct: number; size: number }) {
+function FlashRing({ pct, size, color = FLASH_ORANGE }: { pct: number; size: number; color?: string }) {
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -3999,7 +4056,7 @@ function FlashRing({ pct, size }: { pct: number; size: number }) {
       <Circle cx={size / 2} cy={size / 2} r={r} stroke="#e3e6e3" strokeWidth={stroke} fill="none" />
       <Circle
         cx={size / 2} cy={size / 2} r={r}
-        stroke={BRAND_GREEN} strokeWidth={stroke} fill="none" strokeLinecap="round"
+        stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={c * (1 - clamped)}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
@@ -4036,7 +4093,7 @@ function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; la
 
 // Flash product card — ported from Figma: green header (image + name + price/
 // discount/date pills) over a white footer (progress ring + sold/remaining/revenue).
-export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onMenu: () => void; dateText?: string }) {
+export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onMenu: (e: GestureResponderEvent) => void; dateText?: string }) {
   // Full date + time, web-style (e.g. "08 พ.ค. 69 00:00 - 09 พ.ค. 69 23:59").
   // Uses the product's own period; falls back to `dateText` (the event's period)
   // only when the product has no date yet (e.g. just added).
@@ -4045,8 +4102,10 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
   const ed = clean(p.endText);
   const own = !sd ? "" : !ed || sd === ed ? sd : `${sd} - ${ed}`;
   const dateRange = own || dateText || "";
-  const st = FLASH_STATUS_CFG[p.status]; // base tint + date color follow the status
-  const statusLabel = p.status === "active" ? "กำลังขาย" : p.status === "soldout" ? "สินค้าหมด" : "ล่วงหน้า";
+  // Not joined to any flash event → neutral gray state (no urgency colors).
+  const joined = !!p.eventId || p.discount > 0 || !!p.discountText;
+  const st = joined ? FLASH_STATUS_CFG[p.status] : { label: "ยังไม่เข้าร่วม", color: "#6b7280" }; // base tint + date color follow the status
+  const statusLabel = !joined ? "ยังไม่เข้าร่วม" : p.status === "active" ? "กำลังขาย" : p.status === "soldout" ? "สินค้าหมด" : "ล่วงหน้า";
   // Measure the widest status label so every card's status block is the same, snug width.
   const [labelW, setLabelW] = useState(0);
   const measureLabel = (e: LayoutChangeEvent) => {
@@ -4056,11 +4115,7 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
   return (
     <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
     <LinearGradient colors={[st.color + "26", st.color + "12"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
-    <Pressable
-      onPress={onMenu}
-      className="active:opacity-95"
-      style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}
-    >
+    <View style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}>
       {/* Header — image + name + price/-% + 3-dot */}
       <View className="flex-row" style={{ gap: 12 }}>
         <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: SURFACE_GRAY }}>
@@ -4079,13 +4134,20 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
             </Pressable>
           </View>
           <View className="flex-row items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-            <View className="flex-row items-baseline" style={{ gap: 8 }}>
-              <Text style={{ fontSize: 16, fontWeight: "700", color: FS_DISCOUNT_RED }}>฿{p.flashPrice.toLocaleString()}</Text>
-              <Text style={{ fontSize: 14, color: TEXT_DISABLED, textDecorationLine: "line-through" }}>฿{p.normalPrice.toLocaleString()}</Text>
-            </View>
-            <View style={{ backgroundColor: "rgba(230,46,5,0.1)", borderRadius: 999, paddingHorizontal: 8, height: 22, justifyContent: "center" }}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: FS_DISCOUNT_RED }}>{p.discountText ?? `-${p.discount}%`}</Text>
-            </View>
+            {p.discount > 0 || p.discountText ? (
+              <>
+                <View className="flex-row items-baseline" style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: FS_DISCOUNT_RED }}>฿{p.flashPrice.toLocaleString()}</Text>
+                  <Text style={{ fontSize: 14, color: TEXT_DISABLED, textDecorationLine: "line-through" }}>฿{p.normalPrice.toLocaleString()}</Text>
+                </View>
+                <View style={{ backgroundColor: "rgba(230,46,5,0.1)", borderRadius: 999, paddingHorizontal: 8, height: 22, justifyContent: "center" }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: FS_DISCOUNT_RED }}>{p.discountText ?? `-${p.discount}%`}</Text>
+                </View>
+              </>
+            ) : (
+              /* Regular (non-flash) listing — plain price, no urgency red */
+              <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>฿{p.flashPrice.toLocaleString()}</Text>
+            )}
           </View>
         </View>
       </View>
@@ -4094,7 +4156,9 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
 
       {/* Stats */}
       <View className="flex-row items-start justify-between">
-        <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={p.sold.toLocaleString()} unit="ชิ้น" />
+        {/* Shop's own flash product (no eventId) = green; an app round's
+            product (eventId) = flash orange — matches its summary card. */}
+        <FSStat dot={p.eventId ? FLASH_ORANGE : BRAND_GREEN} label="ขายแล้ว" value={p.sold.toLocaleString()} unit="ชิ้น" />
         {/* คงเหลือ — with a smaller/gray "/total" behind */}
         <View style={{ gap: 8 }}>
           <View className="flex-row items-center" style={{ gap: 8 }}>
@@ -4109,11 +4173,11 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
         </View>
         <FSStat label="ยอดขาย" value={p.revenue.toLocaleString()} unit="บาท" />
       </View>
-    </Pressable>
+    </View>
 
     {/* Hidden measurers — widest status label sets the block width */}
     <View style={{ position: "absolute", opacity: 0 }} pointerEvents="none">
-      {["กำลังขาย", "สินค้าหมด", "ล่วงหน้า"].map((l) => (
+      {["กำลังขาย", "สินค้าหมด", "ล่วงหน้า", "ยังไม่เข้าร่วม"].map((l) => (
         <Text key={l} onLayout={measureLabel} style={{ fontSize: 12, fontWeight: "700" }}>{l}</Text>
       ))}
     </View>
@@ -4124,55 +4188,339 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
         <Package size={13} color={st.color} strokeWidth={2.4} />
         <Text style={{ fontSize: 12, fontWeight: "700", color: st.color }} numberOfLines={1}>{statusLabel}</Text>
       </View>
-      <View className="flex-row items-center" style={{ gap: 5, flexShrink: 1 }}>
-        <Calendar size={13} color={st.color} strokeWidth={2.2} />
-        <Text style={{ fontSize: 12, fontWeight: "600", color: st.color }} numberOfLines={1}>{dateRange}</Text>
-      </View>
+      {joined ? (
+        <View className="flex-row items-center" style={{ gap: 5, flexShrink: 1 }}>
+          <Calendar size={13} color={st.color} strokeWidth={2.2} />
+          <Text style={{ fontSize: 12, fontWeight: "600", color: st.color }} numberOfLines={1}>{dateRange}</Text>
+        </View>
+      ) : (
+        <Text style={{ fontSize: 12, fontWeight: "600", color: st.color, flexShrink: 1 }} numberOfLines={1}>กด ⋯ เพื่อเพิ่มเข้า Flash Sale</Text>
+      )}
     </View>
     </LinearGradient>
     </View>
   );
 }
 
-// Sales-summary card — flash-red header (revenue + item count) over a white base
-// with the sold ring + sold/remaining totals. Data = whatever product list it's given.
-export function FlashSummaryCard({ products }: { products: FlashProduct[] }) {
-  const sumSold = products.reduce((s, p) => s + p.sold, 0);
-  const sumRemaining = products.reduce((s, p) => s + p.remaining, 0);
-  const sumRevenue = products.reduce((s, p) => s + p.revenue, 0);
-  const sumTotal = sumSold + sumRemaining;
-  return (
-    <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
-      <LinearGradient colors={["#ffffff", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
-        <LinearGradient colors={["#e62e05", "rgba(230,46,5,0.82)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
-          <Image source={FLASH_COIN} style={{ position: "absolute", right: 4, bottom: 4, width: 120, height: 120, opacity: 0.95 }} resizeMode="contain" />
-          <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>ยอดขาย</Text>
-          <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>฿{sumRevenue.toLocaleString()}</Text>
-          <View style={{ gap: 2 }}>
-            <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>สินค้าในร้านที่เข้าร่วม Flash Sale</Text>
-            <Text style={{ fontSize: 18, fontWeight: "800", color: "rgba(255,255,255,0.9)" }}>{products.length} รายการ</Text>
-          </View>
-        </LinearGradient>
+/* ---- เดือน/ปี filter — pill + the app-standard wheel-drum modal ---- */
 
-        <View className="flex-row items-center" style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
-          <FlashRing pct={sumTotal > 0 ? sumSold / sumTotal : 0} size={40} />
-          <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
-            <FSStat dot={BRAND_GREEN} label="ขายแล้ว" value={sumSold.toLocaleString()} unit="ชิ้น" />
-            {/* คงเหลือ — with a smaller/gray "/total" behind */}
-            <View style={{ gap: 8 }}>
-              <View className="flex-row items-center" style={{ gap: 8 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
-                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
-              </View>
-              <View className="flex-row items-baseline" style={{ gap: 2 }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{sumRemaining.toLocaleString()}</Text>
-                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{sumTotal.toLocaleString()}</Text>
-                <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
-              </View>
+const FLASH_TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const FLASH_YEARS = [2568, 2569, 2570];
+
+export function FlashMonthPicker({ month, year, onChange }: {
+  month: number; // 1-12
+  year: number;  // พ.ศ.
+  onChange: (month: number, year: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // Pending wheel values — commit only on ตกลง (same contract as the other
+  // wheel pickers: scrolling never mutates live state).
+  const [pM, setPM] = useState(month - 1);
+  const [pY, setPY] = useState(Math.max(0, FLASH_YEARS.indexOf(year)));
+  const openModal = () => {
+    setPM(month - 1);
+    setPY(Math.max(0, FLASH_YEARS.indexOf(year)));
+    setOpen(true);
+  };
+  return (
+    <>
+      {/* Trigger — same Liquid Glass material + 44px height as the app-bar
+          GlassIconButtons, stretched into a capsule to fit the label. */}
+      <Pressable onPress={openModal} hitSlop={8}>
+        <GlassView
+          glassEffectStyle="regular"
+          colorScheme="light"
+          isInteractive
+          style={{ height: 44, borderRadius: 22, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 6 }}
+        >
+          <Calendar size={16} color="#1a1a1a" strokeWidth={2.2} />
+          <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#1a1a1a" }}>{FLASH_TH_MONTHS[month - 1]} {year}</Text>
+          <ChevronDown size={15} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassView>
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
+          <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ textAlign: "center", fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>เลือกเดือน</Text>
+              <Pressable onPress={() => setOpen(false)} hitSlop={10} className="active:opacity-60" style={{ position: "absolute", right: 2, top: 0 }}>
+                <X size={22} color="#9ca3af" strokeWidth={2.2} />
+              </Pressable>
             </View>
-          </View>
-        </View>
-      </LinearGradient>
+            <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+            <View style={{ marginVertical: 4 }}>
+              <WheelHighlight />
+              <View className="flex-row">
+                <Wheel items={FLASH_TH_MONTHS} index={pM} onChange={setPM} />
+                <Wheel items={FLASH_YEARS.map((y) => `${y}`)} index={pY} onChange={setPY} />
+              </View>
+              <WheelFades />
+            </View>
+            <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+            <View className="flex-row items-center" style={{ marginTop: 14, gap: 10 }}>
+              <Pressable onPress={() => setOpen(false)} className="active:opacity-60" style={{ flex: 1, height: 46, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#9ca3af" }}>ยกเลิก</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { setOpen(false); onChange(pM + 1, FLASH_YEARS[pY]); }}
+                className="active:opacity-85"
+                style={{ flex: 1.4, height: 46, borderRadius: 999, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>ตกลง</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+// Summary carousel — WHOLE cards swipe (gradient header + stats strip travel
+// together), with neighbors peeking in from both edges. Page 1 = the SHOP's
+// own flash sale (ร้านจัดเอง, brand green), further pages = one card per
+// APP-run Flash Sale round the shop can join (flash red).
+export function FlashSummaryCard({ products, events = FLASH_EVENTS, focusKey, onPageChange, onAdd }: {
+  products: FlashProduct[];
+  /** Round list (host may overlay local join-state on FLASH_EVENTS). */
+  events?: FlashEvent[];
+  /** When set/changed, the carousel scrolls to that card (e.g. after joining). */
+  focusKey?: string | null;
+  onPageChange?: (key: string) => void;
+  /** "＋ เพิ่มสินค้า" on a joined card — key = "all" | event id. */
+  onAdd?: (key: string, e: GestureResponderEvent) => void;
+}) {
+  // Shop-RUN flash (ร้านจัดเอง) = products with no eventId; every product with
+  // an eventId belongs to one of the app's rounds (the red cards).
+  const shopFlash = products.filter((p) => !p.eventId);
+  const sumSold = shopFlash.reduce((s, p) => s + p.sold, 0);
+  const sumRemaining = shopFlash.reduce((s, p) => s + p.remaining, 0);
+  const sumRevenue = shopFlash.reduce((s, p) => s + p.revenue, 0);
+
+  const [w, setW] = useState(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const lastIdx = useRef(0);
+  const [activeIdx, setActiveIdx] = useState(0); // which card is centered (zIndex)
+  const carouselRef = useRef<ScrollView>(null);
+
+  type SummaryPage = {
+    key: string;
+    label: string;        // small line ABOVE the heading — date range on event pages
+    heading: string;      // big line — "Flash Sale ร้านค้า" / app round name
+    revenue: number;
+    art: ImageSourcePropType; // wallet = shop-run flash, lightning = app round
+    /** none = ยังไม่เข้าร่วม, waiting = เข้าร่วมแล้วรอเวลา, running = countdown */
+    status: "shop" | "none" | "waiting" | "running";
+    hms?: [number, number, number];
+    joined: number;
+    sold: number;
+    remaining: number;
+  };
+  const pages: SummaryPage[] = [
+    {
+      key: "all",
+      label: "จัดโดยร้านของคุณ",
+      heading: "Flash Sale ร้านค้า",
+      revenue: sumRevenue,
+      art: FLASH_COIN,
+      status: "shop" as const,
+      joined: shopFlash.length,
+      sold: sumSold,
+      remaining: sumRemaining,
+    },
+    // EVERY round (joined or not) gets a card — not-joined ones invite joining.
+    ...events.filter((ev) => ev.status !== "ended").map((ev) => {
+      const evProducts = products.filter((x) => x.eventId === ev.id);
+      const joinedRound = ev.status === "active" || ev.status === "pending";
+      return {
+        key: ev.id,
+        label: ev.dateRange,
+        heading: ev.name,
+        revenue: evProducts.reduce((sum, x) => sum + x.revenue, 0),
+        art: FLASH_ICON,
+        status: (ev.status === "active" ? "running" : joinedRound ? "waiting" : "none") as SummaryPage["status"],
+        hms: ev.hms,
+        joined: evProducts.length,
+        sold: evProducts.reduce((sum, x) => sum + x.sold, 0),
+        remaining: evProducts.reduce((sum, x) => sum + x.remaining, 0),
+      };
+    }),
+  ];
+
+  // CENTERED peek geometry — the active card sits centered in the full-bleed
+  // viewport (w + 32) with equal side margins, so neighbors peek in EQUALLY
+  // from both edges (visible peek per side = SIDE - GAP).
+  // SIDE is sized so neighbors stay visible even after their 0.93 shrink
+  // (shrink pulls each near-edge inward by ~3.5% of card width).
+  // The neighbor daylight budget is (SIDE − 16): peek + gap can't exceed it.
+  // At SIDE 28 the budget was only ~12px, so a 4–8px gap left almost no peek
+  // and the side cards vanished. SIDE 42 restores a ~22px visible peek while
+  // keeping the small gap (focused card only ~14px narrower per side).
+  const GAP = 10, SIDE = 42;
+  const viewportW = w + 32; // scroller is full-bleed via marginHorizontal -16
+  const cardW = Math.max(0, viewportW - SIDE * 2);
+  const step = cardW + GAP;
+
+  // Neighbor daylight is set EXACTLY, not eyeballed: scaling a neighbor to
+  // NEIGHBOR_SCALE pulls its near edge inward by (1−scale)/2·cardW, and the
+  // layout already leaves GAP between cards. peekNudge cancels both and leaves
+  // precisely DESIRED_GAP px — device-independent (cardW is known here).
+  const NEIGHBOR_SCALE = 0.92;
+  const DESIRED_GAP = 4;
+  const scaleInset = ((1 - NEIGHBOR_SCALE) / 2) * cardW;
+  const peekNudge = Math.max(0, GAP + scaleInset - DESIRED_GAP);
+  // Enlarge ONLY the focused card, via scale about its own center. Neighbors
+  // keep their exact position + peek (their scale/nudge are unchanged), so
+  // growing the focus never pushes them out — it just grows over the gap. The
+  // focused card gets a higher zIndex (activeIdx) so it sits on top where it
+  // laps its neighbors' near edges.
+  const FOCUS_SCALE = 1.08;
+
+  // Jump to a requested card (e.g. right after joining that round).
+  useEffect(() => {
+    if (!focusKey || step <= 0) return;
+    const idx = pages.findIndex((x) => x.key === focusKey);
+    if (idx >= 0) carouselRef.current?.scrollTo({ x: idx * step, animated: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, step]);
+
+  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+    useNativeDriver: true,
+    listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const i = Math.max(0, Math.min(pages.length - 1, Math.round(e.nativeEvent.contentOffset.x / step)));
+      if (i !== lastIdx.current) {
+        lastIdx.current = i;
+        setActiveIdx(i); // lifts the focused card above its neighbors (zIndex)
+        Haptics.selectionAsync();
+        onPageChange?.(pages[i].key); // list below rescopes to this card
+      }
+    },
+  });
+
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {w > 0 ? (
+        <Animated.ScrollView
+          ref={carouselRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={step}
+          decelerationRate="fast"
+          // Full-bleed with padded content + negative margins — gives the card
+          // shadows room to render instead of being clipped at the scroll bounds.
+          // marginBottom only claws back 6 of the 24px pad: the sticky filter
+          // bar below has an OPAQUE bg that would otherwise paint over the
+          // card's ~18px drop shadow.
+          style={{ marginHorizontal: -16, marginTop: 4, marginBottom: -6 }}
+          contentContainerStyle={{ gap: GAP, paddingHorizontal: SIDE }}
+          removeClippedSubviews={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
+          {pages.map((pg, pi) => {
+            const total = pg.sold + pg.remaining;
+            // Cover-flow depth — cards sit on a virtual WHEEL rotating about
+            // the vertical axis: the focused card faces you flat; neighbors
+            // twist inward (rotateY), shrink and dim as they recede around the
+            // curve. All interpolated from scrollX so dragging feels like
+            // spinning the wheel, not sliding a strip.
+            const range = [(pi - 1) * step, pi * step, (pi + 1) * step];
+            const rotateY = scrollX.interpolate({ inputRange: range, outputRange: ["-26deg", "0deg", "26deg"], extrapolate: "clamp" });
+            const scale = scrollX.interpolate({ inputRange: range, outputRange: [NEIGHBOR_SCALE, FOCUS_SCALE, NEIGHBOR_SCALE], extrapolate: "clamp" });
+            // Neighbors also slide TOWARD the center so their near edge stays
+            // clearly in view — the "there's more to swipe" affordance.
+            // Nudge = peekNudge (computed from the real cardW above) so the
+            // daylight is exactly DESIRED_GAP on any screen.
+            const nudgeX = scrollX.interpolate({ inputRange: range, outputRange: [-peekNudge, 0, peekNudge], extrapolate: "clamp" });
+            const cardOpacity = scrollX.interpolate({ inputRange: range, outputRange: [0.78, 1, 0.78], extrapolate: "clamp" });
+            return (
+              <View key={pg.key} style={{ paddingVertical: 24, zIndex: pi === activeIdx ? 2 : 1 }}>
+              <Animated.View style={{ width: cardW, borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3, opacity: pg.status === "none" ? 1 : cardOpacity, transform: [{ perspective: 900 }, { translateX: nudgeX }, { rotateY }, { scale }] }}>
+                {/* Same spacing rhythm as the original summary card: padding 14,
+                    gap 8 between blocks, tight gap 2 inside the label+value pair */}
+                {/* Shop-RUN flash (ร้านจัดเอง) = brand green; the APP's rounds
+                    = flash red — the color IS the mode signal. */}
+                <LinearGradient colors={pg.key === "all" ? [BRAND_GREEN_DARK, BRAND_GREEN] : ["#e62e05", "rgba(230,46,5,0.82)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
+                  <Image source={pg.art} style={pg.key === "all"
+                    // wallet PNG carries transparent padding — render larger +
+                    // lower so its VISIBLE size/baseline matches the lightning
+                    ? { position: "absolute", right: -2, bottom: -14, width: 136, height: 136, opacity: 0.95 }
+                    : { position: "absolute", right: 4, bottom: 4, width: 120, height: 120, opacity: 0.95 }} resizeMode="contain" />
+                  <View style={{ gap: 2 }}>
+                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }} numberOfLines={1}>{pg.label}</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "800", color: "rgba(255,255,255,0.95)" }}>{pg.heading}</Text>
+                  </View>
+                  {/* Top-right = STATUS: countdown / รอเวลา / ยังไม่เข้าร่วม */}
+                  <View style={{ position: "absolute", top: 12, right: 12 }}>
+                    {pg.status === "running" && pg.hms ? (
+                      <CountdownTimer hms={pg.hms} />
+                    ) : pg.status === "waiting" ? (
+                      <View style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.55)", backgroundColor: "rgba(255,255,255,0.14)", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#fff" }}>เข้าร่วมแล้ว · รอเวลา</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>ยอดขาย</Text>
+                  <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>฿{pg.revenue.toLocaleString()}</Text>
+                </LinearGradient>
+
+                {/* Stats strip — SAME structure on every card (zeros when the
+                    round has no products) so swiping never shifts the layout */}
+                <View className="flex-row items-center" style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+                  {/* Shop's own flash (green card) keeps GREEN accents; the
+                      app's rounds (red cards) use flash orange — the sold
+                      indicator colour reinforces which kind of round it is. */}
+                  <FlashRing pct={total > 0 ? pg.sold / total : 0} size={40} color={pg.key === "all" ? BRAND_GREEN : FLASH_ORANGE} />
+                  <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
+                    <FSStat label="เข้าร่วม" value={pg.joined.toLocaleString()} unit="รายการ" />
+                    <FSStat dot={pg.key === "all" ? BRAND_GREEN : FLASH_ORANGE} label="ขายแล้ว" value={pg.sold.toLocaleString()} unit="ชิ้น" />
+                    {/* คงเหลือ — with a smaller/gray "/total" behind */}
+                    <View style={{ gap: 8 }}>
+                      <View className="flex-row items-center" style={{ gap: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#c9cdc9" }} />
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>คงเหลือ</Text>
+                      </View>
+                      <View className="flex-row items-baseline" style={{ gap: 2 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a" }}>{pg.remaining.toLocaleString()}</Text>
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)" }}>/{total.toLocaleString()}</Text>
+                        <Text style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginLeft: 6 }}>ชิ้น</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* NOT-joined round: lower half (ยอดขาย → stats) blurred with
+                    the join CTA floating on top — numbers tease behind glass */}
+                {pg.status === "none" ? (
+                  /* NOT-joined round — PURE blur, no material/tint layer:
+                     expo-blur's UIVisualEffectView (needs the dev client built
+                     on/after 2026-07-08 — older clients lack ExpoBlur and
+                     crash). Joining happens on the list-head CTA. */
+                  <View
+                    pointerEvents="none"
+                    style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, overflow: "hidden" }}
+                  >
+                    <BlurView
+                      intensity={16}
+                      tint="default"
+                      style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+                    >
+                      {/* Dark pill lifts the label off the busy blurred red —
+                         plain white text was sinking into it. */}
+                      <View style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" }}>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>ยังไม่เข้าร่วม</Text>
+                      </View>
+                    </BlurView>
+                  </View>
+                ) : null}
+              </Animated.View>
+              </View>
+            );
+          })}
+        </Animated.ScrollView>
+      ) : null}
+
     </View>
   );
 }
@@ -4201,30 +4549,121 @@ function FlashCardSkeleton() {
   );
 }
 
-export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number }) {
+export function FlashSaleSection({ insetsBottom = 16, month = 7, year = 2569 }: {
+  insetsBottom?: number;
+  /** เดือน/ปี filter — owned by the host header (pill sits next to search). */
+  month?: number;
+  year?: number;
+}) {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | FlashStatus>("all");
-  const [query, setQuery] = useState("");
   // Local mutable copy so editing from the ⋯ sheet updates the list.
-  const [items, setItems] = useState<FlashProduct[]>(FLASH_PRODUCTS);
+  // App-round products (eventId) + the shop's own flash products (no eventId).
+  const [items, setItems] = useState<FlashProduct[]>([...FLASH_PRODUCTS, ...SHOP_FLASH_PRODUCTS]);
   const [menuFor, setMenuFor] = useState<FlashProduct | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<CardMenuAnchor | null>(null);
+  const rootRef = useRef<View>(null);
   const [termsFor, setTermsFor] = useState<FlashEvent | null>(null); // join terms sheet
+  // Local join-state overlay — joining flips a round to "pending" so its card
+  // unblurs and gains the add CTA, without any separate detail page.
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
+  const events = useMemo(
+    () => FLASH_EVENTS.map((ev) => (joinedIds.has(ev.id) ? { ...ev, status: "pending" as FlashEventStatus, itemCount: Math.max(1, ev.itemCount) } : ev)),
+    [joinedIds],
+  );
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  // เดือน/ปี filter (from the header pill) — app rounds show only in their
+  // month; the shop's own flash card is ALWAYS there, its numbers just follow
+  // the selected month.
+  const monthEvents = useMemo(() => events.filter((ev) => ev.month === month && ev.year === year), [events, month, year]);
+  // Per-month mock: the live month (ก.ค. 2569) shows the real store; other
+  // months scale each shop-flash product's numbers by a deterministic factor
+  // so browsing history reads as real month-by-month variation.
+  const viewItems = useMemo(() => {
+    if (month === 7 && year === 2569) return items;
+    const f = [0.35, 0.55, 0.75, 0.95, 1.15, 0.65][(month + year) % 6];
+    return items.map((p) => {
+      if (p.eventId) return p;
+      const sold = Math.min(p.total, Math.round(p.sold * f));
+      return { ...p, sold, remaining: p.total - sold, revenue: p.flashPrice * sold };
+    });
+  }, [items, month, year]);
+  // Month changed from the header → the previous month's round may not exist
+  // here; snap the scope back to the shop card.
+  useEffect(() => {
+    setScope("all");
+    setFocusKey(null);
+  }, [month, year]);
+  // "เพิ่มสินค้า" from a summary card. App-round card → straight into that
+  // round (dates locked). Shop-flash (green) card → picker with editable dates.
+  const goAdd = (ev: FlashEvent) =>
+    nav.navigate("FlashAddProduct", {
+      eventDate: ev.dateRange,
+      onDone: (np) =>
+        setItems((prev) => [
+          // Joining a RUNNING round sells immediately; future rounds schedule.
+          { ...np, eventId: ev.id, status: (ev.status === "active" ? "active" : "scheduled") as FlashStatus },
+          ...prev.filter((x) => x.id !== np.id),
+        ]),
+    });
+  const onSummaryAdd = (key: string) => {
+    const ev = events.find((x) => x.id === key);
+    if (ev) return goAdd(ev);
+    // Shop's OWN flash (green card) → straight to the product picker with the
+    // dates editable: the shop runs this round itself.
+    nav.navigate("FlashAddProduct", {
+      onDone: (np) =>
+        setItems((prev) => [
+          { ...np, status: "active" as FlashStatus },
+          ...prev.filter((x) => x.id !== np.id),
+        ]),
+    });
+  };
+
+  // ⋯ menu opens as the iOS morph card ANCHORED at the tap (same AppleMenu
+  // pattern as the coupon/promotion detail pages), not a bottom sheet.
+  const openMenu = (p: FlashProduct, e: GestureResponderEvent) => {
+    const { pageX, pageY } = e.nativeEvent;
+    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
+      const anchor = cardMenuAnchor(pageX, pageY, rx, ry, rw, rh);
+      setMenuAnchor(anchor);
+      setMenuFor(p);
+    });
+  };
   const filters: { id: "all" | FlashStatus; label: string; Icon: typeof Package }[] = [
     { id: "all", label: "ทั้งหมด", Icon: Package },
     { id: "active", label: "กำลังขาย", Icon: Zap },
     { id: "soldout", label: "สินค้าหมด", Icon: AlertTriangle },
     { id: "scheduled", label: "กำหนดไว้", Icon: Clock },
   ];
-  const count = (id: "all" | FlashStatus) => (id === "all" ? items.length : items.filter((p) => p.status === id).length);
-  const q = query.trim().toLowerCase();
-  const visible = items.filter((p) => (filter === "all" || p.status === filter) && (!q || p.name.toLowerCase().includes(q)));
+  // Active summary card scopes the WHOLE list: green card = the shop's OWN
+  // flash products (no eventId), an event id = only that app round's products.
+  // Not-joined products don't appear here — adding goes through the dashed CTA
+  // card (which opens the full product picker).
+  const [scope, setScope] = useState<string>("all");
+  const scopeEvent = monthEvents.find((ev) => ev.id === scope);
+  const scoped = scopeEvent
+    ? viewItems.filter((p) => p.eventId === scopeEvent.id)
+    : viewItems.filter((p) => !p.eventId);
+  const count = (id: "all" | FlashStatus) => (id === "all" ? scoped.length : scoped.filter((p) => p.status === id).length);
+  // Search moved to the app-bar button (ShopFlashSearch page) — the section only filters.
+  const visible = scoped.filter((p) => filter === "all" || p.status === filter);
 
-  // Paginate: 10 cards per page, "ดูเพิ่มเติม" reveals the next 10. Resets when
-  // the filter/search changes so a new context starts from the first page.
+  // Paginate: 10 cards per page, revealed by the infinite scroll. Resets when
+  // the filter changes so a new context starts from the first page.
   const PAGE = 10;
   const [shownCount, setShownCount] = useState(PAGE);
   const [loadingMore, setLoadingMore] = useState(false);
-  useEffect(() => setShownCount(PAGE), [filter, q]);
+  useEffect(() => setShownCount(PAGE), [filter, scope]);
+  // Skeleton beat whenever the scope changes (swiping the summary carousel to
+  // another round, switching month, or changing the filter) — the list below
+  // is "reloading" that context, so flash skeletons for ~400ms as feedback.
+  const [scopeLoading, setScopeLoading] = useState(false);
+  useEffect(() => {
+    setScopeLoading(true);
+    const t = setTimeout(() => setScopeLoading(false), 400);
+    return () => clearTimeout(t);
+  }, [scope, filter, month, year]);
   const shown = visible.slice(0, shownCount);
   const moreLeft = visible.length - shown.length;
   const loadMore = () => {
@@ -4233,159 +4672,113 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
     // Brief skeleton beat (300ms rule) before revealing the next page.
     setTimeout(() => { setShownCount((n) => n + PAGE); setLoadingMore(false); }, 350);
   };
-  // Sticky state — the search shortcut appears only once the filter bar is pinned
-  // (i.e. the header block above it has scrolled away).
-  const [stuck, setStuck] = useState(false);
-  const headerH = useRef(0);
-  const offsetY = useRef(0);
-  // Infinite scroll — auto-load when the user nears the bottom (200px early).
-  const onListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-    offsetY.current = contentOffset.y;
-    const nowStuck = headerH.current > 0 && contentOffset.y >= headerH.current - 1;
-    setStuck(nowStuck);
-    if (!nowStuck && searchOpen) setSearchOpenAnimated(false); // top search field is visible again — collapse
-    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) loadMore();
-  };
-  // Filter tap → jump back to the first card of the new context (list top, just
-  // under the pinned bar). Deferred one frame so the scroll clamps against the
-  // NEW (possibly shorter) list — scrolling before re-render made short filters
-  // land at the very top. Skips the scroll when the user is already above it.
-  const pickFilter = (id: "all" | FlashStatus) => {
-    setFilter(id);
-    if (offsetY.current > headerH.current) {
-      // Deferred one frame so the slide clamps against the NEW list, then glide up.
-      requestAnimationFrame(() => listRef.current?.scrollTo({ y: headerH.current, animated: true }));
-    }
-  };
-  // Sticky-bar search — tapping the icon expands an inline search field in place
-  // of the filter pills (no jump back to the top field).
-  const listRef = useRef<ScrollView>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  // Smooth expand/collapse (200ms ease) — the bar morphs instead of snapping.
-  const animateBar = () =>
-    LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
-  const setSearchOpenAnimated = (open: boolean) => {
-    animateBar();
-    setSearchOpen(open);
-  };
-  const openStickySearch = () => {
-    Haptics.selectionAsync();
-    setSearchOpenAnimated(true);
-  };
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView
-        ref={listRef}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-        onScroll={onListScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: insetsBottom }}
-      >
-        {/* [0] Events strip + search (scrolls away) */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 16 }} onLayout={(e) => { headerH.current = e.nativeEvent.layout.height; }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
-            {FLASH_EVENTS.map((ev) => (
-              <FlashEventCard
-                key={ev.id}
-                ev={ev}
-                onPress={ev.status === "join"
-                  ? () => setTermsFor(ev)
-                  : () => nav.navigate("FlashEventDetail", { name: ev.name, dateRange: ev.dateRange, joined: true })}
-              />
-            ))}
-          </ScrollView>
-
-          <View className="flex-row items-center" style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 8, gap: 8 }}>
-            <TextInput style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }} placeholder="ค้นหาสินค้า Flash Sale" placeholderTextColor={TEXT_DISABLED} value={query} onChangeText={setQuery} />
-            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-              <Search size={16} color="white" />
-            </View>
-          </View>
-        </View>
-
-        {/* [1] Filter pills — STICKY (bg so content scrolls under it) + search shortcut
-            (leading icon, only while the bar is pinned) */}
-        <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", paddingTop: 12, paddingBottom: 12, paddingLeft: 16 }}>
-          {stuck && searchOpen ? (
-            /* Expanded inline search — replaces the pills while open */
-            <View className="flex-row items-center" style={{ flex: 1, marginRight: 16, backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 36, paddingLeft: 14, paddingRight: 4, gap: 8 }}>
-              <Search size={14} color={TEXT_MUTED} strokeWidth={2.2} />
-              <TextInput
-                autoFocus
-                style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-                placeholder="ค้นหาสินค้า Flash Sale"
-                placeholderTextColor={TEXT_DISABLED}
-                value={query}
-                onChangeText={setQuery}
-                onBlur={() => setSearchOpenAnimated(false)} // leaving the field collapses it — no close tap needed
-                returnKeyType="search"
-              />
-            </View>
-          ) : (
-            <>
-          {stuck ? (
-            /* Same 36px height as the filter pills; explicit 12px space before the pills */
-            /* Green ring while a query is active — reminds the user a search is applied */
-            <Pressable
-              onPress={openStickySearch}
-              hitSlop={8}
-              className="items-center justify-center active:opacity-70"
-              style={{ width: 36, height: 36, borderRadius: 18, marginRight: 12, backgroundColor: q ? "rgba(49,151,84,0.08)" : "white", borderWidth: q ? 1.5 : 1, borderColor: q ? BRAND_GREEN : DIVIDER_GRAY }}
-            >
-              <Search size={16} color={q ? BRAND_GREEN : TEXT_MUTED} strokeWidth={2.2} />
-            </Pressable>
-          ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
-            {filters.map(({ id, label, Icon }) => {
-              const active = filter === id;
-              return (
-                <Pressable key={id} onPress={() => pickFilter(id)} className="flex-row items-center active:opacity-80"
-                  style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, gap: 8, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}>
-                  <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
-                  <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
-                  <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count(id)}</Text>
+    <View ref={rootRef} style={{ flex: 1 }}>
+      <StickyFilterList
+        filterKey={`${scope}:${filter}`}
+        insetsBottom={insetsBottom}
+        onEndReached={loadMore}
+        header={
+          /* Summary carousel + the scope CTA — BOTH sit ABOVE the sticky
+             filter so "add/join" clearly belongs to the summary card's scope
+             (this round/shop), NOT the status filter selected below. Placing
+             it under the filter read as "add into this filter" (Law of
+             Proximity) and confused users.
+             paddingBottom reserves room for the join CTA's red drop shadow —
+             without it the sticky filter bar's opaque #fafafa bg (next sibling)
+             paints straight over the shadow. */
+          <View style={{ gap: 14, paddingBottom: 14 }}>
+            <FlashSummaryCard
+              key={`${month}-${year}`}
+              products={viewItems}
+              events={monthEvents}
+              focusKey={focusKey}
+              onPageChange={setScope}
+              onAdd={onSummaryAdd}
+            />
+            {scopeEvent?.status === "join" ? (
+              /* เข้าร่วม — the ONE prominent CTA: solid red gradient + shadow. */
+              <Pressable
+                onPress={() => setTermsFor(scopeEvent)}
+                className="active:opacity-85"
+                style={{ borderRadius: 24, boxShadow: "0px 6px 14px rgba(230,46,5,0.32)", elevation: 4 }}
+              >
+                <LinearGradient
+                  colors={["#e62e05", "rgba(230,46,5,0.82)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ height: 56, borderRadius: 24, gap: 8, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+                >
+                  <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center" }}>
+                    <Zap size={15} color="#fff" strokeWidth={2.8} />
                   </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-            </>
-          )}
-        </View>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>เข้าร่วม Flash Sale</Text>
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              /* Add entry — dashed card, color follows the scope (green = shop's
+                 own flash, red = app round with dates locked). */
+              <Pressable
+                onPress={() => (scopeEvent ? goAdd(scopeEvent) : onSummaryAdd("all"))}
+                className="flex-row items-center justify-center active:opacity-70"
+                style={{ height: 56, borderRadius: 24, borderWidth: 1.5, borderStyle: "dashed", borderColor: scopeEvent ? "#f2b5a8" : "#b7dfc5", backgroundColor: "#fff", gap: 6 }}
+              >
+                <Plus size={16} color={scopeEvent ? FLASH_RED : BRAND_GREEN} strokeWidth={2.6} />
+                <Text style={{ fontSize: 14, fontWeight: "700", color: scopeEvent ? FLASH_RED : BRAND_GREEN }}>เพิ่มสินค้าเข้า</Text>
+              </Pressable>
+            )}
+          </View>
+        }
+        filters={filters.map(({ id, label, Icon }) => {
+          const active = filter === id;
+          return (
+            <Pressable key={id} onPress={() => setFilter(id)} className="flex-row items-center active:opacity-80"
+              style={{ height: 36, paddingHorizontal: 16, borderRadius: 999, gap: 8, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}>
+              <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
+              <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
+              <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count(id)}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      >
+        {scopeLoading ? (
+          /* Scope-change beat — skeleton cards while the new context "loads" */
+          <>
+            <FlashCardSkeleton />
+            <FlashCardSkeleton />
+            <FlashCardSkeleton />
+          </>
+        ) : visible.length === 0 ? (
+          /* Empty state — on a NOT-yet-joined round it doubles as the join
+             entry ("เข้าร่วม" button lives here); adding products elsewhere
+             happens via each not-joined card's ⋯ menu. */
+          <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 8 }}>
+            <Zap size={40} color={BORDER_GRAY} strokeWidth={1.5} />
+            <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>
+              {scopeEvent && scopeEvent.status === "join" ? "ยังไม่ได้เข้าร่วมรอบนี้" : "ไม่พบสินค้า Flash Sale"}
+            </Text>
+          </View>
+        ) : (
+          shown.map((p) => <FlashProductCard key={p.id} p={p} onMenu={(e) => openMenu(p, e)} />)
+        )}
 
-        {/* [2] Summary + product list (scrolls under the sticky filter) */}
-        <View style={{ paddingHorizontal: 16, gap: 16 }}>
-          {/* Summary card — totals follow the filtered list */}
-          {visible.length > 0 ? <FlashSummaryCard products={visible} /> : null}
+        {/* Loading beat — skeleton cards where the next page will appear */}
+        {loadingMore ? (
+          <>
+            <FlashCardSkeleton />
+            <FlashCardSkeleton />
+            <FlashCardSkeleton />
+          </>
+        ) : null}
+      </StickyFilterList>
 
-          {visible.length === 0 ? (
-            <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 8 }}>
-              <Zap size={40} color={BORDER_GRAY} strokeWidth={1.5} />
-              <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบสินค้า Flash Sale</Text>
-            </View>
-          ) : (
-            shown.map((p) => <FlashProductCard key={p.id} p={p} onMenu={() => setMenuFor(p)} />)
-          )}
-
-          {/* Loading beat — skeleton cards where the next page will appear */}
-          {loadingMore ? (
-            <>
-              <FlashCardSkeleton />
-              <FlashCardSkeleton />
-              <FlashCardSkeleton />
-            </>
-          ) : null}
-
-        </View>
-      </ScrollView>
-
-      {/* Action sheet */}
-      <FlashActionSheet
+      {/* ⋯ menu — iOS morph card at the tapped point */}
+      <FlashCardMenu
         product={menuFor}
+        anchor={menuAnchor}
         onClose={() => setMenuFor(null)}
         onEdit={(p) =>
           nav.navigate("FlashAddProduct", {
@@ -4393,50 +4786,79 @@ export function FlashSaleSection({ insetsBottom = 16 }: { insetsBottom?: number 
             onDone: (np) => setItems((prev) => prev.map((x) => (x.id === np.id ? np : x))),
           })
         }
+        onAdd={(p) =>
+          nav.navigate("FlashSelectEvent", {
+            preselect: p,
+            onPicked: (np, evId, running) =>
+              setItems((prev) => [
+                { ...np, eventId: evId, status: (running ? "active" : "scheduled") as FlashStatus },
+                ...prev.filter((x) => x.id !== np.id),
+              ]),
+          })
+        }
       />
 
-      {/* Join flow: terms sheet → เข้าร่วม → FlashEventDetail page → เพิ่มสินค้า page */}
+      {/* Join flow: terms sheet → เข้าร่วม → the round's card unblurs and the
+          carousel slides to it (no separate detail page). */}
       <FlashTermsSheet
         event={termsFor}
         onClose={() => setTermsFor(null)}
-        onJoin={() => { const ev = termsFor; setTermsFor(null); if (ev) nav.navigate("FlashEventDetail", { name: ev.name, dateRange: ev.dateRange }); }}
+        onJoin={() => {
+          const ev = termsFor;
+          setTermsFor(null);
+          if (!ev) return;
+          setJoinedIds((prev) => new Set(prev).add(ev.id));
+          setScope(ev.id);
+          setFocusKey(ev.id);
+          showToast(`เข้าร่วม ${ev.name} แล้ว`, "success");
+          // Straight into picking products for the round — no extra tap.
+          goAdd(ev);
+        }}
       />
     </View>
   );
 }
 
-// Flash product action sheet (edit discount/qty, stats, remove).
-export function FlashActionSheet({ product, onClose, onRemove, onEdit }: { product: FlashProduct | null; onClose: () => void; onRemove?: (p: FlashProduct) => void; onEdit?: (p: FlashProduct) => void }) {
+/* ---- Flash product ⋯ menu — iOS morph card anchored at the tapped point ---- */
+
+
+// 3 rows × 48 + 16 padding — keeps the morph's pinned corner accurate.
+const FLASH_MENU_H = 160;
+
+export function FlashCardMenu({ product, anchor, onClose, onRemove, onEdit, onAdd }: {
+  product: FlashProduct | null;
+  anchor: CardMenuAnchor | null;
+  onClose: () => void;
+  onRemove?: (p: FlashProduct) => void;
+  onEdit?: (p: FlashProduct) => void;
+  /** For NOT-joined products — "เพิ่มเข้า Flash Sale" replaces edit/remove. */
+  onAdd?: (p: FlashProduct) => void;
+}) {
   const p = product;
-  const Row = ({ Icon, label, color = "#0a0a0a", divider, onPress }: { Icon: typeof Package; label: string; color?: string; divider?: boolean; onPress: () => void }) => (
-    <Pressable onPress={onPress} className="flex-row items-center active:bg-neutral-50" style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 16, borderTopWidth: divider ? 0.5 : 0, borderTopColor: "#ececec" }}>
-      <Icon size={20} color={color === "#0a0a0a" ? TEXT_SECONDARY : color} strokeWidth={2.2} />
-      <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color }}>{label}</Text>
-    </Pressable>
-  );
+  const joined = !!p && (!!p.eventId || p.discount > 0 || !!p.discountText);
   return (
-    <BottomSheet
-      visible={!!p}
+    <AppleMenu
+      visible={!!p && !!anchor}
       onClose={onClose}
-      centerTitle
-      title={p?.name ?? ""}
-      centerSubtitle={p ? (
-        <Text style={{ fontSize: 12.5, color: TEXT_MUTED }} numberOfLines={1}>
-          <Text style={{ color: "#ff3b30", fontWeight: "700" }}>฿{p.flashPrice.toLocaleString()}</Text>
-          {" · "}{p.discountText ?? `-${p.discount}%`}{" · "}เหลือ {p.remaining.toLocaleString()}/{p.total.toLocaleString()}
-        </Text>
-      ) : undefined}
-      minHeightRatio={0.1}
-      maxHeightRatio={0.6}
+      anchorTop={anchor?.top}
+      anchorBottom={anchor?.bottom}
+      right={anchor?.right ?? 12}
+      originSize={28}
+      menuHeight={joined ? FLASH_MENU_H : 112}
     >
-      {p ? (
-        <View style={{ paddingTop: 4 }}>
-          <Row Icon={Pencil} label="แก้ไขส่วนลด / จำนวน" onPress={() => { onClose(); if (onEdit) onEdit(p); else Alert.alert("แก้ไข Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
-          <Row divider Icon={BarChart3} label="ดูสถิติการขาย" onPress={() => { onClose(); Alert.alert("สถิติการขาย", `${p.name}\nขาย ${p.sold} · รายได้ ฿${p.revenue.toLocaleString()}`); }} />
-          <Row divider Icon={Trash2} label="นำออกจาก Flash Sale" color="#ff3b30" onPress={() => { onClose(); if (onRemove) onRemove(p); else Alert.alert("นำออก", `นำ "${p.name}" ออกจาก Flash Sale? (กำลังพัฒนา)`); }} />
-        </View>
+      {p ? joined ? (
+        <>
+          <AppleMenuItem label="แก้ไขส่วนลด / จำนวน" Icon={Pencil} onPress={() => { onClose(); if (onEdit) onEdit(p); else Alert.alert("แก้ไข Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
+          <AppleMenuItem label="ดูสถิติการขาย" Icon={BarChart3} onPress={() => { onClose(); Alert.alert("สถิติการขาย", `${p.name}\nขาย ${p.sold} · รายได้ ฿${p.revenue.toLocaleString()}`); }} />
+          <AppleMenuItem label="นำออกจาก Flash Sale" Icon={Trash2} danger onPress={() => { onClose(); if (onRemove) onRemove(p); else Alert.alert("นำออก", `นำ "${p.name}" ออกจาก Flash Sale? (กำลังพัฒนา)`); }} />
+        </>
+      ) : (
+        <>
+          <AppleMenuItem label="เพิ่มเข้า Flash Sale" Icon={Zap} onPress={() => { onClose(); if (onAdd) onAdd(p); else Alert.alert("เพิ่มเข้า Flash Sale", `${p.name}\n(กำลังพัฒนา)`); }} />
+          <AppleMenuItem label="ดูสถิติการขาย" Icon={BarChart3} onPress={() => { onClose(); Alert.alert("สถิติการขาย", `${p.name}\nขาย ${p.sold} · รายได้ ฿${p.revenue.toLocaleString()}`); }} />
+        </>
       ) : null}
-    </BottomSheet>
+    </AppleMenu>
   );
 }
 
@@ -4508,7 +4930,7 @@ function FlashTermsSheet({ event, onClose, onJoin }: { event: FlashEvent | null;
 
 
 
-export function ProductsManageSection({ type, setType, showSearch = true }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void; showSearch?: boolean }) {
+export function ProductsManageSection({ type, setType, showSearch = true, insetsBottom = 24 }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void; showSearch?: boolean; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<"all" | PMStatus>("all");
   const [query, setQuery] = useState("");
@@ -4516,6 +4938,17 @@ export function ProductsManageSection({ type, setType, showSearch = true }: { ty
   const regular = usePMProducts("regular");
   const material = usePMProducts("material");
   const [menuFor, setMenuFor] = useState<PMProduct | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<CardMenuAnchor | null>(null);
+  const rootRef = useRef<View>(null);
+  // Long-press menu opens as the iOS morph card anchored at the press point
+  // (same AppleMenu pattern as the Flash Sale cards).
+  const openMenu = (p: PMProduct, e: GestureResponderEvent) => {
+    const { pageX, pageY } = e.nativeEvent;
+    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
+      setMenuAnchor(cardMenuAnchor(pageX, pageY, rx, ry, rw, rh));
+      setMenuFor(p);
+    });
+  };
 
   // Brief skeleton-load whenever the tab changes (or on first mount).
   const [loading, setLoading] = useState(true);
@@ -4543,42 +4976,44 @@ export function ProductsManageSection({ type, setType, showSearch = true }: { ty
     ]);
 
   return (
-    <View style={{ gap: 14 }}>
-      {/* Product-type switcher — shared sliding-pill segmented control (same
-          look as the storefront tabs) */}
-      <SegmentedTabs
-        tabs={[
-          { id: "regular" as const, label: "ผลิตภัณฑ์", count: regular.length },
-          { id: "material" as const, label: "วัตถุดิบ", count: material.length },
-        ]}
-        active={type}
-        onChange={(t) => { setType(t); setFilter("all"); }}
-      />
+    <View ref={rootRef} style={{ flex: 1 }}>
+    <StickyFilterList
+      filterKey={`${type}-${filter}`}
+      insetsBottom={insetsBottom}
+      contentGap={14}
+      header={
+        <View style={{ gap: 14 }}>
+          {/* Product-type switcher — shared sliding-pill segmented control */}
+          <SegmentedTabs
+            tabs={[
+              { id: "regular" as const, label: "ผลิตภัณฑ์", count: regular.length },
+              { id: "material" as const, label: "วัตถุดิบ", count: material.length },
+            ]}
+            active={type}
+            onChange={(t) => { setType(t); setFilter("all"); }}
+          />
 
-      {/* Add action is a floating FAB rendered by OverviewScreen (above the tab bar). */}
-
-      {/* Search — hidden on the pushed subpage (app-bar button → ShopProductManageSearch) */}
-      {showSearch ? (
-      <View
-        className="flex-row items-center"
-        style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-          placeholder="ค้นหาชื่อสินค้า หรือหมวดหมู่"
-          placeholderTextColor={TEXT_DISABLED}
-          value={query}
-          onChangeText={setQuery}
-        />
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="white" />
+          {/* Search — hidden on the pushed subpage (app-bar button → ShopProductManageSearch) */}
+          {showSearch ? (
+            <View
+              className="flex-row items-center"
+              style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
+            >
+              <TextInput
+                style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+                placeholder="ค้นหาชื่อสินค้า หรือหมวดหมู่"
+                placeholderTextColor={TEXT_DISABLED}
+                value={query}
+                onChangeText={setQuery}
+              />
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+                <Search size={16} color="white" />
+              </View>
+            </View>
+          ) : null}
         </View>
-      </View>
-      ) : null}
-
-      {/* Status filter pills — full-bleed so the row scrolls edge-to-edge (not cropped by the page padding) */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {PM_FILTERS.map(({ id, label, Icon }) => {
+      }
+      filters={PM_FILTERS.map(({ id, label, Icon }) => {
           const active = filter === id;
           return (
             <Pressable
@@ -4595,8 +5030,7 @@ export function ProductsManageSection({ type, setType, showSearch = true }: { ty
             </Pressable>
           );
         })}
-      </ScrollView>
-
+    >
       {/* Card list */}
       {loading ? (
         [0, 1, 2, 3].map((i) => <PMCardSkeleton key={i} />)
@@ -4607,18 +5041,22 @@ export function ProductsManageSection({ type, setType, showSearch = true }: { ty
         </View>
       ) : (
         visible.map((p) => (
-          <PMCard key={p.id} p={p} onMenu={() => setMenuFor(p)} onPreview={() => nav.navigate("ShopProductDetail", { productId: p.id, type })} />
+          <PMCard key={p.id} p={p} onMenu={(e) => openMenu(p, e)} onPreview={() => nav.navigate("ShopProductDetail", { productId: p.id, type })} />
         ))
       )}
 
-      {/* Long-press action menu */}
-      <PMActionSheet
+    </StickyFilterList>
+
+      {/* Long-press ⋯ menu — iOS morph card at the press point (must live
+          OUTSIDE the scroll list: AppleMenu is an absolute overlay, not a Modal) */}
+      <PMCardMenu
         product={menuFor}
+        anchor={menuAnchor}
         onClose={() => setMenuFor(null)}
         onToggle={(prod) => {
           const next: PMStatus = prod.status === "เปิดขาย" ? "ปิดขาย" : "เปิดขาย";
           setPMStatus(prod.id, next);
-          // Update the open sheet's product so the switch reflects the new state.
+          // Update the open menu's product so the switch reflects the new state.
           setMenuFor({ ...prod, status: next, statusColor: PM_STATUS_COLOR[next] });
         }}
         onDelete={remove}
@@ -4672,7 +5110,7 @@ export function PMAddMenuFab({ bottom, onAdd }: { bottom: number; onAdd: (mode: 
 // white card, header row (image + name / category / chip row: status + type +
 // participation tags), divider, then stock flush left with the price flush
 // right. Tap = product detail page; long-press = action menu.
-export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => void; onPreview: () => void }) {
+export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: (e: GestureResponderEvent) => void; onPreview: () => void }) {
   const dimmed = p.status !== "เปิดขาย";
   const overlay = p.status === "สินค้าหมด" ? "หมด" : p.status === "ปิดขาย" ? "ปิด" : null;
   // In a RUNNING product-scoped promotion? (store-backed, live). Scheduled
@@ -4704,19 +5142,13 @@ export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => v
           ) : null}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          {/* Name row — status pill sits flush right of the name */}
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <Text style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
-            <View style={{ backgroundColor: p.statusColor + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: p.statusColor }}>{p.status}</Text>
-            </View>
-          </View>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }} numberOfLines={1}>{p.name}</Text>
           <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }} numberOfLines={1}>{p.category}</Text>
-          {/* Chip row — type + participation tags, under the category. Pill
+          {/* Chip row — status (in place of type) + participation tags. Pill
               sizing matches the peer list cards (order/coupon status pills). */}
           <View className="flex-row items-center" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-            <View style={{ backgroundColor: p.typeColor + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: p.typeColor }}>{p.type}</Text>
+            <View style={{ backgroundColor: p.statusColor + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: p.statusColor }}>{p.status}</Text>
             </View>
             {p.flash ? (
               <View className="flex-row items-center" style={{ gap: 4, backgroundColor: "rgba(230,46,5,0.1)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
@@ -4750,69 +5182,50 @@ export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: () => v
 }
 
 // Bottom-sheet action menu for a product (toggle sale / edit / stock / delete).
-export function PMActionSheet({
-  product, onClose, onToggle, onDelete,
+export function PMCardMenu({
+  product, anchor, onClose, onToggle, onDelete,
 }: {
   product: PMProduct | null;
+  anchor: CardMenuAnchor | null;
   onClose: () => void;
   onToggle: (p: PMProduct) => void;
   onDelete: (p: PMProduct) => void;
 }) {
   const p = product;
-  const Row = ({ Icon, label, color = "#0a0a0a", divider, onPress }: { Icon: typeof Package; label: string; color?: string; divider?: boolean; onPress: () => void }) => (
-    <Pressable
-      onPress={onPress}
-      className="flex-row items-center active:bg-neutral-50"
-      style={{ paddingHorizontal: 16, paddingVertical: 16, gap: 14, borderTopWidth: divider ? 1 : 0, borderTopColor: "#f0f0f0" }}
-    >
-      <Icon size={20} color={color === "#0a0a0a" ? TEXT_SECONDARY : color} strokeWidth={2.2} />
-      <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color }}>{label}</Text>
-    </Pressable>
-  );
-
   return (
-    <BottomSheet
-      visible={!!p}
+    <AppleMenu
+      visible={!!p && !!anchor}
       onClose={onClose}
-      centerTitle
-      title={p?.name ?? ""}
-      centerSubtitle={p ? (
-        <Text style={{ fontSize: 12.5, color: TEXT_MUTED }} numberOfLines={1}>
-          {p.type}{" · "}
-          <Text style={{ color: BRAND_GREEN, fontWeight: "700" }}>{p.priceText}</Text>
-          {" · "}{p.stockText}
-        </Text>
-      ) : undefined}
-      minHeightRatio={0.1}
-      maxHeightRatio={0.85}
+      anchorTop={anchor?.top}
+      anchorBottom={anchor?.bottom}
+      right={anchor?.right ?? 12}
+      originSize={28}
+      menuHeight={208} // 4 rows × 48 + 16
     >
       {p ? (
-        <View style={{ paddingTop: 4 }}>
-          {/* Plain white rows with hairline dividers (same as other sheets) */}
-          <View style={{ borderTopWidth: 1, borderTopColor: "#f0f0f0" }}>
-            {/* Sale on/off — switch toggle */}
-            <View className="flex-row items-center" style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 14 }}>
-              <PackageCheck size={20} color={p.status === "เปิดขาย" ? BRAND_GREEN : TEXT_SECONDARY} strokeWidth={2.2} />
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: "#0a0a0a" }}>เปิดการขาย</Text>
-              <Switch
-                value={p.status === "เปิดขาย"}
-                onValueChange={() => onToggle(p)}
-                trackColor={{ false: "#e9e9ea", true: BRAND_GREEN }}
-                thumbColor="#ffffff"
-                ios_backgroundColor="#e9e9ea"
-              />
-            </View>
-            <Row divider Icon={Pencil} label="แก้ไขสินค้า" onPress={() => { onClose(); Alert.alert("แก้ไขสินค้า", `${p.name}\n(แบบฟอร์มกำลังพัฒนา)`); }} />
-            <Row divider Icon={Boxes} label="จัดการสตอกสินค้า" onPress={() => { onClose(); Alert.alert("จัดการสตอก", `${p.name}\n(กำลังพัฒนา)`); }} />
-            <Row divider Icon={Trash2} label="ลบสินค้า" color="#ff3b30" onPress={() => onDelete(p)} />
+        <>
+          {/* Sale on/off — switch row (menu stays open so the flip is visible) */}
+          <View className="flex-row items-center" style={{ height: 48, paddingHorizontal: 18, gap: 14 }}>
+            <PackageCheck size={20} color={p.status === "เปิดขาย" ? BRAND_GREEN : "#1a1a1a"} strokeWidth={2} />
+            <Text style={{ flex: 1, fontSize: 16, color: "#1a1a1a" }}>เปิดการขาย</Text>
+            <Switch
+              value={p.status === "เปิดขาย"}
+              onValueChange={() => onToggle(p)}
+              trackColor={{ false: "#e9e9ea", true: BRAND_GREEN }}
+              thumbColor="#ffffff"
+              ios_backgroundColor="#e9e9ea"
+            />
           </View>
-        </View>
+          <AppleMenuItem label="แก้ไขสินค้า" Icon={Pencil} onPress={() => { onClose(); Alert.alert("แก้ไขสินค้า", `${p.name}\n(แบบฟอร์มกำลังพัฒนา)`); }} />
+          <AppleMenuItem label="จัดการสตอกสินค้า" Icon={Boxes} onPress={() => { onClose(); Alert.alert("จัดการสตอก", `${p.name}\n(กำลังพัฒนา)`); }} />
+          <AppleMenuItem label="ลบสินค้า" Icon={Trash2} danger onPress={() => onDelete(p)} />
+        </>
       ) : null}
-    </BottomSheet>
+    </AppleMenu>
   );
 }
 
-export function DocSection({ kind, showSearch = true }: { kind: DocKind; showSearch?: boolean }) {
+export function DocSection({ kind, showSearch = true, insetsBottom = 24 }: { kind: DocKind; showSearch?: boolean; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   const docs = kind === "qt" ? QUOTATIONS : kind === "pr" ? PURCHASE_REQUESTS : PURCHASE_ORDERS_DOC;
   const [filter, setFilter] = useState<string>("all");
@@ -4833,29 +5246,30 @@ export function DocSection({ kind, showSearch = true }: { kind: DocKind; showSea
   });
 
   return (
-    <View style={{ gap: 14 }}>
-      {/* Search — hidden on the pushed subpage (app-bar button → ShopDocSearch) */}
-      {showSearch ? (
-      <View
-        className="flex-row items-center"
-        style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-          placeholder={`ค้นหาเลข${DOC_TITLE[kind]} ชื่อลูกค้า หรือสินค้า`}
-          placeholderTextColor={TEXT_DISABLED}
-          value={query}
-          onChangeText={setQuery}
-        />
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-          <Search size={16} color="white" />
-        </View>
-      </View>
-      ) : null}
-
-      {/* Filter pills — full-bleed so the row scrolls edge-to-edge (not cropped) */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-        {["all", ...statuses].map((id) => {
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      contentGap={14}
+      header={
+        showSearch ? (
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
+          >
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+              placeholder={`ค้นหาเลข${DOC_TITLE[kind]} ชื่อลูกค้า หรือสินค้า`}
+              placeholderTextColor={TEXT_DISABLED}
+              value={query}
+              onChangeText={setQuery}
+            />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+              <Search size={16} color="white" />
+            </View>
+          </View>
+        ) : undefined
+      }
+      filters={["all", ...statuses].map((id) => {
           const active = filter === id;
           const label = id === "all" ? "ทั้งหมด" : DOC_STATUS[kind][id].label;
           const c = count(id);
@@ -4873,8 +5287,7 @@ export function DocSection({ kind, showSearch = true }: { kind: DocKind; showSea
             </Pressable>
           );
         })}
-      </ScrollView>
-
+    >
       {visible.length === 0 ? (
         <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingVertical: 48, alignItems: "center", gap: 10 }}>
           <FileText size={40} color={BORDER_GRAY} strokeWidth={1.5} />
@@ -4885,7 +5298,7 @@ export function DocSection({ kind, showSearch = true }: { kind: DocKind; showSea
           <DocCard key={d.id} doc={d} kind={kind} onOpenDetail={() => nav.navigate("ShopDocDetail", { doc: d, kind })} />
         ))
       )}
-    </View>
+    </StickyFilterList>
   );
 }
 
@@ -5269,7 +5682,7 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
 // ===================== ORDERS SECTION =====================
 // Mobile port of the web OrdersTab: filter pills (horizontal scroll) + search,
 // then a stack of order cards filtered by the active tab + query.
-export function OrdersSection({ showSearch = true, initialFilter }: { showSearch?: boolean; initialFilter?: string }) {
+export function OrdersSection({ showSearch = true, initialFilter, insetsBottom = 24 }: { showSearch?: boolean; initialFilter?: string; insetsBottom?: number }) {
   const [filter, setFilter] = useState<"all" | OrderStatus>((initialFilter as OrderStatus) ?? "all");
   const [query, setQuery] = useState("");
 
@@ -5288,53 +5701,30 @@ export function OrdersSection({ showSearch = true, initialFilter }: { showSearch
   });
 
   return (
-    <View style={{ gap: 14 }}>
-      {/* Search — hidden on the pushed จัดการคำสั่งซื้อ page (its app-bar search
-          button opens the ShopOrderSearch page instead) */}
-      {showSearch ? (
-      <View
-        className="flex-row items-center"
-        style={{
-          backgroundColor: "white",
-          borderWidth: 1,
-          borderColor: DIVIDER_GRAY,
-          borderRadius: 999,
-          height: 44,
-          paddingLeft: 16,
-          paddingRight: 6,
-          gap: 8,
-        }}
-      >
-        <TextInput
-          style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-          placeholder="ค้นหาเลขที่ออเดอร์ / ลูกค้า / สินค้า"
-          placeholderTextColor={TEXT_DISABLED}
-          value={query}
-          onChangeText={setQuery}
-        />
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: BRAND_GREEN,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Search size={16} color="white" />
-        </View>
-      </View>
-      ) : null}
-
-      {/* Filter pills — full-bleed horizontal scroll (Fitts: 36px tall) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginHorizontal: -16 }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-      >
-        {ORDER_TABS.map((tb) => {
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      contentGap={14}
+      header={
+        showSearch ? (
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
+          >
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+              placeholder="ค้นหาเลขที่ออเดอร์ / ลูกค้า / สินค้า"
+              placeholderTextColor={TEXT_DISABLED}
+              value={query}
+              onChangeText={setQuery}
+            />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+              <Search size={16} color="white" />
+            </View>
+          </View>
+        ) : undefined
+      }
+      filters={ORDER_TABS.map((tb) => {
           const active = filter === tb.id;
           const c = count(tb.id);
           return (
@@ -5386,8 +5776,7 @@ export function OrdersSection({ showSearch = true, initialFilter }: { showSearch
             </Pressable>
           );
         })}
-      </ScrollView>
-
+    >
       {/* Order cards / empty state */}
       {visible.length === 0 ? (
         <View
@@ -5407,7 +5796,7 @@ export function OrdersSection({ showSearch = true, initialFilter }: { showSearch
       ) : (
         visible.map((o) => <OrderCard key={o.id} order={o} />)
       )}
-    </View>
+    </StickyFilterList>
   );
 }
 

@@ -16,7 +16,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { GlassDatePicker } from "../components/GlassDatePicker";
+import { GlassDateRangePicker } from "../components/GlassDatePicker";
 import { showToast } from "../components/Toast";
 import { SHOP_PRODUCTS } from "./ShopScreen";
 import { useAllPromotions, computedStatus } from "../data/promotions";
@@ -101,11 +101,15 @@ export function FlashAddProductScreen() {
   const insets = useSafeAreaInsets();
   // Edit mode — opened from a card's ⋯ sheet: skip step 1, prefill everything.
   const edit = params?.edit;
+  // Preselect — "เพิ่มเข้า Flash Sale" from a specific product's ⋯: the product
+  // is already known, so skip the picker and go straight to discount setup.
+  const preselect = params?.preselect;
   const editIsBaht = !!edit?.discountText?.startsWith("-฿");
-  const [step, setStep] = useState<1 | 2>(edit ? 2 : 1);
-  const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(() =>
-    edit ? ({ id: edit.id, name: edit.name, price: edit.normalPrice, image: edit.image, category: "" } as unknown as (typeof SHOP_PRODUCTS)[number]) : null,
-  );
+  const [step, setStep] = useState<1 | 2>(edit || preselect ? 2 : 1);
+  const [picked, setPicked] = useState<(typeof SHOP_PRODUCTS)[number] | null>(() => {
+    const src = edit ?? preselect;
+    return src ? ({ id: src.id, name: src.name, price: src.normalPrice, image: src.image, category: "" } as unknown as (typeof SHOP_PRODUCTS)[number]) : null;
+  });
   const [query, setQuery] = useState("");
   const [discType, setDiscType] = useState<"percent" | "baht">(editIsBaht ? "baht" : "percent");
   const [discVal, setDiscVal] = useState(edit ? (editIsBaht ? parseInt(edit.discountText!.replace(/[^0-9]/g, "")) || 0 : edit.discount) : 20);
@@ -130,7 +134,7 @@ export function FlashAddProductScreen() {
   const maxStock = DEFAULT_STOCK;
 
   const goBack = () => {
-    if (step === 2 && !edit) setStep(1); // edit mode has no step 1 to go back to
+    if (step === 2 && !edit && !preselect) setStep(1); // edit/preselect have no step 1
     else if (nav.canGoBack()) nav.goBack();
   };
 
@@ -203,16 +207,14 @@ export function FlashAddProductScreen() {
             <FSProductHeader image={picked.image as number} name={picked.name} originalPrice={picked.price} flashPrice={flashPrice} stock={maxStock.toLocaleString()} />
 
             {/* Date row — เริ่มต้น / สิ้นสุด (prefilled with the event period when opened from an event) */}
-            <View className="flex-row" style={{ gap: 12, zIndex: 10 }}>
-              <View style={{ flex: 1, gap: 8 }}>
-                <FSLabel>เริ่มต้น</FSLabel>
-                <GlassDatePicker value={startDate} onChange={setStartDate} placeholder="เลือกวันที่" />
-              </View>
-              <View style={{ flex: 1, gap: 8 }}>
-                <FSLabel>สิ้นสุด</FSLabel>
-                <GlassDatePicker value={endDate} onChange={setEndDate} placeholder="เลือกวันที่" />
-              </View>
-            </View>
+            <GlassDateRangePicker
+              start={startDate}
+              end={endDate}
+              onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+              // Opened from a flash round → the round's window is fixed; the
+              // dates are shown for reference but locked.
+              disabled={!!params?.eventDate}
+            />
 
             {/* Discount */}
             <View style={{ gap: 8 }}>

@@ -7,7 +7,7 @@
  * ShopProductManageSearch page (same pattern as the other list pages).
  */
 import { useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,12 +41,8 @@ export function ShopProductsScreen() {
         }
       />
       <View style={{ flex: 1 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 100 }}
-        >
-          <ProductsManageSection type={type} setType={setType} showSearch={false} />
-        </ScrollView>
+        {/* Section owns its scroll (StickyFilterList) — no wrapper ScrollView. */}
+        <ProductsManageSection type={type} setType={setType} showSearch={false} insetsBottom={insets.bottom + 100} />
         {/* Scroll fades — content dissolves into the header / bottom edge */}
         <LinearGradient
           pointerEvents="none"

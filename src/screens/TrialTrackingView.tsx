@@ -23,6 +23,7 @@ import { View, Text, ScrollView, Alert } from "react-native";
 import { FlaskConical, CircleAlert, Clock, Check, Ban } from "lucide-react-native";
 
 import { BottomSheet } from "../components/BottomSheet";
+import { StickyFilterList } from "../components/StickyFilterList";
 import { SearchBar } from "../components/SearchBar";
 import {
   RegistrationCard,
@@ -48,7 +49,7 @@ function fallbackProduct(trialId: string): ApplicantsProduct {
   return { id: trialId, name: trialId, tagline: "", category: "", image: "", rewardPoints: 0 };
 }
 
-export function TrialTrackingOwnerSection() {
+export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?: number } = {}) {
   // Owner-added trials merged on top of the static catalog — for product lookup.
   const added = useAddedTrials();
   const catalog = useMemo<TrialProduct[]>(
@@ -122,39 +123,20 @@ export function TrialTrackingOwnerSection() {
   ];
 
   return (
-    <View style={{ gap: 16 }}>
-      {/* Filter pills (horizontally scrollable on a phone) */}
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 999,
-          padding: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 1,
-        }}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ borderRadius: 999, overflow: "hidden" }}
-          contentContainerStyle={{ gap: 4, alignItems: "center" }}
-        >
-          {pills.map((p) => (
-            <FilterPill
-              key={p.key}
-              label={p.label}
-              count={p.count}
-              Icon={p.Icon}
-              active={filter === p.key}
-              onPress={() => setFilter(p.key)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      filters={pills.map((p) => (
+        <FilterPill
+          key={p.key}
+          label={p.label}
+          count={p.count}
+          Icon={p.Icon}
+          active={filter === p.key}
+          onPress={() => setFilter(p.key)}
+        />
+      ))}
+    >
       {/* Search box (shared) */}
       <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
 
@@ -198,6 +180,6 @@ export function TrialTrackingOwnerSection() {
       >
         {evalReg && <EvalSummary reg={evalReg} product={productFor(evalReg.trialId)} />}
       </BottomSheet>
-    </View>
+    </StickyFilterList>
   );
 }

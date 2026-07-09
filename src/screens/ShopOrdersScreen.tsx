@@ -5,7 +5,7 @@
  * Reuses OrdersSection from MyShopScreen; search lives behind the app-bar
  * button → ShopOrderSearch page (same pattern as the shop profile).
  */
-import { View, ScrollView } from "react-native";
+import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,12 +43,8 @@ export function ShopOrdersScreen() {
         }
       />
       <View style={{ flex: 1 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
-        >
-          <OrdersSection showSearch={false} initialFilter={initialFilter} />
-        </ScrollView>
+        {/* Section owns its scroll (StickyFilterList) — no wrapper ScrollView. */}
+        <OrdersSection showSearch={false} initialFilter={initialFilter} insetsBottom={insets.bottom + 24} />
         {/* Scroll fades — content dissolves into the header / bottom edge */}
         <LinearGradient
           pointerEvents="none"

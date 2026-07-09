@@ -6,7 +6,8 @@
  * Renders the matching section component (all return parent-scroll <View>s) and
  * re-creates each section's floating "create/add" FAB.
  */
-import { View, ScrollView, Pressable } from "react-native";
+import { useState } from "react";
+import { View, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -19,6 +20,7 @@ import { BottomFade } from "../components/BottomFade";
 import {
   SECTION_LABEL,
   FlashSaleSection,
+  FlashMonthPicker,
   QuotationSection,
   DocSection,
   type SectionId,
@@ -36,11 +38,15 @@ export function ShopSectionScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { section, initialFilter } = useRoute<RouteProp<RootStackParamList, "ShopSection">>().params;
+  // Flash Sale เดือน/ปี filter — lives here so its pill can sit in the app bar
+  // next to search; the section below re-scopes to it.
+  const [flashMonth, setFlashMonth] = useState(7);
+  const [flashYear, setFlashYear] = useState(2569);
 
   // Per-section floating "create/add" action (mirrors the old in-console FABs).
   const fabPress =
-    section === "flash_sale" ? () => nav.navigate("FlashAddProduct")
-    : section === "trials_products" ? () => nav.navigate("TrialAddProduct")
+    // flash_sale: adding lives on the summary cards now (no FAB)
+    section === "trials_products" ? () => nav.navigate("TrialAddProduct")
     : section === "promotions" ? () => nav.navigate("PromotionCreate")
     : section === "coupons" ? () => nav.navigate("CouponCreate")
     : null;
@@ -81,23 +87,40 @@ export function ShopSectionScreen() {
             >
               <Search size={20} color="#1a1a1a" />
             </GlassIconButton>
+          ) : section === "flash_sale" ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <FlashMonthPicker
+                month={flashMonth}
+                year={flashYear}
+                onChange={(m, y) => { setFlashMonth(m); setFlashYear(y); }}
+              />
+              <GlassIconButton
+                onPress={() => nav.navigate("ShopFlashSearch")}
+                accessibilityLabel="ค้นหาสินค้า Flash Sale"
+              >
+                <Search size={20} color="#1a1a1a" />
+              </GlassIconButton>
+            </View>
           ) : undefined
         }
       />
       <View style={{ flex: 1 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + (fabPress ? 96 : 24) }}
-        >
-          {section === "flash_sale" ? <FlashSaleSection /> : null}
-          {section === "hm_quotations" ? <QuotationSection showSearch={false} initialFilter={initialFilter} /> : null}
-          {section === "hm_pr" ? <DocSection kind="pr" showSearch={false} /> : null}
-          {section === "hm_po" ? <DocSection kind="po" showSearch={false} /> : null}
-          {section === "trials_products" ? <TrialRegistryOwnerSection /> : null}
-          {section === "trials_tracking" ? <TrialTrackingOwnerSection /> : null}
-          {section === "promotions" ? <PromotionsOwnerSection showSearch={false} /> : null}
-          {section === "coupons" ? <CouponsOwnerSection showSearch={false} /> : null}
-        </ScrollView>
+        {/* Every section owns its scroll (StickyFilterList: pinned filter bar +
+            full-bleed pill rows) — no wrapper ScrollView, nothing clips. */}
+        {(() => {
+          const bottom = insets.bottom + (fabPress ? 96 : 24);
+          switch (section) {
+            case "flash_sale": return <FlashSaleSection insetsBottom={bottom} month={flashMonth} year={flashYear} />;
+            case "hm_quotations": return <QuotationSection showSearch={false} initialFilter={initialFilter} insetsBottom={bottom} />;
+            case "hm_pr": return <DocSection kind="pr" showSearch={false} insetsBottom={bottom} />;
+            case "hm_po": return <DocSection kind="po" showSearch={false} insetsBottom={bottom} />;
+            case "trials_products": return <TrialRegistryOwnerSection insetsBottom={bottom} />;
+            case "trials_tracking": return <TrialTrackingOwnerSection insetsBottom={bottom} />;
+            case "promotions": return <PromotionsOwnerSection showSearch={false} insetsBottom={bottom} />;
+            case "coupons": return <CouponsOwnerSection showSearch={false} insetsBottom={bottom} />;
+            default: return null;
+          }
+        })()}
         {/* Scroll fades — content dissolves into the header / bottom edge */}
         <LinearGradient
           pointerEvents="none"

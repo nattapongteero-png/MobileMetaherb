@@ -29,6 +29,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SearchBar } from "../components/SearchBar";
+import { StickyFilterList } from "../components/StickyFilterList";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   useAllCoupons,
@@ -180,7 +181,7 @@ export function CouponCard({ c, onPress }: { c: Coupon; onPress: () => void }) {
   );
 }
 
-export function CouponsOwnerSection({ showSearch = true }: { showSearch?: boolean }) {
+export function CouponsOwnerSection({ showSearch = true, insetsBottom = 24 }: { showSearch?: boolean; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   const coupons = useAllCoupons();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -204,25 +205,16 @@ export function CouponsOwnerSection({ showSearch = true }: { showSearch?: boolea
   ];
 
   return (
-    <View style={{ gap: 16 }}>
-      {/* Search — shared SearchBar; hidden on the pushed subpage (app-bar
-          button → ShopCouponSearch) */}
-      {showSearch ? (
-        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาโค้ด, ชื่อคูปอง..." />
-      ) : null}
-
-      {/* Filter chips — full-bleed scroll row, same as the other list pages */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginHorizontal: -16 }}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-      >
-        {pills.map((p) => (
-          <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
-        ))}
-      </ScrollView>
-
+    <StickyFilterList
+      filterKey={filter}
+      insetsBottom={insetsBottom}
+      header={
+        showSearch ? <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาโค้ด, ชื่อคูปอง..." /> : undefined
+      }
+      filters={pills.map((p) => (
+        <FilterPill key={p.key} label={p.label} count={p.count} Icon={p.Icon} active={filter === p.key} onPress={() => setFilter(p.key)} />
+      ))}
+    >
       {/* Card grid / empty state */}
       {filtered.length === 0 ? (
         <View
@@ -246,6 +238,6 @@ export function CouponsOwnerSection({ showSearch = true }: { showSearch?: boolea
           ))}
         </View>
       )}
-    </View>
+    </StickyFilterList>
   );
 }

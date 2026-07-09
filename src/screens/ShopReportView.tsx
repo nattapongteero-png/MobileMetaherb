@@ -11,7 +11,7 @@ import {
 import { SalesChart } from "../components/SalesChart";
 import { PeriodTabs, ShopSalesReportView } from "./ShopSalesReportView";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { SalesDatePicker, salesDateLabel, type DateSel } from "../components/SalesDatePicker";
+import { SalesDatePicker, salesDateLabel, type DateRange } from "../components/SalesDatePicker";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   REPORT_DATA, sumField, fmtBaht,
@@ -75,7 +75,7 @@ function Row({ children }: { children: ReactNode }) {
 }
 
 /** รายงานข้อมูลลูกค้า / สินค้า / Market — KPIs + chart + table (ported from web). */
-export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: ReportKind; period: Period; setPeriod: (p: Period) => void; dateSel: DateSel }) {
+export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: ReportKind; period: Period; setPeriod: (p: Period) => void; dateSel: DateRange }) {
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const data = REPORT_DATA[period];
   const scope = salesDateLabel(period, dateSel);
@@ -211,9 +211,10 @@ export function ShopReportScreen() {
   const insets = useSafeAreaInsets();
   const { kind } = useRoute<RouteProp<RootStackParamList, "ShopReport">>().params;
   const [period, setPeriod] = useState<Period>("daily");
-  const [dateSel, setDateSel] = useState<DateSel>(() => {
+  const [dateSel, setDateSel] = useState<DateRange>(() => {
     const d = new Date();
-    return { day: d.getDate(), month: d.getMonth(), year: d.getFullYear() + 543 };
+    const today = { day: d.getDate(), month: d.getMonth(), year: d.getFullYear() + 543 };
+    return { start: today, end: today }; // start === end → single-point scope
   });
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
