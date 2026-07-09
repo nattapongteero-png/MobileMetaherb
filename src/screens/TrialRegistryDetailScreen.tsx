@@ -19,7 +19,6 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -31,12 +30,16 @@ import {
   FileText,
   Store,
   Star,
-  MoreVertical,
+  Sparkles,
+  MoreHorizontal,
 } from "lucide-react-native";
-import { BottomFade } from "../components/BottomFade";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
+import { LinearGradient } from "expo-linear-gradient";
+import { BottomFade } from "../components/BottomFade";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { GlassIconButton } from "../components/GlassIconButton";
+import { AppleMenu, AppleMenuItem } from "../components/AppleMenu";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { TrialDetailOverview } from "./trialDetail/TrialDetailOverview";
@@ -55,8 +58,6 @@ import {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // Active tab pill — web: bg-gradient-to-br from-#3fb56b to-#267a43.
-const TAB_FROM = "#3fb56b";
-const TAB_TO = "#267a43";
 // Figma hero band green (node 8066:10951).
 const FIG_GREEN = "#008e48";
 
@@ -75,7 +76,7 @@ export function TrialRegistryDetailScreen() {
     () => TRIAL_PRODUCTS.find((p) => p.id === id) ?? TRIAL_PRODUCTS[0],
     [id],
   );
-  const [tab, setTab] = useState<TabId>("overview");
+  const [tab, setTab] = useState<TabId>(route.params.initialTab ?? "overview");
 
   // Cohort — derived exactly like the web TrialDetailPage so the hero KPIs match
   // the dashboard. evaluated rows carry evaluatedAt; pending/rejected don't take
@@ -132,172 +133,139 @@ export function TrialRegistryDetailScreen() {
     { label: "เวลาเหลือ", value: `${product.endsInDays}`, sub: "วัน" },
   ];
   const ratingText = avgRating > 0 ? avgRating.toFixed(1) : "—";
-  const [menuOpen, setMenuOpen] = useState(false);
   const insets = useSafeAreaInsets();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      {/* Faint mint app bar (shared SubPageHeader) — back + title | edit / delete / export */}
+      {/* Faint mint app bar (shared SubPageHeader) — back + title | ⋯ morph menu
+          (same pattern as the coupon / promotion / product detail pages) */}
       <SubPageHeader
         title="สินค้าทดลอง"
         subtitle={product.name}
         onBack={() => nav.goBack()}
         showSearch={false}
         rightSlot={
-          <Pressable
-            onPress={() => setMenuOpen(true)}
-            accessibilityLabel="เมนู"
-            hitSlop={6}
-            className="items-center justify-center active:opacity-80"
-            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#fff", borderWidth: 1, borderColor: DIVIDER_GRAY }}
-          >
-            <MoreVertical size={18} color={TEXT_SECONDARY} strokeWidth={2.4} />
-          </Pressable>
+          menuOpen ? (
+            // The button "becomes" the menu — keep a spacer so the layout holds.
+            <View style={{ width: 44, height: 44 }} />
+          ) : (
+            <GlassIconButton onPress={() => setMenuOpen(true)} accessibilityLabel="เพิ่มเติม">
+              <MoreHorizontal size={20} color="#1a1a1a" strokeWidth={2.2} />
+            </GlassIconButton>
+          )
         }
       />
 
       <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
-          {/* ===== HERO CARD (Figma 8066:10951) ===== */}
-          <View style={{ backgroundColor: "#fff", borderRadius: 24, borderWidth: 1, borderColor: "#f0f0f0", marginTop: 12, overflow: "visible" }}>
-            {/* Green header band — round avatar + rating badge | category / title / store */}
-            <View
+          {/* ===== HERO CARD — all-green gradient box (web parity) ===== */}
+          <View style={{ borderRadius: 24, marginTop: 12, overflow: "hidden" }}>
+            {/* Green header band — web-parity gradient + Sparkles watermark,
+                content keeps the mobile arrangement (avatar + badge | info) */}
+            <LinearGradient
+              colors={["#319754", "#287745", "#1d5b32"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={{
-                backgroundColor: FIG_GREEN,
                 paddingHorizontal: 16,
                 paddingTop: 16,
                 paddingBottom: 16,
                 borderRadius: 24,
+                overflow: "hidden",
               }}
             >
-              <View className="flex-row items-start" style={{ gap: 16 }}>
-                {/* Round avatar + rating badge — pops above the band top edge (Figma) */}
-                <View style={{ width: 88, marginTop: -24 }}>
+              <View pointerEvents="none" style={{ position: "absolute", top: -16, right: -16 }}>
+                <Sparkles size={128} color="rgba(255,255,255,0.05)" strokeWidth={1.5} />
+              </View>
+              <View className="flex-row items-center" style={{ gap: 16 }}>
+                {/* Round avatar + rating badge — sits fully inside the green band */}
+                <View style={{ width: 88 }}>
                   <View
                     style={{
                       width: 88,
                       height: 88,
                       borderRadius: 44,
                       borderWidth: 2,
-                      borderColor: FIG_GREEN,
+                      borderColor: "rgba(255,255,255,0.3)",
                       backgroundColor: "rgba(255,255,255,0.2)",
                       overflow: "hidden",
                     }}
                   >
                     <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                   </View>
-                  {/* rating badge — overlaps avatar bottom-left */}
-                  <View
-                    style={{
-                      position: "absolute",
-                      left: 4,
-                      bottom: -10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 4,
-                      backgroundColor: "#fff",
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      shadowColor: "#000",
-                      shadowOpacity: 0.12,
-                      shadowRadius: 4,
-                      shadowOffset: { width: 0, height: 1 },
-                      elevation: 2,
-                    }}
-                  >
-                    <Star size={15} color="#f59e0b" fill="#f59e0b" strokeWidth={0} />
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: FIG_GREEN }}>
-                      {ratingText}
-                      <Text style={{ fontSize: 12, fontWeight: "400", color: FIG_GREEN }}> ({evaluated.length})</Text>
-                    </Text>
+                  {/* rating badge — centered on the avatar's bottom edge */}
+                  <View style={{ position: "absolute", left: 0, right: 0, bottom: -10, alignItems: "center" }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        backgroundColor: "#fff",
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 12,
+                        shadowColor: "#000",
+                        shadowOpacity: 0.12,
+                        shadowRadius: 4,
+                        shadowOffset: { width: 0, height: 1 },
+                        elevation: 2,
+                      }}
+                    >
+                      <Star size={15} color="#f59e0b" fill="#f59e0b" strokeWidth={0} />
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: FIG_GREEN }}>{ratingText}</Text>
+                    </View>
                   </View>
                 </View>
-                {/* category / title / store */}
-                <View style={{ flex: 1, minWidth: 0, gap: 4, paddingTop: 2 }}>
-                  <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>{product.category}</Text>
-                  <Text numberOfLines={2} style={{ fontSize: 14, fontWeight: "700", color: "#fff", lineHeight: 19 }}>
+                {/* category / title / store — centered against the avatar,
+                    category as a translucent pill so the name reads first */}
+                <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                  <View style={{ alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.18)", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 }}>
+                    <Text style={{ fontSize: 11.5, fontWeight: "600", color: "#fff" }}>{product.category}</Text>
+                  </View>
+                  <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: "700", color: "#fff", lineHeight: 23 }}>
                     {product.name}
                   </Text>
-                  <View className="flex-row items-center" style={{ gap: 5, marginTop: 2 }}>
-                    <Store size={15} color="#fff" strokeWidth={2} />
-                    <Text style={{ fontSize: 12.5, color: "#fff" }}>{product.studioName || "METAHERB Store"}</Text>
+                  <View className="flex-row items-center" style={{ gap: 5 }}>
+                    <Store size={13} color="rgba(255,255,255,0.85)" strokeWidth={2.2} />
+                    <Text numberOfLines={1} style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)" }}>{product.studioName || "METAHERB Store"}</Text>
                   </View>
                 </View>
               </View>
-            </View>
 
-            {/* White body — about + KPI tiles + tabs */}
-            <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16, gap: 14 }}>
-              {/* เกี่ยวกับผลิตภัณฑ์ */}
-              <View style={{ gap: 4 }}>
-                <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>เกี่ยวกับผลิตภัณฑ์</Text>
-                <Text style={{ fontSize: 14, fontWeight: "500", color: "rgba(0,0,0,0.85)", lineHeight: 20 }}>
-                  {product.tagline}
-                </Text>
-              </View>
+              {/* เกี่ยวกับผลิตภัณฑ์ — tagline inside the green box (web hero) */}
+              <Text style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)", lineHeight: 18, marginTop: 14 }} numberOfLines={2}>
+                {product.tagline}
+              </Text>
 
-              {/* KPI tiles — 3 equal #fafafa chips */}
-              <View className="flex-row" style={{ gap: 8 }}>
-                {kpis.map((k) => (
-                  <View
-                    key={k.label}
-                    style={{ flex: 1, backgroundColor: "#fafafa", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}
-                  >
-                    <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>{k.label}</Text>
-                    <View className="flex-row items-baseline" style={{ gap: 5, marginTop: 3 }}>
-                      <Text style={{ fontSize: 17, fontWeight: "700", color: "#000" }}>{k.value}</Text>
-                      <Text style={{ fontSize: 13, color: "rgba(0,0,0,0.6)" }}>{k.sub}</Text>
+              {/* KPI strip — inline label · value · sub with thin white dividers (web) */}
+              <View className="flex-row items-center flex-wrap" style={{ columnGap: 14, rowGap: 6, marginTop: 12 }}>
+                {kpis.map((k, i) => (
+                  <View key={k.label} className="flex-row items-center" style={{ gap: 14 }}>
+                    {i > 0 ? <View style={{ width: 1, height: 12, backgroundColor: "rgba(255,255,255,0.2)" }} /> : null}
+                    <View className="flex-row items-baseline" style={{ gap: 5 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "500", color: "rgba(255,255,255,0.65)" }}>{k.label}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>{k.value}</Text>
+                      <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>{k.sub}</Text>
                     </View>
                   </View>
                 ))}
               </View>
 
-              {/* ===== TABS NAV — pill bar, green active ===== */}
-              <View className="flex-row self-start" style={{ backgroundColor: "#f3f4f6", borderRadius: 999, padding: 4, gap: 4 }}>
-              {TABS.map((t) => {
-                const active = tab === t.id;
-                const badge = t.id === "applicants" ? applicants.length : undefined;
-                return (
-                  <Pressable
-                    key={t.id}
-                    onPress={() => setTab(t.id)}
-                    className="flex-row items-center justify-center active:opacity-90"
-                    style={{ height: 34, paddingHorizontal: 16, borderRadius: 999, gap: 6, overflow: "hidden" }}
-                  >
-                    {active ? (
-                      <LinearGradient
-                        colors={[TAB_FROM, TAB_TO]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{ position: "absolute", inset: 0 }}
-                      />
-                    ) : null}
-                    <t.Icon size={14} color={active ? "#fff" : TEXT_MUTED} strokeWidth={2.2} />
-                    <Text style={{ fontSize: 12.5, fontWeight: active ? "700" : "500", color: active ? "#fff" : TEXT_SECONDARY }}>
-                      {t.label}
-                    </Text>
-                    {badge !== undefined && badge > 0 ? (
-                      <View
-                        style={{
-                          minWidth: 18,
-                          height: 16,
-                          paddingHorizontal: 6,
-                          borderRadius: 8,
-                          backgroundColor: active ? "rgba(255,255,255,0.25)" : "#ff4757",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: "600", color: "#fff" }}>{badge}</Text>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
+              {/* ===== TABS NAV — white sliding-pill capsule on the green (web) ===== */}
+              <View style={{ marginTop: 14 }}>
+                <SegmentedTabs
+                  tabs={TABS.map((t) => ({
+                    id: t.id,
+                    label: t.label,
+                    count: t.id === "applicants" && applicants.length > 0 ? applicants.length : undefined,
+                  }))}
+                  active={tab}
+                  onChange={setTab}
+                />
               </View>
-            </View>
+            </LinearGradient>
           </View>
 
           {/* ===== TAB CONTENT ===== */}

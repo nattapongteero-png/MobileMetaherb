@@ -78,6 +78,7 @@ import {
   PackageX,
   Pencil,
   Sprout,
+  SlidersHorizontal,
   GripVertical,
   PlusCircle,
   ScanSearch,
@@ -133,6 +134,7 @@ import { CouponsOwnerSection } from "./CouponsView";
 import { SalesDatePicker, type DateRange } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 import {
   BRAND_GREEN,
   BRAND_GREEN_DARK,
@@ -432,8 +434,14 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
   const items = order.map((id) => MENU_BY_ID[id]).filter(Boolean);
   // "จัดลำดับ" rides as the last cell — a circular tile like its menu peers.
   const cells: Cell[] = [...items.map((m) => ({ kind: "menu" as const, m })), { kind: "reorder" as const }];
+  // iPad: 5 tiles per row (slightly larger, like the Home categories); phones 4.
+  const perRow = isTablet() ? 5 : 4;
+  const pageSize = perRow * 2;
+  const tileW = `${100 / perRow}%` as const;
+  const circle = isTablet() ? 56 : 52;
+  const labelSize = isTablet() ? 12 : 10.5;
   const pages: Cell[][] = [];
-  for (let i = 0; i < cells.length; i += 8) pages.push(cells.slice(i, i + 8));
+  for (let i = 0; i < cells.length; i += pageSize) pages.push(cells.slice(i, i + pageSize));
 
   const openEdit = () => setEditing(true);
   const saveOrder = (o: SectionId[]) => {
@@ -451,18 +459,18 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
               <View key={pi} style={{ width: w, flexDirection: "row", flexWrap: "wrap" }}>
                 {pg.map((cell) =>
                   cell.kind === "reorder" ? (
-                    <Pressable key="reorder" onPress={openEdit} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
-                      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                        <Pencil size={20} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
+                    <Pressable key="reorder" onPress={openEdit} className="active:opacity-60" style={{ width: tileW, alignItems: "center", paddingVertical: 10 }}>
+                      <View style={{ width: circle, height: circle, borderRadius: circle / 2, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                        <Pencil size={isTablet() ? 22 : 20} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
                       </View>
-                      <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>จัดลำดับ</Text>
+                      <Text numberOfLines={1} style={{ fontSize: labelSize, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>จัดลำดับ</Text>
                     </Pressable>
                   ) : (
-                    <Pressable key={cell.m.id} onPress={() => onSelect?.(cell.m.id)} className="active:opacity-60" style={{ width: "25%", alignItems: "center", paddingVertical: 10 }}>
-                      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                        <cell.m.Icon size={22} color={BRAND_GREEN_DARK} strokeWidth={2} />
+                    <Pressable key={cell.m.id} onPress={() => onSelect?.(cell.m.id)} className="active:opacity-60" style={{ width: tileW, alignItems: "center", paddingVertical: 10 }}>
+                      <View style={{ width: circle, height: circle, borderRadius: circle / 2, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                        <cell.m.Icon size={isTablet() ? 24 : 22} color={BRAND_GREEN_DARK} strokeWidth={2} />
                       </View>
-                      <Text numberOfLines={1} style={{ fontSize: 10.5, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>{cell.m.label}</Text>
+                      <Text numberOfLines={1} style={{ fontSize: labelSize, color: TEXT_SECONDARY, textAlign: "center", marginTop: 6, maxWidth: "98%" }}>{cell.m.label}</Text>
                     </Pressable>
                   ),
                 )}
@@ -1095,6 +1103,9 @@ function ShopHeader({ title, subtitle, onBack, headerRight }: { title?: string; 
         </View>
         {headerRight}
       </View>
+      {/* iPad — extra green breathing room under the app bar, same as the
+          main pages' headers. */}
+      {isTablet() ? <View style={{ height: 28 }} /> : null}
     </SafeAreaView>
   );
 }
@@ -1399,6 +1410,11 @@ export function MyShopScreen() {
       scrollEdgeAppearance="opaque"
       tabBarStyle={{ backgroundColor: "#ffffff" }}
       minimizeBehavior="never"
+      // iPad — same label treatment as the main tab bar (small + Thai Medium);
+      // stacked icon-over-label + icon size come from the shared native patch.
+      {...(isTablet()
+        ? { tabLabelStyle: { fontSize: 11, fontFamily: "IBMPlexSansThaiLooped_500Medium" } }
+        : null)}
       screenOptions={{ lazy: false }}
     >
       <ShopTab.Screen name="ShopOverview" component={OverviewScreen} options={{ title: "ภาพรวม", tabBarIcon: () => ({ sfSymbol: "chart.bar.fill" }) }} />
@@ -1662,7 +1678,7 @@ function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; b
               <MaterialCard
                 key={m.id}
                 m={m}
-                width={(width - 16 * 2 - 14) / 2}
+                width={gridCardWidth(gridColumns(190, 32, 14), 32, 14)}
                 onPress={() => nav.navigate("HerbalMarketDetail", { id: m.id, preview: true })}
               />
             ))}
@@ -2151,7 +2167,7 @@ function DashboardCalendar({
                     disabled={!cell.inMonth}
                     className="active:opacity-70"
                     style={{
-                      aspectRatio: 1,
+                      aspectRatio: isTablet() ? 0.8 : 1,
                       borderRadius: 8,
                       alignItems: "center",
                       justifyContent: "center",
@@ -2192,7 +2208,7 @@ function DashboardCalendar({
                   onPress={() => setMonth(() => mi)}
                   className="active:opacity-70"
                   style={{
-                    aspectRatio: 1.4,
+                    aspectRatio: isTablet() ? 1.1 : 1.4,
                     borderRadius: 10,
                     alignItems: "center",
                     justifyContent: "center",
@@ -2728,31 +2744,41 @@ function OverviewTab({
         borderWidth: 1,
         borderColor: "#f0e6d4",
         padding: 16,
+        ...(isTablet()
+          ? ({
+              padding: 20,
+              shadowColor: "#f59e0b",
+              shadowOpacity: 0.1,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 2,
+            } as const)
+          : null),
       }}
     >
       <View className="flex-row items-center justify-between">
-        <Text style={{ fontSize: 12, color: TEXT_DISABLED }} numberOfLines={1}>
+        <Text style={{ fontSize: isTablet() ? 13.5 : 12, color: TEXT_DISABLED }} numberOfLines={1}>
           ยอดขาย {ctxLabel}
         </Text>
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: isTablet() ? 38 : 32,
+            height: isTablet() ? 38 : 32,
+            borderRadius: 19,
             backgroundColor: "rgba(245,158,11,0.1)",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <PlusCircle size={16} color="#f59e0b" />
+          <PlusCircle size={isTablet() ? 19 : 16} color="#f59e0b" />
         </View>
       </View>
       <View className="flex-row items-baseline" style={{ marginTop: 8, gap: 6 }}>
         <AnimatedNumber
           value={fmtNum(ctxSales)}
-          style={{ fontSize: 26, fontWeight: "800", color: "#1a1a1a", letterSpacing: -0.5 }}
+          style={{ fontSize: isTablet() ? 24 : 26, fontWeight: "800", color: "#1a1a1a", letterSpacing: -0.5 }}
         />
-        <Text style={{ fontSize: 13, color: TEXT_DISABLED }}>บาท</Text>
+        <Text style={{ fontSize: isTablet() ? 14.5 : 13, color: TEXT_DISABLED }}>บาท</Text>
       </View>
       <View className="flex-row items-center justify-between">
         <DeltaRow
@@ -2821,36 +2847,47 @@ function OverviewTab({
         borderWidth: 1,
         borderColor: "#e0f0e5",
         padding: 16,
+        // iPad split layout: web card's soft green glow + roomier padding.
+        ...(isTablet()
+          ? ({
+              padding: 20,
+              shadowColor: "#319754",
+              shadowOpacity: 0.1,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 2,
+            } as const)
+          : null),
       }}
     >
       <View className="flex-row items-center justify-between">
-        <Text style={{ fontSize: 12, color: "#3d7d52", fontWeight: "500" }}>
+        <Text style={{ fontSize: isTablet() ? 13.5 : 12, color: "#3d7d52", fontWeight: "500" }}>
           {period === "yearly" ? "ยอดขายรายปี" : "ยอดขายรายเดือน"}
         </Text>
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: isTablet() ? 38 : 32,
+            height: isTablet() ? 38 : 32,
+            borderRadius: 19,
             backgroundColor: "rgba(49,151,84,0.15)",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <DollarSign size={16} color="#287745" />
+          <DollarSign size={isTablet() ? 19 : 16} color="#287745" />
         </View>
       </View>
       <View className="flex-row items-baseline" style={{ marginTop: 8, gap: 6 }}>
         <AnimatedNumber
           value={fmtNum(bigSales)}
           style={{
-            fontSize: 28,
+            fontSize: isTablet() ? 24 : 28,
             fontWeight: "800",
             color: "#287745",
             letterSpacing: -0.5,
           }}
         />
-        <Text style={{ fontSize: 13, color: "rgba(61,125,82,0.8)" }}>บาท</Text>
+        <Text style={{ fontSize: isTablet() ? 14.5 : 13, color: "rgba(61,125,82,0.8)" }}>บาท</Text>
       </View>
       <View className="flex-row items-center justify-between">
         <DeltaRow value={delta.sales} label={periodLabel} />
@@ -2865,12 +2902,13 @@ function OverviewTab({
       count={ORDER_STATUS.reduce((a, b) => a + b.count, 0)}
       onSeeAll={() => nav.navigate("ShopOrders")}
     >
+      {/* iPad: all 6 stages fit one row; phones wrap 3-per-row into two rows. */}
       <View
         className="flex-row flex-wrap"
         style={{ justifyContent: "space-between", rowGap: 8 }}
       >
         {ORDER_STATUS.map((s) => (
-          <StatusTile key={s.id} {...s} width="31.5%" onPress={() => nav.navigate("ShopOrders", { initialFilter: s.id })} />
+          <StatusTile key={s.id} {...s} width={isTablet() ? "15.8%" : "31.5%"} onPress={() => nav.navigate("ShopOrders", { initialFilter: s.id })} />
         ))}
       </View>
     </SectionCard>
@@ -3014,18 +3052,58 @@ function OverviewTab({
           <MetaManagerCard onPress={() => nav.navigate("ShopManagerChat")} />
           <Text style={{ fontSize: 16, fontWeight: "700", color: TEXT_PRIMARY, marginTop: 10, marginBottom: -6 }}>ภาพรวม</Text>
           {orderTrackingCard}
-          {quotationCard}
-          {trialCard}
-          <DashboardCalendar
-            period={period}
-            onPeriodChange={onPeriodChange}
-            sel={cal}
-            onChange={setCal}
-          />
-          {salesCard}
-          {kpiPair}
-          {subKpiPair}
-          {contextualSalesCard}
+          {/* iPad: quotation (left) + trial (right) share a row; phones stack. */}
+          {isTablet() ? (
+            <View className="flex-row" style={{ gap: 14 }}>
+              <View style={{ flex: 1 }}>{quotationCard}</View>
+              <View style={{ flex: 1 }}>{trialCard}</View>
+            </View>
+          ) : (
+            <>
+              {quotationCard}
+              {trialCard}
+            </>
+          )}
+          {/* iPad: heatmap calendar (left) + KPI stack (right), like the web
+              dashboard's "Calendar + Stats" split. Phones keep the stack. */}
+          {isTablet() ? (
+            // The calendar's natural height drives the row; the KPI column is
+            // absolute-filled to that exact height so its four flex:1 blocks
+            // split it evenly (flex children inside an auto-height column
+            // collapse under Yoga — the absolute fill gives them a definite
+            // height to divide).
+            <View className="flex-row" style={{ gap: 14 }}>
+              {/* iPad: taller day cells give the calendar (and thus the whole
+                  row) more height — the KPI stack follows automatically. */}
+              <View style={{ flex: 1 }}>
+                <DashboardCalendar
+                  period={period}
+                  onPeriodChange={onPeriodChange}
+                  sel={cal}
+                  onChange={setCal}
+                />
+              </View>
+              <View style={{ flex: 1, gap: 14 }}>
+                {salesCard}
+                {kpiPair}
+                {subKpiPair}
+                {contextualSalesCard}
+              </View>
+            </View>
+          ) : (
+            <>
+              <DashboardCalendar
+                period={period}
+                onPeriodChange={onPeriodChange}
+                sel={cal}
+                onChange={setCal}
+              />
+              {salesCard}
+              {kpiPair}
+              {subKpiPair}
+              {contextualSalesCard}
+            </>
+          )}
           {topProductsCard}
           {topCustomersCard}
         </>
@@ -3335,8 +3413,8 @@ function DetailButton({ onPress }: { onPress?: () => void }) {
       className="flex-row items-center justify-center active:opacity-70"
       style={{
         marginTop: 8,
-        height: 30,
-        paddingHorizontal: 12,
+        height: isTablet() ? 34 : 30,
+        paddingHorizontal: isTablet() ? 14 : 12,
         borderRadius: 999,
         backgroundColor: "white",
         borderWidth: 1,
@@ -3344,8 +3422,8 @@ function DetailButton({ onPress }: { onPress?: () => void }) {
         gap: 4,
       }}
     >
-      <Eye size={12} color={TEXT_SECONDARY} />
-      <Text style={{ fontSize: 11, fontWeight: "600", color: TEXT_SECONDARY }}>
+      <Eye size={isTablet() ? 13.5 : 12} color={TEXT_SECONDARY} />
+      <Text style={{ fontSize: isTablet() ? 12.5 : 11, fontWeight: "600", color: TEXT_SECONDARY }}>
         ดูรายละเอียด
       </Text>
     </Pressable>
@@ -3455,36 +3533,46 @@ function KpiCard({
         borderWidth: 1,
         borderColor: DIVIDER_GRAY,
         padding: 14,
+        ...(isTablet()
+          ? ({
+              padding: 18,
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 1 },
+              elevation: 1,
+            } as const)
+          : null),
       }}
     >
       <View className="flex-row items-center justify-between">
-        <Text style={{ fontSize: 11, color: TEXT_DISABLED }} numberOfLines={1}>
+        <Text style={{ fontSize: isTablet() ? 13 : 11, color: TEXT_DISABLED }} numberOfLines={1}>
           {label}
         </Text>
         <View
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
+            width: isTablet() ? 34 : 28,
+            height: isTablet() ? 34 : 28,
+            borderRadius: isTablet() ? 17 : 14,
             backgroundColor: `${accent}1A`,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Icon size={14} color={accent} />
+          <Icon size={isTablet() ? 17 : 14} color={accent} />
         </View>
       </View>
       <View className="flex-row items-baseline" style={{ marginTop: 8, gap: 4 }}>
         <AnimatedNumber
           value={value}
           style={{
-            fontSize: 24,
+            fontSize: isTablet() ? 24 : 24,
             fontWeight: "800",
             color: "#1a1a1a",
             letterSpacing: -0.3,
           }}
         />
-        <Text style={{ fontSize: 12, color: TEXT_DISABLED }}>{unit}</Text>
+        <Text style={{ fontSize: isTablet() ? 13.5 : 12, color: TEXT_DISABLED }}>{unit}</Text>
       </View>
       <DeltaRow value={delta} label={deltaLabel} compact />
     </View>
@@ -3505,11 +3593,11 @@ function DeltaRow({
   const Arrow = up ? TrendingUp : TrendingDown;
   return (
     <View className="flex-row items-center" style={{ marginTop: 6, gap: 4 }}>
-      <Arrow size={compact ? 11 : 13} color={color} />
-      <Text style={{ color, fontSize: compact ? 11 : 12, fontWeight: "600" }}>
+      <Arrow size={(compact ? 11 : 13) + (isTablet() ? 2 : 0)} color={color} />
+      <Text style={{ color, fontSize: (compact ? 11 : 12) + (isTablet() ? 1.5 : 0), fontWeight: "600" }}>
         {Math.abs(value)}%
       </Text>
-      <Text style={{ color: TEXT_DISABLED, fontSize: compact ? 10 : 11 }} numberOfLines={1}>
+      <Text style={{ color: TEXT_DISABLED, fontSize: (compact ? 10 : 11) + (isTablet() ? 1.5 : 0) }} numberOfLines={1}>
         เทียบกับ{label}
       </Text>
     </View>
@@ -3946,12 +4034,13 @@ export function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDet
 // ===================== จัดการสินค้า — list management view =====================
 // Mirrors the web ProductsTab: product-type segmented tabs (ผลิตภัณฑ์ / วัตถุดิบ),
 // status filter pills + search, and a card list with a 3-dot action menu.
-const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[] = [
-  { id: "all", label: "ทั้งหมด", Icon: Package },
-  { id: "เปิดขาย", label: "เปิดขาย", Icon: PackageCheck },
-  { id: "ปิดขาย", label: "ปิดขาย", Icon: EyeOff },
-  { id: "สินค้าหมด", label: "สินค้าหมด", Icon: AlertTriangle },
-];
+// Per-status product counts for the ShopProductFilter sheet's rows.
+const statusCounts = (list: PMProduct[]): Record<"all" | PMStatus, number> => ({
+  all: list.length,
+  เปิดขาย: list.filter((p) => p.status === "เปิดขาย").length,
+  ปิดขาย: list.filter((p) => p.status === "ปิดขาย").length,
+  สินค้าหมด: list.filter((p) => p.status === "สินค้าหมด").length,
+});
 
 // Skeleton placeholder mirroring a product card while the list loads.
 function PMCardSkeleton() {
@@ -4930,8 +5019,19 @@ function FlashTermsSheet({ event, onClose, onJoin }: { event: FlashEvent | null;
 
 
 
+// Status filter chips for the product-manage list (sticky filter bar).
+const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[] = [
+  { id: "all", label: "ทั้งหมด", Icon: Package },
+  { id: "เปิดขาย", label: "เปิดขาย", Icon: PackageCheck },
+  { id: "ปิดขาย", label: "ปิดขาย", Icon: PackageX },
+  { id: "สินค้าหมด", label: "สินค้าหมด", Icon: ShoppingBag },
+];
+
 export function ProductsManageSection({ type, setType, showSearch = true, insetsBottom = 24 }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void; showSearch?: boolean; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
+  // Product-type chips (ผลิตภัณฑ์ / วัตถุดิบ) switch the list; status + category
+  // live behind the "กรองเพิ่มเติม" button → ShopProductFilter sheet (same
+  // filter shell as the customer ผลิตภัณฑ์ page).
   const [filter, setFilter] = useState<"all" | PMStatus>("all");
   const [query, setQuery] = useState("");
   // Store-backed lists — toggle/delete from any page updates here live.
@@ -4960,14 +5060,14 @@ export function ProductsManageSection({ type, setType, showSearch = true, insets
 
   const list = type === "regular" ? regular : material;
 
-  const count = (id: "all" | PMStatus) => (id === "all" ? list.length : list.filter((p) => p.status === id).length);
-
   const q = query.trim().toLowerCase();
   const visible = list.filter((p) => {
     if (filter !== "all" && p.status !== filter) return false;
     if (!q) return true;
     return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
   });
+  const filterActive = filter !== "all";
+  const count = (id: "all" | PMStatus) => list.filter((p) => id === "all" || p.status === id).length;
 
   const remove = (p: PMProduct) =>
     Alert.alert("ลบสินค้า", `ต้องการลบ "${p.name}" ใช่หรือไม่?`, [
@@ -5061,6 +5161,7 @@ export function ProductsManageSection({ type, setType, showSearch = true, insets
         }}
         onDelete={remove}
       />
+
     </View>
   );
 }
@@ -5089,19 +5190,109 @@ export function PMAddFab({ bottom, onPress }: { bottom: number; onPress: () => v
   );
 }
 
-// Add-FAB that morphs into a 2-option menu (เพิ่มผลิตภัณฑ์ / เพิ่มวัตถุดิบ) —
-// same iOS 26 morph as the app-bar ⋯ menus, but pinned to the FAB's
-// bottom-right corner so the card grows upward. The FAB hides while open
-// (the button "becomes" the menu).
+// Speed-dial add button — pressing + springs TWO separate pill actions out
+// above the FAB (เพิ่มผลิตภัณฑ์ / เพิ่มวัตถุดิบ), each its own floating button
+// with a tinted icon tile, while the plus rotates into a close ×. Tap-outside
+// or the × collapses everything back into the FAB.
 export function PMAddMenuFab({ bottom, onAdd }: { bottom: number; onAdd: (mode: "regular" | "material") => void }) {
   const [open, setOpen] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+  const toggle = (to: boolean) => {
+    setOpen(to);
+    Animated.spring(anim, { toValue: to ? 1 : 0, useNativeDriver: true, stiffness: 330, damping: 24, mass: 0.9 }).start();
+  };
+  const pick = (mode: "regular" | "material") => {
+    toggle(false);
+    onAdd(mode);
+  };
+
+  // lift = final distance above the FAB; each button travels up from the FAB.
+  const ACTIONS = [
+    { key: "regular" as const, label: "เพิ่มผลิตภัณฑ์", Icon: Package, tint: BRAND_GREEN, lift: 70 },
+    { key: "material" as const, label: "เพิ่มวัตถุดิบ", Icon: Sprout, tint: "#14b8a6", lift: 140 },
+  ];
+
   return (
     <>
-      {!open ? <PMAddFab bottom={bottom} onPress={() => setOpen(true)} /> : null}
-      <AppleMenu visible={open} onClose={() => setOpen(false)} anchorBottom={bottom} right={16} originSize={58}>
-        <AppleMenuItem label="เพิ่มผลิตภัณฑ์" Icon={Package} onPress={() => { setOpen(false); onAdd("regular"); }} />
-        <AppleMenuItem label="เพิ่มวัตถุดิบ" Icon={Sprout} onPress={() => { setOpen(false); onAdd("material"); }} />
-      </AppleMenu>
+      {/* Tap-outside catcher */}
+      {open ? (
+        <Pressable onPress={() => toggle(false)} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} />
+      ) : null}
+
+      {/* Action pills — separate floating buttons springing out of the FAB */}
+      {ACTIONS.map((a) => (
+        <Animated.View
+          key={a.key}
+          pointerEvents={open ? "auto" : "none"}
+          style={{
+            position: "absolute",
+            right: 16,
+            bottom: bottom + a.lift,
+            zIndex: 41,
+            opacity: anim.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 1, 1] }),
+            transform: [
+              { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [a.lift - 6, 0] }) },
+              { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
+            ],
+          }}
+        >
+          {/* Label chip on the left · FAB-sized icon circle on the right
+              (the circle stacks in the same column as the + button) */}
+          <Pressable onPress={() => pick(a.key)} className="flex-row items-center active:opacity-80" style={{ gap: 10 }}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 999,
+                height: 38,
+                paddingHorizontal: 14,
+                justifyContent: "center",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.14,
+                shadowRadius: 12,
+                elevation: 6,
+              }}
+            >
+              <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#1a1a1a" }}>{a.label}</Text>
+            </View>
+            <View
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: 29,
+                backgroundColor: a.tint,
+                alignItems: "center",
+                justifyContent: "center",
+                shadowColor: a.tint,
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.32,
+                shadowRadius: 14,
+                elevation: 8,
+              }}
+            >
+              <a.Icon size={24} color="#fff" strokeWidth={2.4} />
+            </View>
+          </Pressable>
+        </Animated.View>
+      ))}
+
+      {/* The FAB — plus rotates into × while open */}
+      <View style={{ position: "absolute", right: 16, bottom, zIndex: 42, borderRadius: 30, shadowColor: BRAND_GREEN, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.32, shadowRadius: 14 }}>
+        <Pressable
+          onPress={() => toggle(!open)}
+          accessibilityLabel={open ? "ปิดเมนูเพิ่ม" : "เพิ่มสินค้า"}
+          className="active:opacity-90"
+          style={{
+            width: 58, height: 58, borderRadius: 29, backgroundColor: BRAND_GREEN,
+            alignItems: "center", justifyContent: "center",
+            shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 6,
+          }}
+        >
+          <Animated.View style={{ transform: [{ rotate: anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] }) }] }}>
+            <Plus size={26} color="white" strokeWidth={2.6} />
+          </Animated.View>
+        </Pressable>
+      </View>
     </>
   );
 }
@@ -5133,7 +5324,8 @@ export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: (e: Ges
     >
       {/* Header — image + name / category / status + type + participation chips */}
       <View className="flex-row items-center" style={{ gap: 12 }}>
-        <View style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
+        {/* iPad gets a larger thumbnail so the photo reads in the wider card. */}
+        <View style={{ width: isTablet() ? 84 : 52, height: isTablet() ? 84 : 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
           <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
           {overlay ? (
             <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>

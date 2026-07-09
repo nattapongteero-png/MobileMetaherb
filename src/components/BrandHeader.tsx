@@ -3,6 +3,7 @@ import { Animated, Image, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Bell, ChevronLeft, Search, ShoppingCart, Sparkles } from "lucide-react-native";
+import { isTablet, tabletSearchBarWidth } from "../theme/layout";
 import { GlassIconButton } from "./GlassIconButton";
 import { CountBadge } from "./CountBadge";
 import { BRAND_GREEN } from "../theme/tokens";
@@ -253,7 +254,7 @@ export function BrandHeader({
           {showLogo ? (
             <Image source={LOGO} style={{ width: 44, height: 44 }} resizeMode="contain" />
           ) : null}
-          <View className="flex-1">
+          <View className={isTablet() ? "" : "flex-1"}>
             <Text style={{ color: "white", fontSize: titleSize, fontWeight: "700", includeFontPadding: false, letterSpacing: 0.5 }}>
               {title}
             </Text>
@@ -263,6 +264,10 @@ export function BrandHeader({
               </Text>
             ) : null}
           </View>
+
+          {/* Push the action buttons to the right on tablets (title lost its
+              flex-1; the search floats centered as an overlay below). */}
+          {isTablet() ? <View style={{ flex: 1 }} /> : null}
 
           {ai}
           {showBell ? (
@@ -279,11 +284,48 @@ export function BrandHeader({
             count={effectiveCartCount}
             accessibilityLabel="ตะกร้าสินค้า"
           />
+
+          {/* iPad — search floats dead-center of the top row; phones keep the
+              dedicated row below. */}
+          {isTablet() ? (
+            <View
+              pointerEvents="box-none"
+              style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
+            >
+              <View
+                className="flex-row items-center rounded-full px-4"
+                style={{
+                  width: tabletSearchBarWidth(),
+                  height: 42,
+                  backgroundColor: "#ffffff",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 4,
+                }}
+              >
+                <Search size={17} color={BRAND_GREEN} />
+                <TextInput
+                  value={query}
+                  onChangeText={onChangeQuery}
+                  placeholder={searchPlaceholder}
+                  placeholderTextColor="#a3a3a3"
+                  returnKeyType="search"
+                  style={{ flex: 1, marginLeft: 8, fontSize: 13, color: "#374151" }}
+                />
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
 
-      {/* Search row — full-width bar that hides on scroll-down, returns on scroll-up */}
-      <Animated.View style={{ height: searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
+      {/* iPad — extra green breathing room under the header (the search row
+          moved up into the top row, so give some space back). */}
+      {isTablet() ? <View style={{ height: 28 }} /> : null}
+
+      {/* Search row — full-width bar that hides on scroll-down, returns on
+          scroll-up. iPad puts the search in the top row instead. */}
+      <Animated.View style={{ height: isTablet() ? 0 : searchRowHeight, opacity: searchVisible, overflow: "hidden" }}>
         <View style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12, paddingTop: 14 }}>
           <View
             className="flex-row items-center rounded-full px-4"

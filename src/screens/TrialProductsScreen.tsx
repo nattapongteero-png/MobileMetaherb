@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
+import type { TestObjective } from "../data/ownerTrialRegistrations";
 import { BrandHeader } from "../components/BrandHeader";
 import {
   Sparkles,
@@ -23,6 +24,7 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED, STAR_YELLOW } from "../theme/tokens";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 /* ----------------------------------------------------------------------------
  * Data — ported verbatim from web src/app/data/trialProducts.ts
@@ -31,9 +33,8 @@ import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED, STAR_YELLOW } from "../theme/t
 
 // 2-column trial grid: full width minus 16px page padding each side minus the gap.
 const TRIAL_GRID_GAP = 14;
-const TRIAL_CARD_WIDTH = Math.floor(
-  (Dimensions.get("window").width - 16 * 2 - TRIAL_GRID_GAP) / 2,
-);
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const TRIAL_CARD_WIDTH = gridCardWidth(gridColumns(190, 32, TRIAL_GRID_GAP), 32, TRIAL_GRID_GAP);
 
 type ConcernKey = "cosmetic" | "health" | "aroma" | "food" | "equipment";
 
@@ -61,6 +62,12 @@ export type TrialProduct = {
   prevAvgRating?: number;
   prevRatingCount?: number;
   concerns?: ConcernKey[];
+  /** Eval setup from the add form — drives the แบบประเมิน card on the owner
+   *  detail's ข้อมูลสินค้า tab (web parity). Optional: built-in mocks fall
+   *  back to the category's objective template. */
+  testObjectives?: TestObjective[];
+  activePhases?: ("baseline" | "after_full")[];
+  evaluationDays?: number;
 };
 
 export const TRIAL_PRODUCTS: TrialProduct[] = [

@@ -101,6 +101,20 @@ export function ShopSectionScreen() {
                 <Search size={20} color="#1a1a1a" />
               </GlassIconButton>
             </View>
+          ) : section === "trials_products" ? (
+            <GlassIconButton
+              onPress={() => nav.navigate("ShopTrialSearch")}
+              accessibilityLabel="ค้นหาสินค้าทดลอง"
+            >
+              <Search size={20} color="#1a1a1a" />
+            </GlassIconButton>
+          ) : section === "trials_tracking" ? (
+            <GlassIconButton
+              onPress={() => nav.navigate("ShopTrialTrackingSearch")}
+              accessibilityLabel="ค้นหาคำขอทดลอง"
+            >
+              <Search size={20} color="#1a1a1a" />
+            </GlassIconButton>
           ) : undefined
         }
       />
@@ -114,8 +128,8 @@ export function ShopSectionScreen() {
             case "hm_quotations": return <QuotationSection showSearch={false} initialFilter={initialFilter} insetsBottom={bottom} />;
             case "hm_pr": return <DocSection kind="pr" showSearch={false} insetsBottom={bottom} />;
             case "hm_po": return <DocSection kind="po" showSearch={false} insetsBottom={bottom} />;
-            case "trials_products": return <TrialRegistryOwnerSection insetsBottom={bottom} />;
-            case "trials_tracking": return <TrialTrackingOwnerSection insetsBottom={bottom} />;
+            case "trials_products": return <TrialRegistryOwnerSection insetsBottom={bottom} showSearch={false} />;
+            case "trials_tracking": return <TrialTrackingOwnerSection insetsBottom={bottom} showSearch={false} />;
             case "promotions": return <PromotionsOwnerSection showSearch={false} insetsBottom={bottom} />;
             case "coupons": return <CouponsOwnerSection showSearch={false} insetsBottom={bottom} />;
             default: return null;

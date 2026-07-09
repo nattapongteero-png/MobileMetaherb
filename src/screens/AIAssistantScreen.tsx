@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, ScrollView, TextInput, Pressable, Image, Dimensions,
-  KeyboardAvoidingView, Platform, Keyboard, Alert,
+  KeyboardAvoidingView, Platform, Keyboard, Alert, Linking,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -15,9 +15,11 @@ import Animated, {
 import {
   Plus, History, Send, Sparkles, Check, Tag, ShoppingCart, ArrowRight, Camera, Mic,
   Moon, Activity, Scale, Brain, Shield, Wallet, Gift, Package, Leaf, Receipt, X,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { getImagePicker } from "../utils/imagePicker";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { PressableScale } from "../components/PressableScale";
 import { ProductCard } from "../components/ProductCard";
@@ -30,9 +32,10 @@ import { voxSpeak, stopVox } from "../utils/voxtts";
 import { STATUS_LABEL } from "../data/orders";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_WIDTH = appWidth();
 const AI_GRAD = ["#0088ff", "#6366f1", "#9747ff"] as const;
 const AI_PURPLE = "#6366f1";
 const META_AI = require("../../assets/meta-ai.gif");
@@ -84,7 +87,7 @@ const chipExit = new Keyframe({
 export function AIAssistantScreen() {
   const nav = useNavigation<Nav>();
   const route = useRoute<RouteProp<RootStackParamList, "AIAssistant">>();
-  const { messages, typing, send, setPageContext, quickReplyChips, markRead, newChat } = useAIAssistant();
+  const { messages, typing, send, sendImage, setPageContext, quickReplyChips, markRead, newChat } = useAIAssistant();
   useEffect(() => { setPageContext(route.params?.context); }, [route.params, setPageContext]);
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
@@ -129,7 +132,40 @@ export function AIAssistantScreen() {
   // Bar widens on focus — side margins shrink 24 → 16.
   const composerPad = useAnimatedStyle(() => ({ paddingHorizontal: 16 }));
 
-  const onCamera = () => Alert.alert("กำลังพัฒนา", "ส่งรูปให้เมต้าช่วยวิเคราะห์ — กำลังพัฒนาเร็วๆ นี้ครับ");
+  // Pick a photo (camera or library), downscale + base64-encode, and hand it to
+  // เมต้า for vision analysis. Keeps the payload small (quality 0.5) so the
+  // multimodal request stays fast; caption = whatever's typed in the composer.
+  const runPicker = async (mode: "camera" | "library") => {
+    const ImagePicker = getImagePicker();
+    if (!ImagePicker) { Alert.alert("ยังไม่พร้อม", "ฟีเจอร์รูปภาพต้องอัปเดต/รีบิลด์แอปก่อนนะครับ"); return; }
+    try {
+      const perm =
+        mode === "camera"
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm?.granted) { Alert.alert("ต้องอนุญาต", mode === "camera" ? "กรุณาอนุญาตการใช้กล้อง" : "กรุณาอนุญาตการเข้าถึงรูปภาพ"); return; }
+      const opts = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, base64: true } as const;
+      const res = mode === "camera" ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      if (!asset?.base64) { Alert.alert("ผิดพลาด", "อ่านรูปไม่สำเร็จ ลองใหม่อีกครั้งครับ"); return; }
+      const mime = asset.mimeType ?? "image/jpeg";
+      const caption = text.trim();
+      setText("");
+      Keyboard.dismiss();
+      await sendImage(`data:${mime};base64,${asset.base64}`, caption);
+    } catch {
+      Alert.alert("ผิดพลาด", "เปิดรูปไม่สำเร็จ ลองใหม่อีกครั้งครับ");
+    }
+  };
+
+  const onCamera = () => {
+    Alert.alert("ส่งรูปให้เมต้า", "ให้เมต้าช่วยดูรูปอาการหรือฉลากสินค้า", [
+      { text: "ถ่ายรูป", onPress: () => runPicker("camera") },
+      { text: "เลือกจากคลังภาพ", onPress: () => runPicker("library") },
+      { text: "ยกเลิก", style: "cancel" },
+    ]);
+  };
 
   const cleanupSubs = () => { subsRef.current.forEach((s) => s.remove()); subsRef.current = []; };
 
@@ -612,10 +648,49 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
     );
   }
 
+  // User photo — image thumbnail (+ optional caption) right-aligned
+  if (m.role === "user" && m.kind === "image") {
+    return (
+      <View style={{ alignItems: "flex-end", marginBottom: 16 }}>
+        <View style={{ maxWidth: "72%", borderRadius: 18, overflow: "hidden", backgroundColor: "#eceef1" }}>
+          <Image source={{ uri: m.image }} style={{ width: 200, height: 200, backgroundColor: "#e5e7eb" }} resizeMode="cover" />
+          {m.text ? (
+            <Text style={{ fontSize: 14.5, color: "#1a1a1a", lineHeight: 21, paddingHorizontal: 14, paddingVertical: 9 }}>{m.text}</Text>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ marginBottom: 22 }}>
       {m.kind === "text" && (
-        <Text style={{ fontSize: 15, color: "#333", lineHeight: 23 }}>{m.text}</Text>
+        <View>
+          <Text style={{ fontSize: 15, color: "#333", lineHeight: 23 }}>{m.text}</Text>
+          {/* Source citations — grounded answers show where the facts came
+              from (herb KB / Wikipedia); tap opens the reference. */}
+          {m.sources?.length ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {m.sources.map((s) => (
+                <Pressable
+                  key={s.url + s.title}
+                  onPress={() => Linking.openURL(s.url).catch(() => {})}
+                  className="active:opacity-60"
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 5,
+                    backgroundColor: "rgba(49,151,84,0.08)", borderWidth: 1, borderColor: "rgba(49,151,84,0.25)",
+                    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: "100%",
+                  }}
+                >
+                  <BookOpen size={11} color={BRAND_GREEN_DARK} strokeWidth={2.4} />
+                  <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "600", color: BRAND_GREEN_DARK, flexShrink: 1 }}>
+                    {s.title} · {s.org}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
       )}
 
       {m.kind === "products" && (
@@ -623,7 +698,7 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
           <Text style={{ fontSize: 15, color: "#333", lineHeight: 23, marginBottom: 10 }}>{m.text}</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {m.products.map((p) => (
-              <ProductCard key={p.id} product={p} width={(SCREEN_WIDTH - 16 * 2 - 12) / 2} />
+              <ProductCard key={p.id} product={p} width={gridCardWidth(gridColumns(190, 32, 12), 32, 12)} />
             ))}
           </View>
         </View>

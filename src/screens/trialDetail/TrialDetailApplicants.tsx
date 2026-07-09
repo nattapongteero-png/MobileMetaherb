@@ -41,8 +41,6 @@ import {
   Ban,
   Users,
   Phone,
-  MessageCircle,
-  MapPin,
   Coins,
   Star,
   ThumbsUp,
@@ -52,8 +50,9 @@ import {
   Sparkles,
 } from "lucide-react-native";
 
-import { BottomSheet } from "../../components/BottomSheet";
-import { SearchBar } from "../../components/SearchBar";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../../navigation/RootStack";
 import {
   getRegistrationsForTrial,
   getRegistrationStatus,
@@ -84,7 +83,7 @@ export type ApplicantsProduct = {
 /* ---------------------------------------------------------------------------
  *  STATUS_CFG — ported VERBATIM (OwnerTrialTabs.tsx L651-656).
  * ------------------------------------------------------------------------- */
-const STATUS_CFG: Record<
+export const STATUS_CFG: Record<
   RegistrationStatus,
   { label: string; pillBg: string; pillText: string }
 > = {
@@ -132,7 +131,7 @@ const PORTRAIT_POOL = {
   ],
 } as const;
 
-function portraitForApplicant(name: string, gender: string | undefined): string {
+export function portraitForApplicant(name: string, gender: string | undefined): string {
   const key = (gender || "unknown") as keyof typeof PORTRAIT_POOL;
   const pool = PORTRAIT_POOL[key] || PORTRAIT_POOL.unknown;
   let h = 0;
@@ -142,7 +141,7 @@ function portraitForApplicant(name: string, gender: string | undefined): string 
 }
 
 /** th-TH short date — mirrors web new Date(...).toLocaleString("th-TH", {...}). */
-function submittedLabelFor(ts: number): string {
+export function submittedLabelFor(ts: number): string {
   try {
     return new Date(ts).toLocaleString("th-TH", {
       day: "numeric",
@@ -184,7 +183,9 @@ export function FilterPill({
         paddingLeft: 6,
         paddingRight: 12,
         borderRadius: 999,
-        backgroundColor: active ? BRAND_GREEN : "transparent",
+        backgroundColor: active ? BRAND_GREEN : "#fff",
+        borderWidth: 1,
+        borderColor: active ? BRAND_GREEN : "#e5e7eb",
       }}
     >
       {/* icon chip */}
@@ -238,12 +239,15 @@ export function RegistrationCard({
   onApprove,
   onReject,
   onViewEval,
+  onPress,
 }: {
   reg: Registration;
   product: ApplicantsProduct;
   onApprove: () => void;
   onReject: () => void;
   onViewEval: () => void;
+  /** Tap on the card body (e.g. open the trial's detail page). */
+  onPress?: () => void;
 }) {
   const status = getRegistrationStatus(reg);
   const cfg = STATUS_CFG[status];
@@ -256,389 +260,121 @@ export function RegistrationCard({
       ? { uri: product.image }
       : undefined;
 
-  /* -- Footer actions (status-dependent) -------------------------------- */
+  /* -- Footer actions (status-dependent, compact) ------------------------ */
   let actions: React.ReactNode = null;
   if (status === "pending_approval") {
     actions = (
-      <>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Pressable
           onPress={onReject}
           hitSlop={4}
-          style={{
-            borderWidth: 1,
-            borderColor: "#ff3b30",
-            height: 36,
-            paddingHorizontal: 16,
-            borderRadius: 999,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
+          className="active:opacity-80"
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "#ff3b30", height: 32, paddingHorizontal: 14, borderRadius: 999 }}
         >
-          <X size={14} color="#ff3b30" strokeWidth={2.4} />
-          <Text style={{ fontSize: 13, color: "#ff3b30" }}>ปฏิเสธ</Text>
+          <X size={13} color="#ff3b30" strokeWidth={2.4} />
+          <Text style={{ fontSize: 12.5, fontWeight: "600", color: "#ff3b30" }}>ปฏิเสธ</Text>
         </Pressable>
         <Pressable
           onPress={onApprove}
           hitSlop={4}
-          style={{
-            backgroundColor: BRAND_GREEN,
-            height: 36,
-            paddingHorizontal: 16,
-            borderRadius: 999,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
+          className="active:opacity-90"
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: BRAND_GREEN, height: 32, paddingHorizontal: 14, borderRadius: 999 }}
         >
-          <Check size={14} color="#fff" strokeWidth={2.6} />
-          <Text style={{ fontSize: 13, color: "#fff" }}>อนุมัติ</Text>
+          <Check size={13} color="#fff" strokeWidth={2.6} />
+          <Text style={{ fontSize: 12.5, fontWeight: "600", color: "#fff" }}>อนุมัติ</Text>
         </Pressable>
-      </>
+      </View>
     );
   } else if (status === "approved") {
     actions = (
-      <>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            marginRight: 8,
-          }}
-        >
-          <Clock size={14} color="#b45309" strokeWidth={2.4} />
-          <Text style={{ fontSize: 12, color: "#b45309", fontWeight: "500" }}>
-            รอผู้ทดสอบส่งแบบประเมิน
-          </Text>
-        </View>
-        <Pressable
-          hitSlop={4}
-          style={{
-            borderWidth: 1,
-            borderColor: "#d1d5db",
-            height: 36,
-            paddingHorizontal: 16,
-            borderRadius: 999,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <Phone size={14} color="#374151" />
-          <Text style={{ fontSize: 13, color: "#374151" }}>ติดต่อ</Text>
-        </Pressable>
-        <Pressable
-          hitSlop={4}
-          style={{
-            borderWidth: 1,
-            borderColor: "#d1d5db",
-            height: 36,
-            paddingHorizontal: 16,
-            borderRadius: 999,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <MessageCircle size={14} color="#374151" />
-          <Text style={{ fontSize: 13, color: "#374151" }}>ส่งข้อความ</Text>
-        </Pressable>
-      </>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Clock size={13} color="#b45309" strokeWidth={2.4} />
+        <Text style={{ fontSize: 12, color: "#b45309", fontWeight: "500" }}>รอผู้ทดสอบส่งแบบประเมิน</Text>
+      </View>
     );
   } else if (status === "evaluated") {
     actions = (
-      <>
-        {reg.evaluation && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginRight: 8,
-            }}
-          >
-            <Star size={14} color="#fbbf24" fill="#fbbf24" strokeWidth={0} />
-            <Text style={{ fontSize: 12, color: "#b45309", fontWeight: "600" }}>
-              {reg.evaluation.overall}/5
-            </Text>
-            <Text style={{ fontSize: 12, color: "#9ca3af", marginHorizontal: 2 }}>
-              ·
-            </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        {reg.evaluation ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             {reg.evaluation.wouldRecommend ? (
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
-              >
-                <ThumbsUp size={12} color={BRAND_GREEN} strokeWidth={2.4} />
-                <Text style={{ fontSize: 12, color: BRAND_GREEN, fontWeight: "600" }}>
-                  แนะนำ
-                </Text>
-              </View>
+              <ThumbsUp size={13} color={BRAND_GREEN} strokeWidth={2.4} />
             ) : (
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
-              >
-                <ThumbsDown size={12} color="#dc2626" strokeWidth={2.4} />
-                <Text style={{ fontSize: 12, color: "#dc2626", fontWeight: "600" }}>
-                  ไม่แนะนำ
-                </Text>
-              </View>
+              <ThumbsDown size={13} color="#dc2626" strokeWidth={2.4} />
             )}
+            <Text style={{ fontSize: 12, fontWeight: "600", color: reg.evaluation.wouldRecommend ? BRAND_GREEN : "#dc2626" }}>
+              {reg.evaluation.wouldRecommend ? "แนะนำ" : "ไม่แนะนำ"}
+            </Text>
           </View>
-        )}
+        ) : null}
         <Pressable
           onPress={reg.evaluation ? onViewEval : undefined}
           disabled={!reg.evaluation}
           hitSlop={4}
-          style={{
-            height: 36,
-            paddingHorizontal: 16,
-            borderRadius: 999,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            backgroundColor: reg.evaluation ? BRAND_GREEN : "#f3f4f6",
-          }}
+          className="active:opacity-80"
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: BRAND_GREEN, height: 32, paddingHorizontal: 14, borderRadius: 999, opacity: reg.evaluation ? 1 : 0.4 }}
         >
-          <FileText
-            size={14}
-            color={reg.evaluation ? "#fff" : "#9ca3af"}
-            strokeWidth={2.4}
-          />
-          <Text
-            style={{
-              fontSize: 13,
-              color: reg.evaluation ? "#fff" : "#9ca3af",
-            }}
-          >
-            ดูแบบประเมิน
-          </Text>
+          <FileText size={13} color={BRAND_GREEN} strokeWidth={2.4} />
+          <Text style={{ fontSize: 12.5, fontWeight: "600", color: BRAND_GREEN }}>ดูแบบประเมิน</Text>
         </Pressable>
-      </>
-    );
-  } else {
-    // rejected
-    actions = (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Ban size={14} color="#6b7280" strokeWidth={2.4} />
-        <Text style={{ fontSize: 12, color: "#6b7280", fontWeight: "500" }}>
-          คำขอถูกปฏิเสธ
-        </Text>
       </View>
     );
   }
 
   return (
-    <View
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: "#f3f4f6",
-        overflow: "hidden",
-      }}
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      className="active:opacity-90"
+      style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14 }}
     >
-      {/* Header: avatar + name/phone + status pill | date */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingTop: 16,
-          gap: 8,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            flex: 1,
-            flexWrap: "wrap",
-          }}
-        >
-          {hasName ? (
-            <Image
-              source={{ uri: portraitForApplicant(reg.name, reg.gender) }}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 999,
-                borderWidth: 2,
-                borderColor: "rgba(49,151,84,0.15)",
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 999,
-                backgroundColor: "rgba(49,151,84,0.1)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 14, color: BRAND_GREEN, fontWeight: "700" }}>
-                ?
-              </Text>
-            </View>
-          )}
-          <View style={{ minWidth: 0, flexShrink: 1 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: hasName ? "#1a1a1a" : "#9ca3af",
-                fontStyle: hasName ? "normal" : "italic",
-              }}
-            >
-              {hasName ? reg.name.trim() : "ไม่ระบุชื่อ"}
-            </Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 }}
-            >
-              <Phone size={12} color={hasPhone ? "#6b7280" : "#9ca3af"} strokeWidth={2.2} />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: hasPhone ? "#6b7280" : "#9ca3af",
-                  fontStyle: hasPhone ? "normal" : "italic",
-                }}
-              >
-                {hasPhone ? reg.phone.trim() : "ไม่ระบุเบอร์"}
-              </Text>
-            </View>
+      {/* Header — avatar | name + phone | status pill (tinted, peer style) */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        {hasName ? (
+          <Image
+            source={{ uri: portraitForApplicant(reg.name, reg.gender) }}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#f3f4f6" }}
+          />
+        ) : (
+          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 16, color: BRAND_GREEN, fontWeight: "700" }}>?</Text>
           </View>
-          {/* status pill */}
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 4,
-              borderRadius: 999,
-              backgroundColor: cfg.pillBg,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: cfg.pillText, fontWeight: "500" }}>
-              {cfg.label}
-            </Text>
-          </View>
+        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: hasName ? "#0a0a0a" : "#9ca3af" }}>
+            {hasName ? reg.name.trim() : "ไม่ระบุชื่อ"}
+          </Text>
+          <Text numberOfLines={1} style={{ fontSize: 12, color: "#737373", marginTop: 2 }}>
+            {hasPhone ? reg.phone.trim() : "ไม่ระบุเบอร์"}
+          </Text>
         </View>
-        <Text style={{ fontSize: 12, color: "#6b7280" }}>{submittedLabel}</Text>
-      </View>
-
-      {/* Body: product row + address + motivation */}
-      <View
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          marginTop: 8,
-          gap: 12,
-        }}
-      >
-        {/* Trial product row */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            backgroundColor: "#f9fafb",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 10,
-              overflow: "hidden",
-              backgroundColor: "#f3f4f6",
-            }}
-          >
-            {imgSrc && (
-              <Image source={imgSrc} style={{ width: 56, height: 56 }} />
-            )}
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                color: BRAND_GREEN,
-                fontWeight: "600",
-                letterSpacing: 0.4,
-              }}
-            >
-              {product.category.toUpperCase()}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{ fontSize: 14, color: "#1a1a1a", fontWeight: "600" }}
-            >
-              {product.name || reg.trialId}
-            </Text>
-            <Text numberOfLines={1} style={{ fontSize: 12, color: "#6b7280" }}>
-              {product.tagline}
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ fontSize: 11, color: "#6b7280" }}>คะแนน</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-              <Coins size={14} color="#d97706" strokeWidth={2.4} />
-              <Text style={{ fontSize: 14, color: "#d97706", fontWeight: "700" }}>
-                +{(product.rewardPoints || 0).toLocaleString()}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Address + Motivation — web is 2-col on md; phone stacks to 1 col. */}
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-            <MapPin size={14} color="#9ca3af" strokeWidth={2.2} style={{ marginTop: 2 }} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 11, color: "#6b7280", fontWeight: "500", marginBottom: 2 }}>
-                ที่อยู่จัดส่ง
-              </Text>
-              <Text style={{ fontSize: 12.5, color: "#374151", lineHeight: 18 }}>
-                {reg.address || "—"}
-              </Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-            <MessageCircle size={14} color="#9ca3af" strokeWidth={2.2} style={{ marginTop: 2 }} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 11, color: "#6b7280", fontWeight: "500", marginBottom: 2 }}>
-                เหตุผลในการขอ
-              </Text>
-              <Text numberOfLines={2} style={{ fontSize: 12.5, color: "#374151", lineHeight: 18 }}>
-                {reg.motivation || "—"}
-              </Text>
-            </View>
-          </View>
+        <View style={{ backgroundColor: cfg.pillBg + "1a", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: cfg.pillBg }}>{cfg.label}</Text>
         </View>
       </View>
 
-      {/* Footer: actions */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: "#f3f4f6",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 8,
-          flexWrap: "wrap",
-          backgroundColor: "rgba(249,250,251,0.3)",
-        }}
-      >
+      {/* Product line — image + name + reward */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, backgroundColor: "#f9fafb", borderRadius: 12, padding: 10 }}>
+        <View style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+          {imgSrc && <Image source={imgSrc} style={{ width: 40, height: 40 }} />}
+        </View>
+        <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, fontWeight: "600", color: "#374151" }}>
+          {product.name || reg.trialId}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+          <Coins size={13} color="#d97706" strokeWidth={2.4} />
+          <Text style={{ fontSize: 12.5, color: "#d97706", fontWeight: "700" }}>+{(product.rewardPoints || 0).toLocaleString()}</Text>
+        </View>
+      </View>
+
+      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 12 }} />
+
+      {/* Footer — submitted date left · actions right */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <Text style={{ fontSize: 11.5, color: "#9ca3af" }}>{submittedLabel}</Text>
         {actions}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -896,6 +632,7 @@ export function EvalSummary({
 type FilterKey = "all" | RegistrationStatus;
 
 export function TrialDetailApplicants({ product }: { product: ApplicantsProduct }) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Local mutable cohort copy so approve/reject works in the mockup.
   const [regs, setRegs] = useState<Registration[]>(() =>
     getRegistrationsForTrial(product.id, product.category)
@@ -904,25 +641,14 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
   );
 
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [search, setSearch] = useState("");
-  const [evalReg, setEvalReg] = useState<Registration | null>(null);
 
   const countByStatus = (s: RegistrationStatus) =>
     regs.filter((r) => getRegistrationStatus(r) === s).length;
 
   const filteredApplicants = useMemo(() => {
-    let result = regs;
-    if (filter !== "all")
-      result = result.filter((r) => getRegistrationStatus(r) === filter);
-    const q = search.trim().toLowerCase();
-    if (q)
-      result = result.filter(
-        (r) =>
-          (r.name || "").toLowerCase().includes(q) ||
-          (r.phone || "").includes(q),
-      );
-    return result;
-  }, [regs, filter, search]);
+    if (filter === "all") return regs;
+    return regs.filter((r) => getRegistrationStatus(r) === filter);
+  }, [regs, filter]);
 
   const matchReg = (target: Registration) => (r: Registration) =>
     r.trialId === target.trialId &&
@@ -937,22 +663,19 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
     );
   };
 
+  // Silent state update — the caller (list Alert / detail page) confirms first.
+  const doReject = (reg: Registration) =>
+    setRegs((prev) =>
+      prev.map((r) => (matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r)),
+    );
+
   const reject = (reg: Registration) => {
     Alert.alert(
       "ปฏิเสธคำขอ",
       `ปฏิเสธคำขอของ "${reg.name || "ผู้สมัคร"}"?`,
       [
         { text: "ยกเลิก", style: "cancel" },
-        {
-          text: "ปฏิเสธ",
-          style: "destructive",
-          onPress: () =>
-            setRegs((prev) =>
-              prev.map((r) =>
-                matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r,
-              ),
-            ),
-        },
+        { text: "ปฏิเสธ", style: "destructive", onPress: () => doReject(reg) },
       ],
     );
   };
@@ -967,41 +690,25 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
 
   return (
     <View style={{ gap: 16 }}>
-      {/* Filter pills row (horizontally scrollable on a phone) */}
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 999,
-          padding: 4,
-          // shadow ~ shadow-[0px_0px_6px_0px_rgba(0,0,0,0.08)]
-          shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 1,
-        }}
+      {/* Status filter — standalone chips (white pill + border + count badge),
+          full-bleed scroll row like the other list pages' filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -16 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: "center" }}
       >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ borderRadius: 999, overflow: "hidden" }}
-          contentContainerStyle={{ gap: 4, alignItems: "center" }}
-        >
-          {pills.map((p) => (
-            <FilterPill
-              key={p.key}
-              label={p.label}
-              count={p.count}
-              Icon={p.Icon}
-              active={filter === p.key}
-              onPress={() => setFilter(p.key)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Search box (shared) */}
-      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์..." />
+        {pills.map((p) => (
+          <FilterPill
+            key={p.key}
+            label={p.label}
+            count={p.count}
+            Icon={p.Icon}
+            active={filter === p.key}
+            onPress={() => setFilter(p.key)}
+          />
+        ))}
+      </ScrollView>
 
       {/* Card list / empty state */}
       {filteredApplicants.length === 0 ? (
@@ -1030,21 +737,20 @@ export function TrialDetailApplicants({ product }: { product: ApplicantsProduct 
               product={product}
               onApprove={() => approve(r)}
               onReject={() => reject(r)}
-              onViewEval={() => setEvalReg(r)}
+              onViewEval={() => nav.navigate("OwnerTrialEvalAnswers", { reg: r, product })}
+              onPress={() =>
+                nav.navigate("OwnerTrialRequestDetail", {
+                  reg: r,
+                  product,
+                  onApprove: () => approve(r),
+                  onReject: () => doReject(r),
+                })
+              }
             />
           ))}
         </View>
       )}
 
-      {/* Read-only evaluation sheet */}
-      <BottomSheet
-        centerTitle
-        visible={!!evalReg}
-        onClose={() => setEvalReg(null)}
-        title="แบบประเมินจากผู้ทดสอบ"
-      >
-        {evalReg && <EvalSummary reg={evalReg} product={product} />}
-      </BottomSheet>
     </View>
   );
 }

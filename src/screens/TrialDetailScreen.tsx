@@ -34,6 +34,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED, STAR_YELLOW } from "../theme/tokens";
 import { TRIAL_PRODUCTS as TRIAL_CARDS, TrialProduct as TrialCard } from "./TrialProductsScreen";
 import { ShopAvatar } from "../components/ShopAvatar";
+import { appWidth, gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 
 /** Resolve a local bundled image (require → number) or remote URL string. */
 function imgSource(src: number | string | undefined): any {
@@ -41,10 +42,11 @@ function imgSource(src: number | string | undefined): any {
 }
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 const SCREEN_HEIGHT = Dimensions.get("window").height;
+// Hero height: square on phones (the original design); tablets shorten it so
+// the photo doesn't swallow the whole screen — same treatment as ProductDetail.
+const HERO_H = isTablet() ? Math.round(SCREEN_WIDTH * 0.75) : SCREEN_WIDTH;
 
 const BG = "#fafafa";
 const GREEN_TINT = "rgba(49,151,84,0.10)";
@@ -109,6 +111,10 @@ const DEFAULT_WHAT_TO_TEST = [
 ];
 
 type TrialExtra = { whatToTest: string[]; detail?: TrialProduct["detail"] };
+
+/** Owner trial detail (ข้อมูลสินค้า tab) reuses the same rich per-product content. */
+export type TrialRichDetail = NonNullable<TrialProduct["detail"]>;
+export const getTrialRichDetail = (id: string): TrialRichDetail | undefined => TRIAL_EXTRAS[id]?.detail;
 
 const TRIAL_EXTRAS: Record<string, TrialExtra> = {
   "trial-1": {
@@ -364,9 +370,10 @@ function RelatedTrialCard({ p, onPress, width }: { p: TrialCard; onPress: () => 
 // product page's "สินค้าเหมาะกับคุณ").
 function RelatedTrialPager({ products, onOpen }: { products: TrialCard[]; onOpen: (id: string) => void }) {
   const scrollX = useRef(new Animated.Value(0)).current;
-  const cardWidth = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+  const perPage = gridColumns(190, 32, 12);
+  const cardWidth = gridCardWidth(perPage, 32, 12);
   const pages: TrialCard[][] = [];
-  for (let i = 0; i < products.length; i += 2) pages.push(products.slice(i, i + 2));
+  for (let i = 0; i < products.length; i += perPage) pages.push(products.slice(i, i + perPage));
 
   return (
     <View>
@@ -382,7 +389,11 @@ function RelatedTrialPager({ products, onOpen }: { products: TrialCard[]; onOpen
             {pair.map((p) => (
               <RelatedTrialCard key={p.id} p={p} width={cardWidth} onPress={() => onOpen(p.id)} />
             ))}
-            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+            {pair.length < perPage
+              ? Array.from({ length: perPage - pair.length }).map((_, i) => (
+                  <View key={`pad-${i}`} style={{ width: cardWidth }} />
+                ))
+              : null}
           </View>
         ))}
       </Animated.ScrollView>
@@ -428,24 +439,24 @@ export function TrialDetailScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const galleryScrollX = useRef(new Animated.Value(0)).current;
   const heroScale = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
+    inputRange: [-HERO_H, 0],
     outputRange: [2, 1],
     extrapolateLeft: "extend",
     extrapolateRight: "clamp",
   });
   const heroTranslateY = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
-    outputRange: [-SCREEN_WIDTH / 2, 0],
+    inputRange: [-HERO_H, 0],
+    outputRange: [-HERO_H / 2, 0],
     extrapolateLeft: "extend",
     extrapolateRight: "clamp",
   });
   const headerBgOpacity = scrollY.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.6],
+    inputRange: [HERO_H * 0.35, HERO_H * 0.6],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
   const headerScrimOpacity = scrollY.interpolate({
-    inputRange: [0, SCREEN_WIDTH * 0.5],
+    inputRange: [0, HERO_H * 0.5],
     outputRange: [1, 0],
     extrapolate: "clamp",
   });
@@ -500,7 +511,7 @@ export function TrialDetailScreen() {
             marginTop: -16,
             marginBottom: -14,
             width: SCREEN_WIDTH,
-            height: SCREEN_WIDTH,
+            height: HERO_H,
             backgroundColor: "#f3f4f6",
             transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
           }}
@@ -526,7 +537,7 @@ export function TrialDetailScreen() {
                   setViewerOpen(true);
                 }}
               >
-                <Image source={imgSource(item)} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
+                <Image source={imgSource(item)} style={{ width: SCREEN_WIDTH, height: HERO_H }} resizeMode="cover" />
               </Pressable>
             )}
           />

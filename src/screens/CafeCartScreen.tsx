@@ -16,6 +16,10 @@ import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
 import { CAFE_MENU } from "../data/cafeMenu";
 import { BRAND_GREEN, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { isTablet } from "../theme/layout";
+
+// Line-item thumbnail — matches the main cart's iPad sizing (110pt).
+const ITEM_IMG = isTablet() ? 110 : 64;
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
@@ -65,7 +69,7 @@ export function CafeCartScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
           {lines.map((l) => (
             <Pressable key={l.key} onPress={() => editLine(l)} className="active:opacity-80" style={{ flexDirection: "row", gap: 12, backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
-              <Image source={l.image} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
+              <Image source={l.image} style={{ width: ITEM_IMG, height: ITEM_IMG, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: TEXT_PRIMARY }}>{l.name}</Text>
@@ -74,7 +78,7 @@ export function CafeCartScreen() {
                   </Pressable>
                 </View>
                 {l.summary ? <Text numberOfLines={2} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2, lineHeight: 16 }}>{l.summary}</Text> : null}
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", ...(isTablet() ? { marginTop: "auto" as const, paddingTop: 8 } : { marginTop: 8 }) }}>
                   <Text style={{ fontSize: 14, fontWeight: "800", color: BRAND_GREEN }}>{baht(l.unitPrice * l.qty)}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
                     <Pressable onPress={() => decKey(l.key)} hitSlop={6} className="active:opacity-70" style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>

@@ -52,6 +52,7 @@ import { useCart } from "../context/CartContext";
 import { getShop } from "../data/shops";
 import { useShopName } from "../context/SellerContext";
 import { ShopAvatar } from "../components/ShopAvatar";
+import { appWidth, gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 
 /** Resolve a local bundled image (require → number) or remote URL string. */
 function imgSource(src: number | string | undefined): any {
@@ -60,10 +61,11 @@ function imgSource(src: number | string | undefined): any {
 
 // Phone-frame width parity with the rest of the app's web export.
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 const SCREEN_HEIGHT = Dimensions.get("window").height;
+// Hero height: square on phones (the original design); tablets shorten it so
+// the photo doesn't swallow the whole screen — same treatment as ProductDetail.
+const HERO_H = isTablet() ? Math.round(SCREEN_WIDTH * 0.75) : SCREEN_WIDTH;
 
 const PRICE_ACCENT = "#db8b0a"; // amber price color, ported verbatim from web
 
@@ -168,9 +170,10 @@ function RelatedMaterialPager({
   onOpen: (id: string) => void;
 }) {
   const scrollX = useRef(new Animated.Value(0)).current;
-  const cardWidth = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+  const perPage = gridColumns(190, 32, 12);
+  const cardWidth = gridCardWidth(perPage, 32, 12);
   const pages: HerbalMaterial[][] = [];
-  for (let i = 0; i < materials.length; i += 2) pages.push(materials.slice(i, i + 2));
+  for (let i = 0; i < materials.length; i += perPage) pages.push(materials.slice(i, i + perPage));
 
   return (
     <View>
@@ -191,7 +194,11 @@ function RelatedMaterialPager({
             {pair.map((m) => (
               <MaterialCard key={m.id} m={m} width={cardWidth} onPress={() => onOpen(m.id)} />
             ))}
-            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+            {pair.length < perPage
+              ? Array.from({ length: perPage - pair.length }).map((_, i) => (
+                  <View key={`pad-${i}`} style={{ width: cardWidth }} />
+                ))
+              : null}
           </View>
         ))}
       </Animated.ScrollView>
@@ -270,24 +277,24 @@ export function HerbalMarketDetailScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const galleryScrollX = useRef(new Animated.Value(0)).current;
   const heroScale = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
+    inputRange: [-HERO_H, 0],
     outputRange: [2, 1],
     extrapolateLeft: "extend",
     extrapolateRight: "clamp",
   });
   const heroTranslateY = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
-    outputRange: [-SCREEN_WIDTH / 2, 0],
+    inputRange: [-HERO_H, 0],
+    outputRange: [-HERO_H / 2, 0],
     extrapolateLeft: "extend",
     extrapolateRight: "clamp",
   });
   const headerBgOpacity = scrollY.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.6],
+    inputRange: [HERO_H * 0.35, HERO_H * 0.6],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
   const headerScrimOpacity = scrollY.interpolate({
-    inputRange: [0, SCREEN_WIDTH * 0.5],
+    inputRange: [0, HERO_H * 0.5],
     outputRange: [1, 0],
     extrapolate: "clamp",
   });
@@ -429,7 +436,7 @@ export function HerbalMarketDetailScreen() {
         <Animated.View
           style={{
             width: SCREEN_WIDTH,
-            height: SCREEN_WIDTH,
+            height: HERO_H,
             backgroundColor: "#f5f5f5",
             transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
           }}
@@ -457,7 +464,7 @@ export function HerbalMarketDetailScreen() {
               >
                 <Image
                   source={imgSource(item)}
-                  style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                  style={{ width: SCREEN_WIDTH, height: HERO_H }}
                   resizeMode="cover"
                 />
               </Pressable>

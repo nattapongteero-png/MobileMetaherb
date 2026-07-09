@@ -10,12 +10,14 @@ import { useWishlist } from "../context/WishlistContext";
 import { ALL_PRODUCTS } from "../data/catalog";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web" ? Math.min(Dimensions.get("window").width, 430) : Dimensions.get("window").width;
-const CARD_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+  Platform.OS === "web" ? appWidth() : Dimensions.get("window").width;
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const CARD_WIDTH = gridCardWidth(gridColumns(190, 32, 12), 32, 12);
 
 export function WishlistScreen() {
   const nav = useNavigation<Nav>();

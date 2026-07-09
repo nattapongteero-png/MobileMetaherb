@@ -8,7 +8,8 @@ import {
 } from "../data/aiEngine";
 import { REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
 import type { CatalogProduct } from "../data/catalog";
-import { metaChat, metaPlan, maleify, type AIPlan } from "../services/metaAI";
+import { metaChat, metaPlan, metaVision, maleify, type AIPlan } from "../services/metaAI";
+import { research, type ResearchSource } from "../services/herbResearch";
 import { useCart } from "./CartContext";
 import { useOrders } from "./OrderContext";
 import { STATUS_LABEL } from "../data/orders";
@@ -18,7 +19,8 @@ type P = CatalogProduct;
 /** Rich message payloads — the UI renders cards based on `kind`. */
 export type AIMessage =
   | { id: string; role: "user"; ts: number; kind: "text"; text: string }
-  | { id: string; role: "ai";   ts: number; kind: "text"; text: string }
+  | { id: string; role: "user"; ts: number; kind: "image"; text: string; image: string }
+  | { id: string; role: "ai";   ts: number; kind: "text"; text: string; sources?: ResearchSource[] }
   | { id: string; role: "ai";   ts: number; kind: "products"; text: string; products: P[]; goals?: HealthGoal[] }
   | { id: string; role: "ai";   ts: number; kind: "comparison"; text: string; products: P[]; rows: ComparisonRow[]; summary: string }
   | { id: string; role: "ai";   ts: number; kind: "bundle"; text: string; items: P[]; total: number; discount: number; finalPrice: number; name: string }
@@ -43,6 +45,8 @@ interface AIAssistantContextType {
   profile: CustomerProfile;
   typing: boolean;
   send: (text: string) => Promise<void>;
+  /** Send a photo (data-URI) for เมต้า to analyze; optional caption. */
+  sendImage: (imageDataUrl: string, caption?: string) => Promise<void>;
   setPageContext: (c?: string) => void;
   quickReplyChips: string[];
   unreadCount: number;
@@ -329,8 +333,23 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           return true;
         }
         default: {
+          // Ground herb/health answers: curated KB first (instant), live web
+          // lookup only when the planner marked the turn as knowledge-seeking
+          // (query/goal present) — chit-chat stays latency-free. Never blocks
+          // the answer: research failure just means an ungrounded reply.
+          let grounding = "";
+          let sources: ResearchSource[] = [];
+          try {
+            const r = await research(plan.query?.trim() || text, Boolean(plan.query?.trim() || plan.goal));
+            grounding = r.grounding;
+            sources = r.sources;
+          } catch { /* answer without grounding */ }
           let answered = false;
-          try { const ans = await metaChat(hist); push({ role: "ai", kind: "text", text: ans }); answered = true; }
+          try {
+            const ans = await metaChat(hist, undefined, grounding);
+            push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
+            answered = true;
+          }
           catch { if (intro) { push({ role: "ai", kind: "text", text: intro }); answered = true; } }
           if (!answered) return false;
           // Close the knowledge → shopping loop: attach related in-store products
@@ -483,6 +502,38 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
     await handle(trimmed);
   }, [handle, push]);
 
+  const sendImage = useCallback(async (imageDataUrl: string, caption?: string) => {
+    if (!imageDataUrl) return;
+    const cap = (caption ?? "").trim();
+    push({ role: "user", kind: "image", text: cap, image: imageDataUrl });
+    setTyping(true);
+    try {
+      // Ground the vision answer when the caption looks herb/health-shaped
+      // (same research layer as text chat) so any claim is source-backed.
+      let grounding = "";
+      let sources: ResearchSource[] = [];
+      if (cap) {
+        try {
+          const r = await research(cap, true);
+          grounding = r.grounding;
+          sources = r.sources;
+        } catch { /* answer without grounding */ }
+      }
+      const ans = await metaVision(imageDataUrl, cap, undefined, grounding);
+      push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
+      // Close the loop: attach related in-store products from caption/answer goals.
+      const goals = extractGoals(`${cap} ${ans}`);
+      if (goals.length > 0) {
+        const rel = recommendForGoals(REAL_PRODUCTS, goals, 3);
+        if (rel.length > 0) { await think(250); push({ role: "ai", kind: "products", text: "สินค้าที่เกี่ยวข้องในร้านครับ 👇", products: rel }); }
+      }
+    } catch {
+      push({ role: "ai", kind: "text", text: "ขอโทษครับ ตอนนี้ดูรูปให้ไม่ได้ ลองใหม่อีกครั้งหรือพิมพ์อธิบายอาการมาได้เลยครับ" });
+    } finally {
+      setTyping(false);
+    }
+  }, [push]);
+
   const newChat = useCallback(() => {
     pageCtxRef.current = undefined;
     setSessions((prev) => {
@@ -514,9 +565,9 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
   const quickReplyChips = useMemo(() => quickReplies(profile.lastIntent ?? "greet", profile), [profile]);
 
   const value = useMemo<AIAssistantContextType>(() => ({
-    messages, profile, typing, send, setPageContext, quickReplyChips, unreadCount, markRead,
+    messages, profile, typing, send, sendImage, setPageContext, quickReplyChips, unreadCount, markRead,
     sessions, currentSessionId, newChat, loadSession, deleteSession,
-  }), [messages, profile, typing, send, setPageContext, quickReplyChips, unreadCount, markRead, sessions, currentSessionId, newChat, loadSession, deleteSession]);
+  }), [messages, profile, typing, send, sendImage, setPageContext, quickReplyChips, unreadCount, markRead, sessions, currentSessionId, newChat, loadSession, deleteSession]);
 
   return <AIAssistantContext.Provider value={value}>{children}</AIAssistantContext.Provider>;
 }

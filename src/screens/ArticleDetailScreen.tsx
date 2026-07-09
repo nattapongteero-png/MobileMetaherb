@@ -9,12 +9,13 @@ import { ChevronLeft, Eye, Share2, Calendar } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type DetailRoute = RouteProp<RootStackParamList, "ArticleDetail">;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web" ? Math.min(Dimensions.get("window").width, 430) : Dimensions.get("window").width;
+  Platform.OS === "web" ? appWidth() : Dimensions.get("window").width;
 // Square hero — same height as the product detail page.
 const COVER_H = SCREEN_WIDTH;
 

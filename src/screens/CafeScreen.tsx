@@ -21,12 +21,13 @@ import { useCafeCart } from "../context/CafeCartContext";
 import type { CafeOrder } from "../data/cafePayment";
 import { CountdownRing } from "../components/CountdownRing";
 import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED } from "../theme/tokens";
+import { appWidth, gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 
 const CAFE_IMG = require("../../assets/caffe.png");
 const DRIP_GIF = require("../../assets/drepcoffee.gif"); // animated "brewing" indicator
 const READY_IMG = require("../../assets/herocafe.png"); // finished cup — shown when the order is ready
 // Extra promo banner images that swipe in the café hero carousel.
-const HERO_SLIDES = [require("../../assets/hero cafe1.png"), require("../../assets/hero cafe2.png"), require("../../assets/hero cafe3.png")];
+const HERO_SLIDES = [require("../../assets/hero-cafe1.png"), require("../../assets/hero-cafe2.png"), require("../../assets/hero-cafe3.png")];
 // Promo copy shown per hero slide (index-aligned with [CAFE_IMG, ...HERO_SLIDES]).
 const HERO_PROMOS = [
   { title: "METAHERB Café", desc: "ศิลปะแห่งรสชาติในทุกแก้ว" },
@@ -38,10 +39,12 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
 const fmtTime = (d: Date) =>
   `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const CARD_W = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
-const HERO_H = 128;
-const ILLUS_W = 132; // width of the right-side illustration carousel (the only part that swipes)
+const SCREEN_WIDTH = appWidth();
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const CARD_W = gridCardWidth(gridColumns(190, 32, 12), 32, 12);
+// Hero banner scales up on iPad — the full-width card looks too thin at 128pt.
+const HERO_H = isTablet() ? 190 : 128;
+const ILLUS_W = isTablet() ? 210 : 132; // width of the right-side illustration carousel (the only part that swipes)
 
 /** Café hero — the branded green card + text stay FIXED; the right-side
  *  illustration auto-CROSSFADES between the promo images (soft fade, no slide). */
@@ -86,8 +89,8 @@ function HeroBanner() {
           <LinearGradient colors={["#0b3d2e", "#125239", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ minHeight: HERO_H, flexDirection: "row", alignItems: "center" }}>
             {/* Left — promo text that changes (fades in) with the image */}
             <Animated.View style={{ flex: 1, paddingLeft: 18, paddingVertical: 18, gap: 5, opacity: textOp, transform: [{ translateY: textRise }] }}>
-              <Text style={{ color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.2 }}>{promo.title}</Text>
-              <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12.5, lineHeight: 18 }}>{promo.desc}</Text>
+              <Text style={{ color: "#fff", fontSize: isTablet() ? 25 : 20, fontWeight: "800", letterSpacing: 0.2 }}>{promo.title}</Text>
+              <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: isTablet() ? 14.5 : 12.5, lineHeight: isTablet() ? 21 : 18 }}>{promo.desc}</Text>
             </Animated.View>
             {/* Right — crossfading illustration (images stacked, opacity animated) */}
             <View style={{ width: ILLUS_W, height: HERO_H }}>
@@ -159,7 +162,7 @@ function QueueBanner({ order, onPress, onDismiss, width }: { order: CafeOrder; o
           </Animated.View>
 
           {/* content (in flow — sets the card height); ring stays on the left */}
-          <View style={{ padding: 18, minHeight: 128, justifyContent: "center" }}>
+          <View style={{ padding: 18, minHeight: HERO_H, justifyContent: "center" }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
               <CountdownRing frac={frac} clock={clock} done={done} />
               <View style={{ flex: 1, minWidth: 0, gap: 5 }}>

@@ -49,24 +49,24 @@ import { GROUP_BY_ID, GALLERY_OVERRIDE } from "../data/productVariants";
 import { ShopAvatar } from "../components/ShopAvatar";
 import type { Product } from "../types/Product";
 import { STAR_YELLOW, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { appWidth, isTablet, gridColumns, gridCardWidth } from "../theme/layout";
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProductDetail">;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// Recommended products — paged 2-per-page with animated dots, same UX as the
-// home product rails (Jakob's Law).
+// Recommended products — paged rail with animated dots, same UX as the home
+// product rails (Jakob's Law). Phones page 2 cards; tablets 4 (gridColumns).
+const REC_PER_PAGE = gridColumns(190, 32, 12);
 function RecommendedPager({ products }: { products: Product[] }) {
   const nav = useNavigation<Nav>();
   const scrollX = useRef(new Animated.Value(0)).current;
-  const cardWidth = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+  const cardWidth = gridCardWidth(REC_PER_PAGE, 32, 12);
   const pages: Product[][] = [];
-  for (let i = 0; i < products.length; i += 2) pages.push(products.slice(i, i + 2));
+  for (let i = 0; i < products.length; i += REC_PER_PAGE) pages.push(products.slice(i, i + REC_PER_PAGE));
 
   return (
     <View>
@@ -80,17 +80,22 @@ function RecommendedPager({ products }: { products: Product[] }) {
         )}
         scrollEventThrottle={16}
       >
-        {pages.map((pair, pi) => (
+        {pages.map((page, pi) => (
           <View
             key={`rec-${pi}`}
             style={{ width: SCREEN_WIDTH, paddingHorizontal: 16, flexDirection: "row", gap: 12 }}
           >
-            {pair.map((p) => (
+            {page.map((p) => (
               <View key={p.id}>
                 <ProductCard product={p} width={cardWidth} onPress={() => nav.push("ProductDetail", { product: p })} />
               </View>
             ))}
-            {pair.length === 1 ? <View style={{ width: cardWidth }} /> : null}
+            {/* Pad the last page so remaining cards keep their column width */}
+            {page.length < REC_PER_PAGE
+              ? Array.from({ length: REC_PER_PAGE - page.length }).map((_, i) => (
+                  <View key={`pad-${i}`} style={{ width: cardWidth }} />
+                ))
+              : null}
           </View>
         ))}
       </Animated.ScrollView>
@@ -294,31 +299,34 @@ export function ProductDetailScreen({ route }: Props) {
     }
   };
   const galleryScrollX = useRef(new Animated.Value(0)).current;
+  // Hero height: square on phones (the original design); tablets shorten it so
+  // the photo doesn't swallow the whole screen.
+  const HERO_H = isTablet() ? Math.round(SCREEN_WIDTH * 0.75) : SCREEN_WIDTH;
   // Stretchy hero (iOS style): scrolls away normally on scroll-up, zooms in on
   // pull-down. Driven by the vertical scroll position.
   const scrollY = useRef(new Animated.Value(0)).current;
   const heroScale = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
+    inputRange: [-HERO_H, 0],
     outputRange: [2, 1],
     extrapolateLeft: "extend", // keep filling if pulled further down
     extrapolateRight: "clamp", // no zoom while scrolling up
   });
   const heroTranslateY = scrollY.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0],
-    outputRange: [-SCREEN_WIDTH / 2, 0],
+    inputRange: [-HERO_H, 0],
+    outputRange: [-HERO_H / 2, 0],
     extrapolateLeft: "extend",
     extrapolateRight: "clamp",
   });
   // App-bar background + title fade in as the hero scrolls past (Apple style).
   const headerBgOpacity = scrollY.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.6],
+    inputRange: [HERO_H * 0.35, HERO_H * 0.6],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
   // Dark scrim at the very top — keeps the glass buttons legible over a bright
   // hero image; fades out as the (light) app-bar background fades in.
   const headerScrimOpacity = scrollY.interpolate({
-    inputRange: [0, SCREEN_WIDTH * 0.5],
+    inputRange: [0, HERO_H * 0.5],
     outputRange: [1, 0],
     extrapolate: "clamp",
   });
@@ -475,7 +483,7 @@ export function ProductDetailScreen({ route }: Props) {
         <Animated.View
           style={{
             width: SCREEN_WIDTH,
-            height: SCREEN_WIDTH,
+            height: HERO_H,
             backgroundColor: "#f5f5f5",
             transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
           }}
@@ -504,7 +512,7 @@ export function ProductDetailScreen({ route }: Props) {
               >
                 <Image
                   source={item as number}
-                  style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                  style={{ width: SCREEN_WIDTH, height: HERO_H }}
                   resizeMode="cover"
                 />
               </Pressable>

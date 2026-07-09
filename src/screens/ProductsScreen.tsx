@@ -13,16 +13,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useProductFilter, type KindFilter } from "../context/ProductFilterContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
 // Always floor so two cards + the 12px gap never overflow and break the grid.
-const CARD_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 12) / 2);
+// Responsive grid — 2 columns on phones, more on tablets (flex-wrap fills rows).
+const CARD_WIDTH = gridCardWidth(gridColumns(190, 32, 12), 32, 12);
 
 // Product-kind chips (filter by product flags, not catalog category).
 const KIND_CHIPS: { key: KindFilter; label: string }[] = [

@@ -40,13 +40,12 @@ import {
   Zap,
 } from "lucide-react-native";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH =
-  Platform.OS === "web"
-    ? Math.min(Dimensions.get("window").width, 430)
-    : Dimensions.get("window").width;
+  appWidth();
 
 // Mock order data — same shape as the web PaymentPage flow.
 // MetaHerb Coin — mock wallet balance + conversion (1,000 coins = ฿1).

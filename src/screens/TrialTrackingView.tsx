@@ -20,14 +20,14 @@
 
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { FlaskConical, CircleAlert, Clock, Check, Ban } from "lucide-react-native";
 
-import { BottomSheet } from "../components/BottomSheet";
 import { StickyFilterList } from "../components/StickyFilterList";
 import { SearchBar } from "../components/SearchBar";
 import {
   RegistrationCard,
-  EvalSummary,
   FilterPill,
   type ApplicantsProduct,
 } from "./trialDetail/TrialDetailApplicants";
@@ -39,6 +39,7 @@ import {
 } from "../data/ownerTrialRegistrations";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useAddedTrials } from "../data/trialDrafts";
+import type { RootStackParamList } from "../navigation/RootStack";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN } from "../theme/tokens";
 
@@ -49,7 +50,8 @@ function fallbackProduct(trialId: string): ApplicantsProduct {
   return { id: trialId, name: trialId, tagline: "", category: "", image: "", rewardPoints: 0 };
 }
 
-export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?: number } = {}) {
+export function TrialTrackingOwnerSection({ insetsBottom = 24, showSearch = true }: { insetsBottom?: number; showSearch?: boolean } = {}) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Owner-added trials merged on top of the static catalog — for product lookup.
   const added = useAddedTrials();
   const catalog = useMemo<TrialProduct[]>(
@@ -66,7 +68,6 @@ export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?
 
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
-  const [evalReg, setEvalReg] = useState<Registration | null>(null);
 
   const countByStatus = (s: RegistrationStatus) =>
     regs.filter((r) => getRegistrationStatus(r) === s).length;
@@ -98,6 +99,10 @@ export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?
     showToast(`อนุมัติคำขอของ "${reg.name || "ผู้สมัคร"}" เรียบร้อย`);
   };
 
+  // Silent state update — the caller (list Alert / detail page) confirms first.
+  const doReject = (reg: Registration) =>
+    setRegs((prev) => prev.map((r) => (matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r)));
+
   const reject = (reg: Registration) => {
     Alert.alert("ปฏิเสธคำขอ", `ปฏิเสธคำขอของ "${reg.name || "ผู้สมัคร"}"?`, [
       { text: "ยกเลิก", style: "cancel" },
@@ -105,9 +110,7 @@ export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?
         text: "ปฏิเสธ",
         style: "destructive",
         onPress: () => {
-          setRegs((prev) =>
-            prev.map((r) => (matchReg(reg)(r) ? { ...r, rejectedAt: Date.now() } : r)),
-          );
+          doReject(reg);
           showToast("ปฏิเสธคำขอเรียบร้อย", "info");
         },
       },
@@ -137,8 +140,10 @@ export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?
         />
       ))}
     >
-      {/* Search box (shared) */}
-      <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
+      {/* Search — hidden on the pushed subpage (app-bar button → ShopTrialTrackingSearch) */}
+      {showSearch ? (
+        <SearchBar value={search} onChangeText={setSearch} placeholder="ค้นหาชื่อ, เบอร์, สินค้า..." />
+      ) : null}
 
       {/* Card list / empty state */}
       {filtered.length === 0 ? (
@@ -165,21 +170,19 @@ export function TrialTrackingOwnerSection({ insetsBottom = 24 }: { insetsBottom?
               product={productFor(r.trialId)}
               onApprove={() => approve(r)}
               onReject={() => reject(r)}
-              onViewEval={() => setEvalReg(r)}
+              onViewEval={() => nav.navigate("OwnerTrialEvalAnswers", { reg: r, product: productFor(r.trialId) })}
+              onPress={() =>
+                nav.navigate("OwnerTrialRequestDetail", {
+                  reg: r,
+                  product: productFor(r.trialId),
+                  onApprove: () => approve(r),
+                  onReject: () => doReject(r),
+                })
+              }
             />
           ))}
         </View>
       )}
-
-      {/* Read-only evaluation sheet */}
-      <BottomSheet
-        centerTitle
-        visible={!!evalReg}
-        onClose={() => setEvalReg(null)}
-        title="แบบประเมินจากผู้ทดสอบ"
-      >
-        {evalReg && <EvalSummary reg={evalReg} product={productFor(evalReg.trialId)} />}
-      </BottomSheet>
     </StickyFilterList>
   );
 }

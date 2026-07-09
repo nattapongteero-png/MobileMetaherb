@@ -26,6 +26,7 @@ import { STATUS_LABEL, STATUS_COLOR, TYPE_LABEL, TYPE_COLOR } from "../data/shop
 import { useComplaints } from "../context/ComplaintContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { appWidth } from "../theme/layout";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type DetailRoute = RouteProp<RootStackParamList, "ShopComplaintDetail">;
@@ -64,7 +65,7 @@ export function ShopComplaintDetailScreen() {
 
   // Hooks must run on every render — declare before any early return.
   const [viewer, setViewer] = useState<number | null>(null);
-  const screenW = Dimensions.get("window").width;
+  const screenW = appWidth();
 
   if (!c) {
     return (

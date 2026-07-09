@@ -21,6 +21,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import { SHOP_NOTIF_SEED, SHOP_TYPE_META, type NotifMeta } from "../data/shopNotifications";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { isTablet } from "../theme/layout";
 
 const SHOP_OPEN = require("../../assets/shop-open.png");
 
@@ -104,6 +105,8 @@ export function NotifChip({ label, active, onPress }: { label: string; active: b
 
 /** Card entry (above the filter chips) linking to the shop-side notifications. */
 function ShopNotifCard({ count, items, onPress }: { count: number; items: TickerItem[]; onPress: () => void }) {
+  // iPad gets a taller banner + bigger storefront art; phones keep the original.
+  const tablet = isTablet();
   return (
     <Pressable
       onPress={onPress}
@@ -114,12 +117,26 @@ function ShopNotifCard({ count, items, onPress }: { count: number; items: Ticker
         colors={[BRAND_GREEN, BRAND_GREEN_DARK]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={{ minHeight: 80, justifyContent: "center", paddingVertical: 12, paddingLeft: 16, paddingRight: 96 }}
+        style={{
+          minHeight: tablet ? 104 : 80,
+          justifyContent: "center",
+          paddingVertical: tablet ? 16 : 12,
+          paddingLeft: 16,
+          paddingRight: tablet ? 118 : 96,
+        }}
       >
         {/* Storefront art — bleeds off the bottom-right */}
-        <Image source={SHOP_OPEN} style={{ position: "absolute", right: 2, bottom: -12, width: 92, height: 92 }} resizeMode="contain" />
+        <Image
+          source={SHOP_OPEN}
+          style={
+            tablet
+              ? { position: "absolute", right: 4, bottom: -14, width: 116, height: 116 }
+              : { position: "absolute", right: 2, bottom: -12, width: 92, height: 92 }
+          }
+          resizeMode="contain"
+        />
         <View className="flex-row items-center" style={{ gap: 8 }}>
-          <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>การแจ้งเตือนร้านค้า</Text>
+          <Text style={{ fontSize: tablet ? 17 : 15, fontWeight: "800", color: "#fff" }}>การแจ้งเตือนร้านค้า</Text>
           {count > 0 ? (
             <View style={{ minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: "#ef4444", alignItems: "center", justifyContent: "center" }}>
               <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff", lineHeight: 15 }}>{count > 99 ? "99+" : count}</Text>

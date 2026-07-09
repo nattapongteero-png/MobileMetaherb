@@ -3,7 +3,7 @@ import { Animated, Pressable, Text, View } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
 
 const MENU_W = 240;
-const MENU_H = 112; // ~2 rows × 48 + vertical padding — used to pin the top-right corner
+const DEFAULT_MENU_H = 112; // ~2 rows × 48 + vertical padding — used to pin the corner
 
 /**
  * iOS 26-style options menu — the trigger button itself morphs into the card:
@@ -23,7 +23,7 @@ export function AppleMenu({
   anchorBottom,
   right = 12,
   originSize = 44,
-  menuHeight = MENU_H,
+  menuHeight = DEFAULT_MENU_H,
   children,
 }: {
   visible: boolean;
@@ -36,7 +36,7 @@ export function AppleMenu({
   right?: number;
   /** Trigger diameter the card scales up from. */
   originSize?: number;
-  /** Approx card height (rows × 48 + 16) — keeps the pinned corner accurate. */
+  /** Approx card height (rows × 48 + 16) — keeps the corner pinned during the morph. */
   menuHeight?: number;
   children: React.ReactNode;
 }) {
@@ -100,18 +100,36 @@ export function AppleMenu({
 }
 
 // Apple (Notes-style) menu row — icon on the left, roomy 48px row, 16px label.
+// Pass `tint` to upgrade the row into an icon-menu row: the icon sits inside a
+// tinted rounded tile (same language as the settings / profile menu rows).
 export function AppleMenuItem({
   label,
   Icon,
   onPress,
   danger,
+  tint,
 }: {
   label: string;
   Icon: LucideIcon;
   onPress: () => void;
   danger?: boolean;
+  tint?: string;
 }) {
   const color = danger ? "#ff3b30" : "#1a1a1a";
+  if (tint) {
+    return (
+      <Pressable
+        onPress={onPress}
+        className="flex-row items-center active:opacity-60"
+        style={{ height: 56, paddingHorizontal: 14, gap: 12 }}
+      >
+        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: `${tint}1a`, alignItems: "center", justifyContent: "center" }}>
+          <Icon size={18} color={tint} strokeWidth={2.2} />
+        </View>
+        <Text style={{ flex: 1, fontSize: 15.5, fontWeight: "600", color: "#1a1a1a" }}>{label}</Text>
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
