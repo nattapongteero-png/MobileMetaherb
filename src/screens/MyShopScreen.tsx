@@ -5019,14 +5019,6 @@ function FlashTermsSheet({ event, onClose, onJoin }: { event: FlashEvent | null;
 
 
 
-// Status filter chips for the product-manage list (sticky filter bar).
-const PM_FILTERS: { id: "all" | PMStatus; label: string; Icon: typeof Package }[] = [
-  { id: "all", label: "ทั้งหมด", Icon: Package },
-  { id: "เปิดขาย", label: "เปิดขาย", Icon: PackageCheck },
-  { id: "ปิดขาย", label: "ปิดขาย", Icon: PackageX },
-  { id: "สินค้าหมด", label: "สินค้าหมด", Icon: ShoppingBag },
-];
-
 export function ProductsManageSection({ type, setType, showSearch = true, insetsBottom = 24 }: { type: "regular" | "material"; setType: (t: "regular" | "material") => void; showSearch?: boolean; insetsBottom?: number }) {
   const nav = useNavigation<Nav>();
   // Product-type chips (ผลิตภัณฑ์ / วัตถุดิบ) switch the list; status + category
@@ -5067,7 +5059,6 @@ export function ProductsManageSection({ type, setType, showSearch = true, insets
     return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
   });
   const filterActive = filter !== "all";
-  const count = (id: "all" | PMStatus) => list.filter((p) => id === "all" || p.status === id).length;
 
   const remove = (p: PMProduct) =>
     Alert.alert("ลบสินค้า", `ต้องการลบ "${p.name}" ใช่หรือไม่?`, [
@@ -5082,54 +5073,67 @@ export function ProductsManageSection({ type, setType, showSearch = true, insets
       insetsBottom={insetsBottom}
       contentGap={14}
       header={
-        <View style={{ gap: 14 }}>
-          {/* Product-type switcher — shared sliding-pill segmented control */}
-          <SegmentedTabs
-            tabs={[
-              { id: "regular" as const, label: "ผลิตภัณฑ์", count: regular.length },
-              { id: "material" as const, label: "วัตถุดิบ", count: material.length },
-            ]}
-            active={type}
-            onChange={(t) => { setType(t); setFilter("all"); }}
-          />
-
-          {/* Search — hidden on the pushed subpage (app-bar button → ShopProductManageSearch) */}
-          {showSearch ? (
-            <View
-              className="flex-row items-center"
-              style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
-            >
-              <TextInput
-                style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
-                placeholder="ค้นหาชื่อสินค้า หรือหมวดหมู่"
-                placeholderTextColor={TEXT_DISABLED}
-                value={query}
-                onChangeText={setQuery}
-              />
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
-                <Search size={16} color="white" />
-              </View>
+        showSearch ? (
+          <View
+            className="flex-row items-center"
+            style={{ backgroundColor: "white", borderWidth: 1, borderColor: DIVIDER_GRAY, borderRadius: 999, height: 44, paddingLeft: 16, paddingRight: 6, gap: 8 }}
+          >
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: TEXT_PRIMARY, padding: 0 }}
+              placeholder="ค้นหาชื่อสินค้า หรือหมวดหมู่"
+              placeholderTextColor={TEXT_DISABLED}
+              value={query}
+              onChangeText={setQuery}
+            />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND_GREEN, alignItems: "center", justifyContent: "center" }}>
+              <Search size={16} color="white" />
             </View>
-          ) : null}
-        </View>
+          </View>
+        ) : <View />
       }
-      filters={PM_FILTERS.map(({ id, label, Icon }) => {
-          const active = filter === id;
+      filters={[
+        /* "กรองเพิ่มเติม" — status + type live behind this button (opens the
+           ShopProductFilter iOS sheet); a green dot flags an active status. */
+        <Pressable
+          key="more"
+          onPress={() =>
+            nav.navigate("ShopProductFilter", {
+              status: filter,
+              productType: type,
+              counts: { regular: statusCounts(regular), material: statusCounts(material) },
+              onApply: (s, t) => { setFilter(s); if (t !== type) setType(t); },
+            })
+          }
+          className="flex-row items-center active:opacity-80"
+          style={{ height: 36, paddingHorizontal: 14, borderRadius: 999, gap: 6, backgroundColor: filterActive ? BRAND_GREEN : "white", borderWidth: 1, borderColor: filterActive ? BRAND_GREEN : DIVIDER_GRAY }}
+        >
+          <SlidersHorizontal size={14} color={filterActive ? "white" : TEXT_MUTED} strokeWidth={2.2} />
+          <Text style={{ fontSize: 13, fontWeight: filterActive ? "700" : "500", color: filterActive ? "white" : TEXT_SECONDARY }}>
+            {filterActive ? filter : "กรองเพิ่มเติม"}
+          </Text>
+        </Pressable>,
+        /* Product-type quick chips (ผลิตภัณฑ์ / วัตถุดิบ) */
+        ...([
+          { id: "regular" as const, label: "ผลิตภัณฑ์", Icon: Package, n: regular.length },
+          { id: "material" as const, label: "วัตถุดิบ", Icon: Sprout, n: material.length },
+        ]).map(({ id, label, Icon, n }) => {
+          const active = type === id;
           return (
             <Pressable
               key={id}
-              onPress={() => setFilter(id)}
+              onPress={() => { setType(id); setFilter("all"); }}
               className="flex-row items-center active:opacity-80"
               style={{ height: 36, paddingHorizontal: 14, borderRadius: 999, gap: 6, backgroundColor: active ? BRAND_GREEN : "white", borderWidth: 1, borderColor: active ? BRAND_GREEN : DIVIDER_GRAY }}
             >
               <Icon size={14} color={active ? "white" : TEXT_MUTED} strokeWidth={2.2} />
               <Text style={{ fontSize: 13, fontWeight: active ? "700" : "500", color: active ? "white" : TEXT_SECONDARY }}>{label}</Text>
               <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", backgroundColor: active ? "rgba(255,255,255,0.25)" : SURFACE_GRAY }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{count(id)}</Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "white" : TEXT_MUTED }}>{n}</Text>
               </View>
             </Pressable>
           );
-        })}
+        }),
+      ]}
     >
       {/* Card list */}
       {loading ? (
