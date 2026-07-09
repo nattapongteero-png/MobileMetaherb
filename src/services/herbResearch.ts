@@ -47,7 +47,16 @@ function kbGrounding(hits: HerbKBEntry[]): ResearchResult {
 type WikiSearchItem = { title: string };
 
 async function wikiFetch(url: string, signal?: AbortSignal): Promise<any> {
-  const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
+  const res = await fetch(url, {
+    signal,
+    headers: {
+      Accept: "application/json",
+      // Wikipedia's API policy requires a descriptive User-Agent; a generic/absent
+      // one gets a 403. Identify the app + a contact so requests aren't blocked.
+      "User-Agent": "METAHERB-App/1.0 (herbal e-commerce assistant; contact: support@metaherb.app)",
+      "Api-User-Agent": "METAHERB-App/1.0 (herbal e-commerce assistant; contact: support@metaherb.app)",
+    },
+  });
   if (!res.ok) throw new Error(`wiki ${res.status}`);
   return res.json();
 }

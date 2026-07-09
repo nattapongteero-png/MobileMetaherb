@@ -210,3 +210,65 @@ export async function metaVision(
   if (typeof text !== "string" || !text.trim()) throw new Error("empty vision response");
   return maleify(text.trim());
 }
+
+// ===== Grounded recommend — pick the products that TRULY fit the need =====
+// The agentic step: given the customer's need + a candidate shortlist + the
+// evidence just fetched (herb KB / live web), Gemma re-ranks to the products
+// that actually match — instead of guessing from product names. Returns the
+// chosen ids (best-first) + a short grounded reply.
+export type RecommendCandidate = { id: string; name: string };
+export type RecommendResult = { productIds: string[]; reply: string };
+
+export async function metaRecommend(
+  need: string,
+  candidates: RecommendCandidate[],
+  grounding: string,
+  signal?: AbortSignal,
+): Promise<RecommendResult> {
+  const list = candidates
+    .map((c) => `${c.id}|${c.name}|[${usageTag(c.id)}]`)
+    .join("\n");
+  const system = [
+    'คุณคือสมองของ "เมต้า" ผู้ช่วยร้านสมุนไพร METAHERB (ผู้ชาย ลงท้าย "ครับ")',
+    "งาน: จากความต้องการของลูกค้า + รายการสินค้าที่คัดมาให้ + ข้อมูลอ้างอิงที่ค้นมา จงเลือกสินค้าที่ 'ตรงกับความต้องการจริงๆ' เรียงตรงสุดก่อน",
+    "กติกา:",
+    "- เลือกจากรายการสินค้าที่ให้เท่านั้น ใส่ id ลง productIds (สูงสุด 5 เรียงตรงสุดก่อน)",
+    "- ตัดสินความ 'ตรง' จากข้อมูลอ้างอิงที่ค้นมาเป็นหลัก (สรรพคุณสมุนไพร) ไม่ใช่เดาจากชื่อ ถ้าสินค้าไหนไม่เกี่ยวจริงห้ามใส่",
+    USAGE_RULE,
+    "- reply = ภาษาไทยสั้นๆ (1–3 ประโยค) สุภาพ ลงท้ายครับ อธิบายว่าทำไมถึงแนะนำตัวที่เลือก (อิงข้อมูลที่ค้นมา) ห้ามพิมพ์แท็กในวงเล็บ []",
+    '- ถ้าไม่มีสินค้าไหนตรงเลย ให้ productIds เป็น [] และ reply บอกตามตรงว่ายังไม่มีสินค้าที่ตรง',
+    'ตอบเป็น JSON object เท่านั้น: { "productIds": ["id"], "reply": "ข้อความไทย" }',
+  ].join("\n");
+
+  const user = [
+    `ความต้องการของลูกค้า: "${need}"`,
+    "",
+    "สินค้าที่คัดมา (id|ชื่อ|วิธีใช้):",
+    list,
+    "",
+    grounding.trim() ? `ข้อมูลอ้างอิงที่ค้นมา:\n${grounding.trim()}` : "(ไม่มีข้อมูลอ้างอิงเพิ่มเติม — ใช้ความรู้ทั่วไปอย่างระวัง)",
+  ].join("\n");
+
+  const res = await fetch(`${AI_LLM_BASE}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: AI_LLM_MODEL,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 320,
+      stream: false,
+    }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`recommend ${res.status}`);
+  const json = await res.json();
+  const content = json?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") throw new Error("no recommend content");
+  const parsed = JSON.parse(content) as RecommendResult;
+  return {
+    productIds: Array.isArray(parsed.productIds) ? parsed.productIds.map(String) : [],
+    reply: parsed.reply ? maleify(parsed.reply) : "",
+  };
+}

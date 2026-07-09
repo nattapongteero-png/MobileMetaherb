@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 import type { CafeCartLine } from "../data/cafeCart";
 import { INITIAL_CAFE_HISTORY, type CafePayMethodId, type CafeOrder, type CafeHistoryOrder, type CafeFavorite } from "../data/cafePayment";
 import { startOrderLiveActivity, endOrderLiveActivity, reconcileOrderLiveActivities } from "../services/cafeLiveActivity";
+import { scheduleCafeReadyNotification, cancelCafeReadyNotification } from "../services/cafeNotify";
 
 /**
  * META Caffe cart — shared across the café landing, item-detail and cart screens.
@@ -101,11 +102,16 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
       startedAt: order.readyAt - order.waitMinutes * 60000,
       readyAt: order.readyAt,
     });
+    // Local "ready" push at readyAt (fires even if the app is closed) — the
+    // actual notification the success screen promises. Fire-and-forget.
+    void scheduleCafeReadyNotification({ orderId: order.orderId, readyAt: order.readyAt, queueNo: order.queueNo, itemsLabel });
   };
   const completeOrder: Ctx["completeOrder"] = (orderId) => {
     const done = activeOrders.find((o) => o.orderId === orderId);
     if (!done) return;
     endOrderLiveActivity(orderId);
+    // Picked up — cancel the pending "ready" push if it hasn't fired yet.
+    void cancelCafeReadyNotification(orderId);
     setActiveOrders((prev) => prev.filter((o) => o.orderId !== orderId));
     setOrderHistory((prev) => (prev.some((o) => o.orderId === orderId) ? prev : [{ ...done, ratingService: 0, ratingTaste: 0, comment: "" }, ...prev]));
   };

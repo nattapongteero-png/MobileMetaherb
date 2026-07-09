@@ -8,7 +8,7 @@ import {
 } from "../data/aiEngine";
 import { REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
 import type { CatalogProduct } from "../data/catalog";
-import { metaChat, metaPlan, metaVision, maleify, type AIPlan } from "../services/metaAI";
+import { metaChat, metaPlan, metaVision, metaRecommend, maleify, type AIPlan } from "../services/metaAI";
 import { research, type ResearchSource } from "../services/herbResearch";
 import { useCart } from "./CartContext";
 import { useOrders } from "./OrderContext";
@@ -234,27 +234,70 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
       const planGoals: HealthGoal[] = plan.goal ? ([plan.goal] as HealthGoal[]) : activeGoals;
       switch (plan.action) {
         case "search": {
+          const applyHardFilters = (p: P) =>
+            (plan.maxPrice == null || p.price <= plan.maxPrice) &&
+            (plan.minPrice == null || p.price >= plan.minPrice) &&
+            (plan.minRating == null || p.rating >= plan.minRating) &&
+            (!plan.promoOnly || p.isFlashSale || p.hasCoupon || (p.discountPercent ?? 0) > 0);
+
           let results: P[] = [];
-          // Prefer the exact products Gemma picked (semantic match), keeping any hard filters the user set.
-          if (!plan.sort && plan.productIds?.length) {
-            const byId = new Map(products.map((p) => [p.id, p]));
-            results = (plan.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[])
-              .filter((p) =>
-                (plan.maxPrice == null || p.price <= plan.maxPrice) &&
-                (plan.minPrice == null || p.price >= plan.minPrice) &&
-                (plan.minRating == null || p.rating >= plan.minRating) &&
-                (!plan.promoOnly || p.isFlashSale || p.hasCoupon || (p.discountPercent ?? 0) > 0))
-              .slice(0, 6);
+          let sources: ResearchSource[] = [];
+          let groundedReply = "";
+
+          // Agentic web-first recommend — for need/symptom queries (not plain
+          // sort/price browsing): fetch herb evidence (KB → live web), then let
+          // Gemma pick the products that TRULY fit from a candidate shortlist,
+          // instead of guessing off product names. Falls back silently to the
+          // name-based matcher on any failure so recommendations never break.
+          const isNeedQuery = !plan.sort && (Boolean(plan.query?.trim()) || Boolean(plan.goal));
+          if (isNeedQuery) {
+            try {
+              const byId = new Map(products.map((p) => [p.id, p]));
+              // Candidate pool: Gemma's picks ∪ the keyword/goal matcher — deduped,
+              // hard-filtered, capped. Gives the ranker real options to choose from.
+              const pool: P[] = [];
+              const seen = new Set<string>();
+              const addCand = (p?: P) => { if (p && !seen.has(p.id) && applyHardFilters(p)) { seen.add(p.id); pool.push(p); } };
+              (plan.productIds ?? []).forEach((id) => addCand(byId.get(String(id))));
+              filterProducts(products, { query: plan.query, goals: planGoals, category: plan.category, maxPrice: plan.maxPrice, minPrice: plan.minPrice, minRating: plan.minRating, promoOnly: plan.promoOnly, limit: 10 }).forEach(addCand);
+              const candidates = pool.slice(0, 10);
+
+              if (candidates.length > 0) {
+                const r = await research(plan.query?.trim() || text, true);
+                sources = r.sources;
+                const ranked = await metaRecommend(
+                  plan.query?.trim() || text,
+                  candidates.map((p) => ({ id: p.id, name: p.name })),
+                  r.grounding,
+                );
+                groundedReply = ranked.reply;
+                results = ranked.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[];
+              }
+            } catch { /* fall through to the name-based matcher below */ }
           }
-          if (results.length === 0) {
+
+          // Fallback / non-need queries — original fast path.
+          if (results.length === 0 && !plan.productIds?.length) {
             results = filterProducts(products, {
               query: plan.query, goals: planGoals, category: plan.category,
               maxPrice: plan.maxPrice, minPrice: plan.minPrice, minRating: plan.minRating,
               promoOnly: plan.promoOnly, sort: plan.sort, limit: 6,
             });
+          } else if (results.length === 0 && plan.productIds?.length && !plan.sort) {
+            const byId = new Map(products.map((p) => [p.id, p]));
+            results = (plan.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[]).filter(applyHardFilters).slice(0, 6);
           }
-          if (results.length === 0) push({ role: "ai", kind: "text", text: intro ? `${intro}\n— แต่ยังไม่พบสินค้าที่ตรงเงื่อนไข ลองปรับราคา/คำค้นดูนะครับ` : "ยังไม่พบสินค้าที่ตรงเงื่อนไขครับ ลองปรับราคา/คำค้นดูนะครับ" });
-          else push({ role: "ai", kind: "products", text: intro || "นี่คือสินค้าที่ตรงกับที่หาครับ:", products: results, goals: planGoals });
+
+          const head = groundedReply || intro;
+          if (results.length === 0) {
+            push({ role: "ai", kind: "text", text: head ? `${head}\n— แต่ยังไม่พบสินค้าที่ตรงเงื่อนไข ลองปรับราคา/คำค้นดูนะครับ` : "ยังไม่พบสินค้าที่ตรงเงื่อนไขครับ ลองปรับราคา/คำค้นดูนะครับ", ...(sources.length && groundedReply ? { sources } : null) });
+          } else if (groundedReply) {
+            // Grounded path: reason (+ sources) as its own bubble, then the cards.
+            push({ role: "ai", kind: "text", text: groundedReply, ...(sources.length ? { sources } : null) });
+            push({ role: "ai", kind: "products", text: "สินค้าที่แนะนำครับ 👇", products: results, goals: planGoals });
+          } else {
+            push({ role: "ai", kind: "products", text: intro || "นี่คือสินค้าที่ตรงกับที่หาครับ:", products: results, goals: planGoals });
+          }
           return true;
         }
         case "compare": {
