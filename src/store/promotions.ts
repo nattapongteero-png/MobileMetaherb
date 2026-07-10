@@ -96,11 +96,18 @@ export type Pricing = {
 };
 
 function amountOff(p: Promotion, base: number): number {
+  // Never trust the stored numbers: a 150% promotion (or a negative one) must
+  // not reverse the till. Fuzzing found exactly that — percent above 100 with
+  // no maxDiscount priced the product below zero.
+  const value = Math.max(0, p.discountValue);
+  let raw: number;
   if (p.discountType === "percent") {
-    const raw = Math.round((base * p.discountValue) / 100);
-    return p.maxDiscount != null ? Math.min(raw, p.maxDiscount) : raw;
+    raw = Math.round((base * Math.min(value, 100)) / 100);
+    if (p.maxDiscount != null) raw = Math.min(raw, Math.max(0, p.maxDiscount));
+  } else {
+    raw = value;
   }
-  return Math.min(p.discountValue, base);
+  return Math.min(raw, base);
 }
 
 /**
@@ -117,7 +124,7 @@ export function pricingFor(
   const flash = state.flash.find((f) => f.productId === productId);
   if (flash && flashRunning(flash, now) && flash.flashPrice < basePrice) {
     return {
-      price: flash.flashPrice,
+      price: Math.max(0, flash.flashPrice),
       originalPrice: basePrice,
       discountPercent: Math.round(((basePrice - flash.flashPrice) / basePrice) * 100),
       isFlashSale: true,

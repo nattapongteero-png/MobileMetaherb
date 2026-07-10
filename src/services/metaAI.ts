@@ -6,6 +6,18 @@ import { AI_LLM_BASE, AI_LLM_MODEL } from "../config/aiEndpoints";
 import { goalBans, isContraindicated, servesAnyGoal } from "../data/productGoals";
 import type { HealthGoal } from "../data/aiEngine";
 
+/**
+ * Abort after `ms`. No caller passed a signal, so a hung endpoint hung the chat
+ * turn forever — the customer just watched the typing dots. Every fetch below
+ * now defaults to this. (Hand-built: Hermes has no AbortSignal.timeout.)
+ */
+function timeoutSignal(ms: number): AbortSignal {
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+const DEFAULT_TIMEOUT_MS = 20_000;
+
 type Role = "system" | "user" | "assistant";
 type ChatMsg = { role: Role; content: string };
 
@@ -133,7 +145,7 @@ export async function metaPlan(history: { role: "user" | "ai"; text: string }[],
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: AI_LLM_MODEL, messages, response_format: { type: "json_object" }, temperature: 0.2, max_tokens: 320, stream: false }),
-    signal,
+    signal: signal ?? timeoutSignal(DEFAULT_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`plan ${res.status}`);
   const json = await res.json();
@@ -177,7 +189,7 @@ export async function metaChat(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: AI_LLM_MODEL, messages, temperature: 0.6, max_tokens: 400, stream: false }),
-    signal,
+    signal: signal ?? timeoutSignal(DEFAULT_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`LLM ${res.status}`);
   const json = await res.json();
@@ -250,7 +262,7 @@ export async function metaVision(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: AI_LLM_MODEL, messages, temperature: 0.4, max_tokens: 450, stream: false }),
-    signal,
+    signal: signal ?? timeoutSignal(DEFAULT_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`vision ${res.status}`);
   const json = await res.json();
@@ -310,7 +322,7 @@ export async function metaRecommend(
       max_tokens: 320,
       stream: false,
     }),
-    signal,
+    signal: signal ?? timeoutSignal(DEFAULT_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`recommend ${res.status}`);
   const json = await res.json();

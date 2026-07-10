@@ -212,3 +212,27 @@ describe("the shipped seed reproduces the storefront's existing prices", () => {
     expect(pricingFor("44", 5000, promotionsStore.get())!.price).toBe(4850);
   });
 });
+
+describe("hostile numbers cannot reverse the till", () => {
+  it("clamps a percent above 100 — found by fuzzing", () => {
+    seedPromotions([promo({ discountType: "percent", discountValue: 150, maxDiscount: undefined })]);
+    const p = pricingFor("23", 120, promotionsStore.get(), NOW)!;
+    expect(p.price).toBe(0);
+    expect(p.discountPercent).toBe(100);
+  });
+
+  it("ignores a negative discount instead of raising the price", () => {
+    seedPromotions([promo({ discountType: "baht", discountValue: -50 })]);
+    expect(pricingFor("23", 120, promotionsStore.get(), NOW)).toBeUndefined();
+  });
+
+  it("treats a negative maxDiscount as no discount at all", () => {
+    seedPromotions([promo({ discountType: "percent", discountValue: 30, maxDiscount: -10 })]);
+    expect(pricingFor("23", 120, promotionsStore.get(), NOW)).toBeUndefined();
+  });
+
+  it("clamps a negative flash price to zero", () => {
+    seedPromotions([], [flash({ flashPrice: -5 })]);
+    expect(pricingFor("1", 100, promotionsStore.get(), NOW)!.price).toBe(0);
+  });
+});
