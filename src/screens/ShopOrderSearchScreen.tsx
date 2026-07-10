@@ -34,7 +34,8 @@ export function ShopOrderSearchScreen() {
               o.customer.toLowerCase().includes(q) ||
               o.items.some((it) => it.name.toLowerCase().includes(q)),
           )
-        : orders,
+        // No query → show a recent window, not 19 months of history.
+        : orders.slice(0, 40),
     [q, orders],
   );
 
@@ -87,7 +88,7 @@ export function ShopOrderSearchScreen() {
         contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 24 }}
       >
         <Text style={{ paddingHorizontal: 16, marginBottom: 10, fontSize: 12, color: "#737373" }}>
-          {q ? `พบ ${results.length} คำสั่งซื้อ` : `คำสั่งซื้อทั้งหมด ${orders.length} รายการ`}
+          {q ? `พบ ${results.length} คำสั่งซื้อ` : `ล่าสุด ${results.length} จาก ${orders.length.toLocaleString()} รายการ`}
         </Text>
 
         {results.length === 0 ? (

@@ -11,6 +11,7 @@ import "../src/store";
 
 import { ordersForShop, ordersForUser, allOrders } from "../src/store/orders";
 import { customerStats, monthlyOrders, monthlySales, topProducts, totals } from "../src/store/analytics";
+import { HISTORY_CUTOFF_DAYS, HISTORY_ORDERS, HISTORY_START, buildOrderHistory } from "../src/data/orderHistorySeed";
 import { canFulfill, stockOf } from "../src/store/stock";
 import { walletCoupons, couponsForShop } from "../src/store/coupons";
 import { pricingFor, promotionsStore } from "../src/store/promotions";
@@ -27,26 +28,63 @@ const SHOP = "METAHERB Store";
 const BUYER = DEMO_USER.id;
 
 describe("orders: the buyer's and the seller's arrays really merged", () => {
-  it("seeds one table holding both", () => {
-    expect(allOrders().length).toBe(23); // 14 buyer rows + 9 seller rows
+  it("seeds one table holding the hand-authored rows and the back-filled history", () => {
+    // 14 buyer + 9 seller hand-authored, plus ~19 months of history. The exact
+    // count moves with the calendar, so assert the shape, not a magic number.
+    expect(allOrders().length).toBeGreaterThan(200);
+    expect(HISTORY_ORDERS.length).toBe(allOrders().length - 23);
   });
 
   it("shows the shop the buyer's METAHERB orders, which it could never see before", () => {
     const shopOrders = ordersForShop(SHOP);
     const buyersOrdersAtThisShop = ordersForUser(BUYER).filter((o) => o.shopName === SHOP);
     expect(buyersOrdersAtThisShop.length).toBe(7);
-    expect(shopOrders.length).toBe(16); // its own 9 + the buyer's 7
     for (const o of buyersOrdersAtThisShop) expect(shopOrders).toContain(o);
   });
 
-  it("stamps every seeded order in the recent past, never the future", () => {
+  it("keeps the back-filled history out of the demo buyer's own order list", () => {
+    // The buyer's 14 rows are hand-authored; the history belongs to other people.
+    expect(ordersForUser(BUYER)).toHaveLength(14);
+    expect(HISTORY_ORDERS.every((o) => o.userId !== BUYER)).toBe(true);
+  });
+
+  it("never lets the back-fill collide with the hand-authored window", () => {
+    const cutoff = Date.now() - HISTORY_CUTOFF_DAYS * 86_400_000;
+    for (const o of HISTORY_ORDERS) expect(o.createdAt, o.id).toBeLessThan(cutoff);
+  });
+
+  it("mints a unique id for every order", () => {
+    const ids = allOrders().map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("stamps every seeded order in the past, never the future", () => {
     const now = Date.now();
+    const start = new Date(HISTORY_START.year, HISTORY_START.month, 1).getTime();
     for (const o of allOrders()) {
-      expect(o.createdAt, `${o.id}`).toBeGreaterThan(0);
-      expect(o.createdAt).toBeLessThanOrEqual(now);
-      // The whole demo history spans the last ~25 days.
-      expect(now - o.createdAt).toBeLessThan(30 * 86_400_000);
+      expect(o.createdAt, o.id).toBeGreaterThanOrEqual(start);
+      expect(o.createdAt, o.id).toBeLessThanOrEqual(now);
     }
+  });
+
+  it("covers every month from มกราคม 2568 to the current one, with no gaps", () => {
+    const shop = ordersForShop(SHOP);
+    const now = new Date();
+    const cursor = new Date(HISTORY_START.year, HISTORY_START.month, 1);
+    while (cursor <= now) {
+      const y = cursor.getFullYear();
+      const m = cursor.getMonth();
+      const revenue = monthlySales(shop, y)[m];
+      expect(revenue, `${y}-${m + 1} has no sales`).toBeGreaterThan(0);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  });
+
+  it("is deterministic — the same clock rebuilds the same history", () => {
+    const at = new Date(2026, 6, 10, 12, 0).getTime();
+    const a = buildOrderHistory(at);
+    const b = buildOrderHistory(at);
+    expect(a.map((o) => `${o.id}:${o.total}`)).toEqual(b.map((o) => `${o.id}:${o.total}`));
   });
 
   it("sorts the whole table newest-first", () => {

@@ -864,6 +864,12 @@ const TOP_CUSTOMERS = [
 
 // Filter tabs — "all" + each status, with the same icons as the web.
 // "ส่งสำเร็จ" also collects reviewed (completed) orders; see `matchesShopTab`.
+/**
+ * The orders table holds 19 months of history and StickyFilterList is a plain
+ * ScrollView, so the console renders a window. Search still reaches everything.
+ */
+const ORDER_PAGE_SIZE = 40;
+
 const ORDER_TABS: { id: "all" | OrderStatus; label: string; Icon: typeof BarChart3 }[] = [
   { id: "all", label: "ทั้งหมด", Icon: ClipboardList },
   { id: "pending_payment", label: "รอชำระเงิน", Icon: Wallet },
@@ -5765,7 +5771,7 @@ export function OrdersSection({ showSearch = true, initialFilter, insetsBottom =
   const count = (id: "all" | OrderStatus) => orders.filter((o) => matchesShopTab(o.status, id)).length;
 
   const q = query.trim().toLowerCase();
-  const visible = orders.filter((o) => {
+  const matched = orders.filter((o) => {
     if (!matchesShopTab(o.status, filter)) return false;
     if (!q) return true;
     return (
@@ -5774,6 +5780,10 @@ export function OrdersSection({ showSearch = true, initialFilter, insetsBottom =
       o.items.some((it) => it.name.toLowerCase().includes(q))
     );
   });
+  // The table holds 19 months of history and this list is a plain ScrollView, so
+  // render a window rather than ~230 cards. The count below says what was cut.
+  const visible = matched.slice(0, ORDER_PAGE_SIZE);
+  const hidden = matched.length - visible.length;
 
   return (
     <StickyFilterList
@@ -5869,7 +5879,14 @@ export function OrdersSection({ showSearch = true, initialFilter, insetsBottom =
           <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบคำสั่งซื้อ</Text>
         </View>
       ) : (
-        visible.map((o) => <OrderCard key={o.id} order={o} />)
+        <>
+          {visible.map((o) => <OrderCard key={o.id} order={o} />)}
+          {hidden > 0 ? (
+            <Text style={{ textAlign: "center", fontSize: 12.5, color: TEXT_MUTED, paddingVertical: 12 }}>
+              แสดง {visible.length} รายการล่าสุด · ซ่อนอีก {hidden.toLocaleString()} รายการ — ใช้ช่องค้นหาเพื่อดูออเดอร์เก่า
+            </Text>
+          ) : null}
+        </>
       )}
     </StickyFilterList>
   );

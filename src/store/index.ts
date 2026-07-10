@@ -21,6 +21,7 @@ import { seedPrefs } from "./prefs";
 import { sessionStore, DEMO_USER } from "./session";
 import { MOCK_ORDERS } from "../data/orders";
 import { SHOP_SEED_ORDERS } from "../data/shopOrders";
+import { HISTORY_ORDERS } from "../data/orderHistorySeed";
 import { SEED_COUPONS, SEED_WALLET } from "../data/couponSeed";
 import { SEED_PROMOTIONS } from "../data/promotionSeed";
 import { SEED_FLASH } from "../data/flashSeed";
@@ -37,7 +38,9 @@ setPersistence(AsyncStorage);
 
 // Seed synchronously so the first paint has content, then let `hydrateAll`
 // swap in whatever the user actually did on their last run.
-seedOrders([...MOCK_ORDERS, ...SHOP_SEED_ORDERS]);
+// HISTORY_ORDERS back-fills every month from มกราคม 2568 up to the window the
+// hand-authored rows cover, so the yearly chart and heatmap are never empty.
+seedOrders([...MOCK_ORDERS, ...SHOP_SEED_ORDERS, ...HISTORY_ORDERS]);
 seedStock(Object.fromEntries(Object.entries(SHOP_STOCK).map(([id, s]) => [id, s.stock])));
 seedCoupons(SEED_COUPONS, SEED_WALLET);
 seedPromotions(SEED_PROMOTIONS, SEED_FLASH);
