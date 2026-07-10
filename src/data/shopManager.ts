@@ -126,11 +126,21 @@ function buildBriefing(complaints: Complaint[]): MetaReply {
 
 /* ── Real action: create a coupon ──────────────────────────────────────────── */
 
-export type CouponDraft = { code?: string; discount?: string; minSpend?: number | string; expiry?: string; couponType?: "MH" | "FREE" | "VIP" };
+/** `discount` may arrive as a bare number: the live model returns 15 for "ลด 15%"
+ * even when asked for a string, and `.trim()` on a number crashed the copilot. */
+export type CouponDraft = { code?: string; discount?: string | number; minSpend?: number | string; expiry?: string; couponType?: "MH" | "FREE" | "VIP" };
+
+/** Normalise the draft's discount to display text. A bare number ≤ 100 reads as
+ * a percent (the common "ลด 15%" case); larger reads as baht. */
+function draftDiscountText(d?: string | number | null): string {
+  if (d == null) return "";
+  if (typeof d === "number") return d <= 100 ? `ลด ${d}%` : `ลด ${d} บาท`;
+  return String(d).trim();
+}
 
 /** True when the LLM gave enough to actually mint a coupon (else we ask). */
 export function couponDraftReady(d?: CouponDraft | null): boolean {
-  return !!d && !!(d.discount?.trim() || d.code?.trim());
+  return !!d && !!(draftDiscountText(d.discount) || d.code?.trim());
 }
 
 /** Mint the coupon in the shared table and return a confirmation card. */
@@ -142,7 +152,7 @@ export function createCouponFromDraft(draft: CouponDraft): MetaReply {
   const minOrder = typeof draft.minSpend === "number" ? draft.minSpend : Number(String(draft.minSpend ?? "").replace(/\D/g, "")) || 0;
 
   // "ลด 20%" → percent 20; "ลด 50 บาท" / "฿50" → 50 baht off; "ส่งฟรี" → freeship.
-  const text = draft.discount?.trim() ?? "";
+  const text = draftDiscountText(draft.discount);
   const percent = /(\d+)\s*%/.exec(text);
   const amount = /(\d[\d,]*)/.exec(text.replace(/%/g, ""));
   const discountType: Coupon["discountType"] =

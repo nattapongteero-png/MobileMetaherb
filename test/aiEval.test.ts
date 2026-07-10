@@ -18,6 +18,9 @@ import { isExternalOnly, usageTag } from "../src/data/productUsage";
 import { searchHerbKB } from "../src/data/herbKB";
 import { goalBans } from "../src/data/productGoals";
 import { __systemPromptFor, maleify } from "../src/services/metaAI";
+import { couponDraftReady, createCouponFromDraft } from "../src/data/shopManager";
+import { __resetCoupons, couponsForShop, seedCoupons } from "../src/store/coupons";
+import { METAHERB_SHOP } from "../src/data/shopOrders";
 
 const named = (id: string) => RAW_PRODUCT_BY_ID[id]?.name ?? id;
 const pool = (q: string) => filterProducts(ALL_PRODUCTS, { query: q, goals: extractGoals(q), limit: 10 });
@@ -310,5 +313,24 @@ describe("sensitive contexts carry a rule into the prompt", () => {
     expect(extractCautions("ท้องอืด อาหารไม่ย่อย")).toEqual([]); // ท้อง ≠ ตั้งครรภ์
     expect(extractCautions("ลูกจันทน์เทศราคาเท่าไหร่")).toEqual([]); // ลูก… is a nutmeg
     expect(extractCautions("เป็นเบาหวาน")).toEqual([]); // the disease alone ≠ on medication
+  });
+});
+
+describe("the copilot's coupon draft survives a numeric discount", () => {
+  // The live model returns 15 for "ลด 15%" even when asked for a string; the
+  // old .trim() crashed the manager chat on exactly that draft.
+  it("reads a bare number as a usable draft", () => {
+    expect(couponDraftReady({ discount: 15 })).toBe(true);
+    expect(couponDraftReady({})).toBe(false);
+  });
+
+  it("mints percent from a small number, baht from a large one, into the shared table", () => {
+    __resetCoupons();
+    seedCoupons([]);
+    createCouponFromDraft({ discount: 15, minSpend: 300, code: "NUM15" });
+    createCouponFromDraft({ discount: 150, code: "NUM150" });
+    const byCode = (code: string) => couponsForShop(METAHERB_SHOP).find((c) => c.code === code)!;
+    expect(byCode("NUM15")).toMatchObject({ discountType: "percent", discountValue: 15, minOrder: 300 });
+    expect(byCode("NUM150")).toMatchObject({ discountType: "baht", discountValue: 150 });
   });
 });

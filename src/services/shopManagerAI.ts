@@ -53,7 +53,7 @@ function managerSystem(snapshot: string): string {
     '- "actions" คือ array ของการ์ดข้อมูลที่จะแสดง เลือกได้หลายอัน (สูงสุด 3) ถ้าเจ้าของอยากเห็นหลายมุม เช่น "สรุปร้านวันนี้" → ["briefing"], "ขอภาพรวม+ออเดอร์+ของใกล้หมด" → ["kpi","orders","products"]',
     '- ถ้าเป็นการทักทาย/ถามทั่วไป/ขอคำแนะนำล้วนๆ ที่ไม่ต้องโชว์การ์ด ใช้ actions=["none"]',
     '- "period" ใส่เมื่อ actions มี "kpi" เพื่อเลือกช่วงเวลา: daily=วันนี้, weekly=เดือนนี้(รายสัปดาห์), monthly=ปีนี้(รายเดือน), yearly=หลายปี (ถ้าไม่ระบุ = daily)',
-    '- "coupon" ใส่เฉพาะตอน actions มี "create_coupon": { "code","discount","minSpend","expiry","couponType":"MH|FREE|VIP" } ถ้าข้อมูลไม่พอ ให้ถามกลับและใช้ actions=["create_coupon"] โดยไม่ต้องใส่ coupon',
+    '- "coupon" ใส่เฉพาะตอน actions มี "create_coupon": { "code","discount","minSpend","expiry","couponType":"MH|FREE|VIP" } ถ้าข้อมูลไม่พอ ให้ถามกลับและใช้ actions=["create_coupon"] โดยไม่ต้องใส่ coupon', // e.g. "ลด 15%" / "ลด 50 บาท" — สตริงพร้อมหน่วยเสมอ
     '- "complaint" ใส่เฉพาะตอน actions มี "resolve_complaint": { "id":"รหัสเคส เช่น DSP-...", "decision":"refund_full|refund_partial|reject|acknowledge", "amount":ยอดคืนเงิน } ถ้าไม่ระบุเคส ระบบจะถือว่าทำกับเคสที่รออยู่ — ถ้า decision=refund_partial ต้องมี amount (จำนวนบาท) ด้วย ถ้าเจ้าของไม่ได้บอกจำนวน อย่าใส่ amount (ระบบจะถามกลับเอง)',
     '- "flash" ใส่ตอน actions มี "set_flashsale" (จัดเข้า/ตั้งส่วนลด) หรือ "end_flashsale" (ถอดออก): { "product":"ชื่อสินค้า", "discount":เปอร์เซ็นต์ }',
     '- "pr" ใส่ตอน actions มี "resolve_pr": { "id":"รหัส PR เช่น PR-...", "decision":"approve|reject", "reason":"เหตุผล(ตอน reject)" } ถ้าไม่ระบุ id จะทำกับใบที่รออนุมัติ',
