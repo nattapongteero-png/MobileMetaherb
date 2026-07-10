@@ -8,7 +8,7 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { usePayment } from "../context/PaymentContext";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import { CHECKOUT_COUPONS, couponEligible, type CheckoutCoupon } from "../data/checkoutCoupons";
-import { CHECKOUT_SUBTOTAL } from "../data/checkoutItems";
+import { useCart } from "../context/CartContext";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const GROUPED_BG = "#f2f2f7";
@@ -102,6 +102,12 @@ export function CouponSelectScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { selectedCouponIdx, setSelectedCouponIdx } = usePayment();
+
+  // Coupon eligibility must reflect what is actually being bought — this used
+  // to compare against CHECKOUT_SUBTOTAL, the total of a hardcoded 2-item array.
+  const { items, checkoutItems } = useCart();
+  const lines = checkoutItems.length ? checkoutItems : items.filter((i) => i.inStock);
+  const subtotal = lines.reduce((s, i) => s + i.price * i.quantity, 0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const choose = (idx: number | null) => {
@@ -174,8 +180,8 @@ export function CouponSelectScreen() {
                       key={coupon.code}
                       coupon={coupon}
                       active={selectedCouponIdx === idx}
-                      eligible={couponEligible(coupon, CHECKOUT_SUBTOTAL)}
-                      shortfall={coupon.minSpendValue - CHECKOUT_SUBTOTAL}
+                      eligible={couponEligible(coupon, subtotal)}
+                      shortfall={coupon.minSpendValue - subtotal}
                       onPress={() => choose(idx)}
                     />
                   ))

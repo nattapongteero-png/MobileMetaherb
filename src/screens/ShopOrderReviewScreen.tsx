@@ -7,7 +7,8 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { EmptyState } from "../components/EmptyState";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { ORDERS } from "./MyShopScreen";
+import { useShopOrder } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -33,7 +34,7 @@ export function ShopOrderReviewScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, "ShopOrderReview">>();
-  const order = ORDERS.find((o) => o.id === route.params?.orderId);
+  const order = useShopOrder(METAHERB_SHOP, route.params?.orderId);
   const review = order?.review;
 
   return (

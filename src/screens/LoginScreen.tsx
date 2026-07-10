@@ -8,6 +8,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronLeft, Eye, EyeOff, Mail, Lock } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { signIn } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -107,6 +108,9 @@ export function LoginScreen() {
       setError("กรุณากรอกอีเมลและรหัสผ่าน");
       return;
     }
+    // Mock auth (no server), but it now produces the session every buyer-side
+    // screen reads — and that orders, complaints and trials hang off of.
+    signIn(email.trim());
     nav.navigate("Main");
   };
 

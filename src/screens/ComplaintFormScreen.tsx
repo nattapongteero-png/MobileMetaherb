@@ -142,7 +142,7 @@ export function ComplaintFormScreen() {
       amount: totalRefund,
       refundChannel,
       createdAt,
-      items: order.items.map((it) => ({ name: it.name, option: it.option, qty: it.quantity, price: it.price, image: it.image })),
+      items: order.items.map((it) => ({ name: it.name, option: it.option, qty: it.quantity, price: it.price, image: it.image! })),
       evidence: images.map((uri) => ({ source: { uri } })),
     });
     Alert.alert(

@@ -323,7 +323,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
             const match = products.find((p) => p.name.toLowerCase().includes(key)) || products.find((p) => toks.some((t) => p.name.toLowerCase().includes(t)));
             if (match && !seen.has(match.id)) {
               seen.add(match.id);
-              addToCart({ id: `c-${match.id}`, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id), quantity: qty });
+              addToCart({ id: `c-${match.id}`, productId: match.id, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id), quantity: qty });
               addedNames.push(match.name);
             }
           }
@@ -482,7 +482,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           push({ role: "ai", kind: "text", text: "ยังไม่แน่ใจว่าจะหยิบตัวไหน — ลองพิมพ์ชื่อสินค้าให้ชัดขึ้น หรือกดปุ่มตะกร้าใต้การ์ดสินค้าได้เลยครับ" });
           break;
         }
-        addToCart({ id: `c-${match.id}`, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id) });
+        addToCart({ id: `c-${match.id}`, productId: match.id, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id) });
         push({ role: "ai", kind: "text", text: `เพิ่ม “${match.name}” ลงตะกร้าเรียบร้อย ✓\nยอดรวมโดยประมาณ ฿${(cTotal + match.price).toLocaleString()}` });
         const upsell = crossSell(products, match, 3);
         if (upsell.length > 0) { await think(400); push({ role: "ai", kind: "products", text: "ลูกค้าที่ซื้อสินค้านี้ มักซื้อพร้อมกับ:", products: upsell }); }

@@ -439,6 +439,7 @@ export function ProductDetailScreen({ route }: Props) {
     // Actually add the line to the shared cart (badge + CartScreen update).
     addToCart({
       id: `p-${view.id}-${variants ? variantIdx : selectedOption}`,
+      productId: view.id,
       name: view.name,
       option: noOptions ? "" : variants ? variants[variantIdx!].label : `ขนาด ${OPTIONS[selectedOption!]}`,
       price: view.price,

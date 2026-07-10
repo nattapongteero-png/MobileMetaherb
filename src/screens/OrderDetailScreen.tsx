@@ -97,7 +97,7 @@ export function OrderDetailScreen() {
   const subtotal = order.items.reduce((sum, it) => sum + it.price * it.quantity, 0);
   const shippingFee = Math.max(0, order.total - subtotal); // baked into the mock total
   const discount = Math.max(0, subtotal - order.total);
-  const showTracking = order.trackingNumber && (order.status === "shipped" || order.status === "delivered");
+  const showTracking = order.trackingNumber && (order.status === "shipping" || order.status === "delivered");
   // Only the awaiting-payment state shows the amount in the floating bar — the
   // total is action-relevant only when you're about to pay.
   const showBarTotal = order.status === "pending_payment";

@@ -3,7 +3,10 @@ import { RAW_PRODUCT_BY_ID, REAL_PRODUCTS, getRealProductImage } from "../data/r
 import { shopForKey } from "../data/shops";
 
 export type CartItem = {
+  /** Cart-line key: product id + chosen option ("p-37-0"). Not the product id. */
   id: string;
+  /** Catalog product id — what an order line and the stock table key on. */
+  productId: string;
   name: string;
   option: string;
   price: number;
@@ -28,6 +31,15 @@ type CartValue = {
   updateQty: (id: string, quantity: number) => void;
   removeItem: (id: string) => void;
   removeMany: (ids: string[]) => void;
+  /**
+   * The lines the buyer ticked in the cart and carried into checkout. Set by
+   * CartScreen before navigating to Payment — the Payment screen used to render
+   * a hardcoded 2-item array (data/checkoutItems.ts) no matter what was in the cart.
+   */
+  checkoutItems: CartItem[];
+  beginCheckout: (items: CartItem[]) => void;
+  /** Clear the checked-out lines once an order exists for them. */
+  finishCheckout: () => void;
 };
 
 // Build a cart line straight from a real catalog product (the same source the
@@ -43,6 +55,7 @@ function lineFromProduct(
   const p = RAW_PRODUCT_BY_ID[id];
   return {
     id: `c-${id}`,
+    productId: id,
     name: p.name,
     option: opts.option,
     price: p.price,
@@ -68,6 +81,7 @@ const CartContext = createContext<CartValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(SEED);
+  const [checkoutItems, setCheckoutItems] = useState<CartItem[]>([]);
 
   const addToCart: CartValue["addToCart"] = (input) => {
     const addQty = input.quantity ?? 1;
@@ -81,6 +95,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       const line: CartItem = {
         id: input.id,
+        productId: input.productId,
         name: input.name,
         option: input.option,
         price: input.price,
@@ -104,9 +119,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeMany = (ids: string[]) =>
     setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
 
+  const beginCheckout = (lines: CartItem[]) => setCheckoutItems(lines);
+
+  const finishCheckout = () => {
+    const ids = checkoutItems.map((i) => i.id);
+    setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+    setCheckoutItems([]);
+  };
+
   return (
     <CartContext.Provider
-      value={{ items, count: items.length, addToCart, updateQty, removeItem, removeMany }}
+      value={{
+        items,
+        count: items.length,
+        addToCart,
+        updateQty,
+        removeItem,
+        removeMany,
+        checkoutItems,
+        beginCheckout,
+        finishCheckout,
+      }}
     >
       {children}
     </CartContext.Provider>

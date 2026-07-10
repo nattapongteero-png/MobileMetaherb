@@ -10,6 +10,8 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { getImagePicker } from "../utils/imagePicker";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { useStore } from "../store/db";
+import { sessionStore, updateProfile } from "../store/session";
 
 // Pill input on a gray fill — same as the add-address / add-bank forms.
 const INPUT = { minHeight: 50, backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: "#374151" } as const;
@@ -90,10 +92,11 @@ export function AccountInfoScreen() {
 
   const [avatar, setAvatar] = useState<string | null>(DEFAULT_AVATAR);
 
-  // Committed profile values.
-  const [username, setUsername] = useState("ณัฐพงษ์ ธีโรภาส");
-  const [email, setEmail] = useState("nattapong.t@gmail.com");
-  const [phone, setPhone] = useState("061-421-3111");
+  // Committed profile values — the single session user, not a private copy.
+  const { user } = useStore(sessionStore);
+  const username = user?.name ?? "";
+  const email = user?.email ?? "";
+  const phone = user?.phone ?? "";
 
   // Profile edit sheet (drafts so Cancel/close reverts).
   const [profileSheet, setProfileSheet] = useState(false);
@@ -105,7 +108,11 @@ export function AccountInfoScreen() {
   const profileDirty = dName.trim() !== username || dEmail.trim() !== email || dPhone.trim() !== phone;
   const profileValid = dName.trim() !== "" && dEmail.trim() !== "" && dPhone.trim() !== "";
   const canSaveProfile = profileDirty && profileValid;
-  const saveProfile = () => { if (!canSaveProfile) return; setUsername(dName.trim()); setEmail(dEmail.trim()); setPhone(dPhone.trim()); setProfileSheet(false); };
+  const saveProfile = () => {
+    if (!canSaveProfile) return;
+    updateProfile({ name: dName.trim(), email: dEmail.trim(), phone: dPhone.trim() });
+    setProfileSheet(false);
+  };
 
   // Password edit sheet.
   const [pwSheet, setPwSheet] = useState(false);

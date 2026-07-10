@@ -383,6 +383,7 @@ export function HerbalMarketDetailScreen() {
     const pricePerItem = Math.round((gramPerItem / 1000) * effectivePricePerKg);
     addToCart({
       id: `m-${material.id}-${gramPerItem}`,
+      productId: `m-${material.id}`,
       name: material.name,
       option: `${gramPerItem.toLocaleString()} กรัม/ชิ้น`,
       price: pricePerItem,

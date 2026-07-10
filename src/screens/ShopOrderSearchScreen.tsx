@@ -10,7 +10,9 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { EmptyState } from "../components/EmptyState";
 import { BottomFade } from "../components/BottomFade";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { ORDERS, OrderCard } from "./MyShopScreen";
+import { OrderCard } from "./MyShopScreen";
+import { useShopOrders } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -21,18 +23,19 @@ export function ShopOrderSearchScreen() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
 
+  const orders = useShopOrders(METAHERB_SHOP);
   const q = query.trim().toLowerCase();
   const results = useMemo(
     () =>
       q
-        ? ORDERS.filter(
+        ? orders.filter(
             (o) =>
               o.id.toLowerCase().includes(q) ||
               o.customer.toLowerCase().includes(q) ||
               o.items.some((it) => it.name.toLowerCase().includes(q)),
           )
-        : ORDERS,
-    [q],
+        : orders,
+    [q, orders],
   );
 
   return (
@@ -84,7 +87,7 @@ export function ShopOrderSearchScreen() {
         contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 24 }}
       >
         <Text style={{ paddingHorizontal: 16, marginBottom: 10, fontSize: 12, color: "#737373" }}>
-          {q ? `พบ ${results.length} คำสั่งซื้อ` : `คำสั่งซื้อทั้งหมด ${ORDERS.length} รายการ`}
+          {q ? `พบ ${results.length} คำสั่งซื้อ` : `คำสั่งซื้อทั้งหมด ${orders.length} รายการ`}
         </Text>
 
         {results.length === 0 ? (

@@ -8,7 +8,9 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { ORDERS } from "./MyShopScreen";
+import { useShopOrder } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { shipOrder } from "../store/orders";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -17,14 +19,15 @@ const LABEL = "#6b7280";
 /**
  * ยืนยันการจัดส่ง — slide-up modal in the AddCard style, porting the web's
  * ship-confirm modal: order summary box + required tracking-number input.
- * Confirm hands the tracking number back and flips the order to "กำลังจัดส่ง".
+ * Confirm writes the tracking number to the shared order, which flips it to
+ * "กำลังจัดส่ง" and notifies the buyer.
  */
 export function ConfirmShipScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, "ConfirmShip">>();
   const { orderId, onConfirm } = route.params;
-  const order = ORDERS.find((o) => o.id === orderId);
+  const order = useShopOrder(METAHERB_SHOP, orderId);
 
   const [tracking, setTracking] = useState("");
   const canSubmit = tracking.trim().length > 0;
@@ -32,6 +35,7 @@ export function ConfirmShipScreen() {
   const submit = () => {
     if (!canSubmit) return;
     nav.goBack();
+    shipOrder(orderId, tracking.trim());
     onConfirm?.(tracking.trim());
     showToast("อัปเดตสถานะการจัดส่งเรียบร้อย — ลูกค้าจะติดตามพัสดุได้");
   };

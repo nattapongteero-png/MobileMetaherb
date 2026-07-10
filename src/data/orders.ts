@@ -1,95 +1,40 @@
-// Ported from the MetaHerb website (src/app/store/OrderContext.tsx).
-// Order line items reference the real store catalog (RAW_PRODUCT_BY_ID) so names,
+// Buyer-side seed rows for the shared orders table (src/store/orders.ts).
+// Line items reference the real store catalog (RAW_PRODUCT_BY_ID) so names,
 // prices and photos match what the buyer actually sees in the shop.
+//
+// The Order type itself now lives in src/store/types.ts — it is the SAME type
+// the shop console reads. These rows are just the demo buyer's history.
 
-import type { ImageSourcePropType } from "react-native";
 import { RAW_PRODUCT_BY_ID, getRealProductImage } from "./realProducts";
+import { parseThaiDateTime } from "../store/orders";
+import { DEMO_USER } from "../store/session";
+import {
+  CUSTOMER_STATUS_COLOR,
+  CUSTOMER_STATUS_LABEL,
+  type Order,
+  type OrderItem,
+  type OrderStatus,
+  type Recipient,
+} from "../store/types";
 
-export type OrderStatus =
-  | "pending_payment"
-  | "pending_verify"
-  | "preparing"
-  | "shipped"
-  | "delivered"
-  | "completed"
-  | "cancelled";
-
-export type OrderItem = {
-  name: string;
-  image: ImageSourcePropType;
-  option: string;
-  quantity: number;
-  price: number;
-};
-
-export type Recipient = {
-  name: string;
-  phone: string;
-  /** Full delivery address on one line. */
-  address: string;
-};
-
-export type Order = {
-  id: string;
-  shopName: string;
-  status: OrderStatus;
-  date: string;
-  total: number;
-  trackingNumber?: string;
-  items: OrderItem[];
-  review?: {
-    /** Overall rating (average of per-product ratings) — keeps list/detail display simple. */
-    rating: number;
-    /** Summary comment (first non-empty product comment). */
-    comment: string;
-    /** Stars given to the shop itself (rating only, no text). */
-    shopRating?: number;
-    /** When true, the reviewer's name is hidden on the public review. */
-    anonymous?: boolean;
-    /** Per-product reviews captured at review time. */
-    products?: { name: string; rating: number; comment: string; photos: string[] }[];
-  };
-  // Shipping + payment detail — shown on the order detail screen.
-  recipient?: Recipient;
-  shippingMethod?: string;
-  paymentMethod?: string;
-};
-
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  pending_payment: "รอชำระเงิน",
-  pending_verify: "รอตรวจสอบ",
-  preparing: "กำลังจัดเตรียม",
-  shipped: "จัดส่งแล้ว",
-  delivered: "รับสินค้าแล้ว",
-  completed: "สำเร็จ",
-  cancelled: "ยกเลิก",
-};
-
-// Per-status accent — used for the badge tint.
-export const STATUS_COLOR: Record<OrderStatus, string> = {
-  pending_payment: "#f97316",
-  pending_verify: "#0ea5e9",
-  preparing: "#a855f7",
-  shipped: "#319754",
-  delivered: "#0d9488",
-  completed: "#16a34a",
-  cancelled: "#9ca3af",
-};
+export type { Order, OrderItem, OrderStatus, Recipient };
+export const STATUS_LABEL = CUSTOMER_STATUS_LABEL;
+export const STATUS_COLOR = CUSTOMER_STATUS_COLOR;
 
 // Default delivery target — mirrors the user's saved default address.
 const DEFAULT_RECIPIENT: Recipient = {
-  name: "ณัฐพงษ์ ธีโรภาส",
-  phone: "061-421-3111",
+  name: DEMO_USER.name,
+  phone: DEMO_USER.phone,
   address: "เลขที่ 2 ชั้น 2 ซอยสุขสวัสดิ์ 33 แขวงราษฎร์บูรณะ เขตราษฎร์บูรณะ กรุงเทพมหานคร 10140",
 };
 
 // Build an order line from a real catalog product id ("1"–"43").
 const line = (id: string, quantity: number, option: string): OrderItem => {
   const p = RAW_PRODUCT_BY_ID[id];
-  return { name: p.name, image: getRealProductImage(id), option, quantity, price: p.price };
+  return { productId: id, name: p.name, image: getRealProductImage(id), option, quantity, price: p.price };
 };
 
-type RawOrder = Omit<Order, "total"> & { items: OrderItem[] };
+type RawOrder = Omit<Order, "total" | "userId" | "createdAt">;
 
 const RAW_ORDERS: RawOrder[] = [
   // ── รอชำระเงิน ───────────────────────────────────────────────
@@ -125,14 +70,14 @@ const RAW_ORDERS: RawOrder[] = [
     recipient: DEFAULT_RECIPIENT, shippingMethod: "J&T Express", paymentMethod: "บัตรเครดิต / เดบิต",
     items: [line("4", 3, "แพ็ค 9 ซอง")],
   },
-  // ── จัดส่งแล้ว ───────────────────────────────────────────────
+  // ── จัดส่งแล้ว (in transit) ──────────────────────────────────
   {
-    id: "ORD-20260216-05133", shopName: "Organic Thai Farm", status: "shipped", date: "16 ก.พ. 2569 · 10:00 น.",
+    id: "ORD-20260216-05133", shopName: "Organic Thai Farm", status: "shipping", date: "16 ก.พ. 2569 · 10:00 น.",
     trackingNumber: "TH123456789", recipient: DEFAULT_RECIPIENT, shippingMethod: "ส่งด่วนภายในวัน", paymentMethod: "บัตรเครดิต / เดบิต",
     items: [line("9", 1, "ขวด 2 รสคู่")],
   },
   {
-    id: "ORD-20260215-05511", shopName: "METAHERB Store", status: "shipped", date: "15 ก.พ. 2569 · 19:30 น.",
+    id: "ORD-20260215-05511", shopName: "METAHERB Store", status: "shipping", date: "15 ก.พ. 2569 · 19:30 น.",
     trackingNumber: "TH445566778", recipient: DEFAULT_RECIPIENT, shippingMethod: "Flash Express", paymentMethod: "PromptPay",
     items: [line("27", 2, "แก้ว 16 oz"), line("13", 1, "กล่อง 6 ชิ้น")],
   },
@@ -174,7 +119,10 @@ const RAW_ORDERS: RawOrder[] = [
   },
 ];
 
+/** The demo buyer's order history — seeded into the shared table at app start. */
 export const MOCK_ORDERS: Order[] = RAW_ORDERS.map((o) => ({
   ...o,
+  userId: DEMO_USER.id,
+  createdAt: parseThaiDateTime(o.date),
   total: o.items.reduce((sum, it) => sum + it.price * it.quantity, 0),
 }));

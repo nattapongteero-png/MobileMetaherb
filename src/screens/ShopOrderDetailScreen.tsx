@@ -31,7 +31,10 @@ import { EmptyState } from "../components/EmptyState";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { ORDERS, ORDER_STATUS_CFG, orderTotal, fmtTHB, type ShopOrder } from "./MyShopScreen";
+import { ORDER_STATUS_CFG, orderTotal, fmtTHB, type ShopOrder } from "./MyShopScreen";
+import { useShopOrder } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { cancelOrder, decideCancellation, verifyPayment } from "../store/orders";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -96,43 +99,18 @@ function MoneyRow({ label, value, valueColor }: { label: string; value: string; 
 export function ShopOrderDetailScreen() {
   const nav = useNavigation<Nav>();
   const route = useRoute<RouteProp<RootStackParamList, "ShopOrderDetail">>();
-  const baseOrder = ORDERS.find((o) => o.id === route.params?.orderId);
+  // Every write below lands in the shared orders table, so the buyer's
+  // OrderDetailScreen reflects it. (It used to be component-local `useState`
+  // that evaporated on navigate-away and never reached the customer.)
+  const order = useShopOrder(METAHERB_SHOP, route.params?.orderId);
 
-  // Status flow is mocked locally (ORDERS isn't persisted): พร้อมจัดส่ง →
-  // ready_ship, ยืนยันการจัดส่ง (+tracking) → shipping, ยกเลิก → cancelled,
-  // ยินยอม/ไม่ยินยอมคำขอยกเลิกของลูกค้า → approved / revert to previousStatus.
-  const [localStatus, setLocalStatus] = useState<ShopOrder["status"] | null>(null);
-  const [localTracking, setLocalTracking] = useState<string | null>(null);
-  const [localCancel, setLocalCancel] = useState<{ reason: string; note: string } | null>(null);
-  const [localCancelStatus, setLocalCancelStatus] = useState<"approved" | "denied" | null>(null);
   const openCancel = (orderId: string) =>
-    nav.navigate("CancelOrder", { orderId, onConfirm: (reason, note) => setLocalCancel({ reason, note }) });
-  const openConfirmShip = (orderId: string) =>
-    nav.navigate("ConfirmShip", {
+    nav.navigate("CancelOrder", {
       orderId,
-      onConfirm: (tracking) => {
-        setLocalStatus("shipping");
-        setLocalTracking(tracking);
-      },
+      onConfirm: (reason, note) => cancelOrder(orderId, { by: "shop", reason, note: note || undefined }),
     });
-
-  const order: ShopOrder | undefined = baseOrder
-    ? {
-        ...baseOrder,
-        ...(localStatus ? { status: localStatus } : null),
-        ...(localTracking ? { trackingNumber: localTracking } : null),
-        ...(localCancel
-          ? {
-              status: "cancelled" as const,
-              cancelledBy: "shop" as const,
-              cancelReason: localCancel.reason,
-              cancelNote: localCancel.note || undefined,
-              cancellationStatus: "approved" as const,
-            }
-          : null),
-        ...(localCancelStatus ? { cancellationStatus: localCancelStatus } : null),
-      }
-    : undefined;
+  const openConfirmShip = (orderId: string) =>
+    nav.navigate("ConfirmShip", { orderId, onConfirm: () => {} });
 
   if (!order) {
     return (
@@ -354,11 +332,11 @@ export function ShopOrderDetailScreen() {
             <CancellationSection
               order={order}
               onApprove={() => {
-                setLocalCancelStatus("approved");
+                decideCancellation(order.id, true);
                 showToast("ยินยอมการยกเลิก — คำสั่งซื้อถูกยกเลิกเรียบร้อย");
               }}
               onDeny={() => {
-                const prev = baseOrder?.previousStatus ?? "pending_verify";
+                const prev = order.previousStatus ?? "pending_verify";
                 Alert.alert(
                   "ไม่ยินยอมให้ลูกค้ายกเลิก?",
                   "ออเดอร์จะกลับสู่สถานะเดิมและลูกค้าจะไม่สามารถยกเลิกได้อีก",
@@ -367,8 +345,7 @@ export function ShopOrderDetailScreen() {
                     {
                       text: "ยืนยัน",
                       onPress: () => {
-                        setLocalCancelStatus("denied");
-                        setLocalStatus(prev);
+                        decideCancellation(order.id, false);
                         showToast(`ไม่ยินยอม — ออเดอร์กลับสู่สถานะ "${ORDER_STATUS_CFG[prev].label}"`);
                       },
                     },
@@ -426,7 +403,7 @@ export function ShopOrderDetailScreen() {
       {/* Floating Liquid Glass action bar — primary forward CTA only (contact
           + cancel live in the inline actions section). Hidden when the status
           has no forward action. */}
-      {order.status === "pending_verify" || order.status === "ready_ship" ? (
+      {order.status === "pending_verify" || order.status === "preparing" ? (
       <View
         pointerEvents="box-none"
         style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}
@@ -453,13 +430,13 @@ export function ShopOrderDetailScreen() {
                   label="พร้อมจัดส่ง"
                   variant="primary"
                   onPress={() => {
-                    setLocalStatus("ready_ship");
+                    verifyPayment(order.id);
                     showToast("เปลี่ยนสถานะเป็นพร้อมจัดส่ง");
                   }}
                 />
               </>
             ) : null}
-            {order.status === "ready_ship" ? (
+            {order.status === "preparing" ? (
               <ActionButton label="ยืนยันการจัดส่ง" variant="primary" Icon={Truck} onPress={() => openConfirmShip(order.id)} />
             ) : null}
           </GlassView>
@@ -475,7 +452,7 @@ export function ShopOrderDetailScreen() {
 
 // Vertical 6-step shipping progress — done / current (pulsing halo) / upcoming.
 const STEPS = ["คำสั่งซื้อ", "รอการชำระ", "ตรวจสอบการชำระ", "กำลังจัดเตรียม", "กำลังจัดส่ง", "จัดส่งสำเร็จ"];
-const STEP_MAP: Record<string, number> = { pending_payment: 1, pending_verify: 2, ready_ship: 3, shipping: 4, shipped: 6 };
+const STEP_MAP: Record<string, number> = { pending_payment: 1, pending_verify: 2, preparing: 3, shipping: 4, delivered: 6, completed: 6 };
 
 function ShippingStepper({ status, date }: { status: ShopOrder["status"]; date: string }) {
   const currentStep = STEP_MAP[status] ?? 0;

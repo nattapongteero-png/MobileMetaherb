@@ -11,6 +11,7 @@ import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import { promptPayPayload, MERCHANT_PROMPTPAY, MERCHANT_NAME } from "../utils/promptpay";
 import { useCafeCart } from "../context/CafeCartContext";
 import { buildCafeOrder } from "../data/cafePayment";
+import { markPaid } from "../store/orders";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -25,7 +26,7 @@ const fmtPhone = (p: string) => p.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 export function PromptPayQRScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { total, orderId, cafe, receiveLabel, cafeItems } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
+  const { total, orderId, orderIds, cafe, receiveLabel, cafeItems } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
   const { placeOrder } = useCafeCart();
 
   const payload = useMemo(() => promptPayPayload(MERCHANT_PROMPTPAY, total), [total]);
@@ -71,6 +72,8 @@ export function PromptPayQRScreen() {
       nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
       return;
     }
+    // Slip confirmed → the order(s) move to "รอตรวจสอบ" and the shop is notified.
+    (orderIds ?? [orderId]).forEach((id) => markPaid(id));
     nav.navigate("PaymentSuccess", {
       orderId,
       total,

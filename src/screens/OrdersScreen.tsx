@@ -24,7 +24,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "pending_group", label: "รอชำระเงิน" },
   { key: "preparing", label: "กำลังจัดเตรียม" },
-  { key: "shipped", label: "จัดส่งแล้ว" },
+  { key: "shipping", label: "จัดส่งแล้ว" },
   { key: "delivered", label: "ได้รับสินค้าแล้ว" },
   { key: "completed", label: "สำเร็จ" },
   { key: "cancelled", label: "ยกเลิก" },

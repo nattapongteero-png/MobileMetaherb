@@ -120,6 +120,17 @@ import { useSeller } from "../context/SellerContext";
 import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
+import {
+  ORDER_STATUS_CFG,
+  matchesShopTab,
+  useShopOrders,
+  type OrderStatus,
+  type ShopOrder,
+} from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { verifyPayment } from "../store/orders";
+// Re-exported so the shop sub-screens keep their existing import site.
+export { ORDER_STATUS_CFG, useShopOrders, type ShopOrder };
 import { webCategoryLabel, SHOP_STOCK } from "../data/catalog";
 import { GROUP_BY_ID } from "../data/productVariants";
 import { RAW_PRODUCT_BY_ID } from "../data/realProducts";
@@ -838,171 +849,24 @@ const TOP_CUSTOMERS = [
 ];
 
 // ===================== ORDERS (sidebar → คำสั่งซื้อ) =====================
-// Ported from the web OwnerDashboard OrdersTab. Same 6 statuses, status pill +
-// note colors, filter tabs, and order-card layout — adapted for a phone width.
-type OrderStatus =
-  | "pending_payment"
-  | "pending_verify"
-  | "ready_ship"
-  | "shipping"
-  | "shipped"
-  | "cancelled";
-
-// Status pill bg + footer note tag (exact web values from statusConfig).
-export const ORDER_STATUS_CFG: Record<
-  OrderStatus,
-  { label: string; pillBg: string; note: string; noteColor: string }
-> = {
-  pending_payment: { label: "รอชำระเงิน", pillBg: "#ff8d28", note: "ยังไม่ชำระเงิน", noteColor: "#ff9500" },
-  pending_verify: { label: "รอตรวจสอบ", pillBg: "#ff9500", note: "รอร้านตรวจสอบ", noteColor: "#ff9500" },
-  ready_ship: { label: "พร้อมจัดส่ง", pillBg: "#007aff", note: "พร้อมส่งให้ลูกค้า", noteColor: "#007aff" },
-  shipping: { label: "กำลังจัดส่ง", pillBg: "#319754", note: "ระหว่างจัดส่ง", noteColor: "#319754" },
-  shipped: { label: "ส่งสำเร็จ", pillBg: "#10b981", note: "ส่งสำเร็จแล้ว", noteColor: "#10b981" },
-  cancelled: { label: "ยกเลิก", pillBg: "#ff3b30", note: "ยกเลิกแล้ว", noteColor: "#ff3b30" },
-};
+// Ported from the web OwnerDashboard OrdersTab. Status pill + note colors,
+// filter tabs, and order-card layout — adapted for a phone width.
+//
+// The rows come from the SHARED orders table (src/store/orders.ts) via the
+// `useShopOrders` projection, so a purchase made in the customer app lands here.
+// The old module-level `ORDERS` const — a private array with its own id
+// namespace that no buyer could ever reach — is gone.
 
 // Filter tabs — "all" + each status, with the same icons as the web.
+// "ส่งสำเร็จ" also collects reviewed (completed) orders; see `matchesShopTab`.
 const ORDER_TABS: { id: "all" | OrderStatus; label: string; Icon: typeof BarChart3 }[] = [
   { id: "all", label: "ทั้งหมด", Icon: ClipboardList },
   { id: "pending_payment", label: "รอชำระเงิน", Icon: Wallet },
   { id: "pending_verify", label: "รอตรวจสอบ", Icon: ScanSearch },
-  { id: "ready_ship", label: "พร้อมจัดส่ง", Icon: Package },
+  { id: "preparing", label: "พร้อมจัดส่ง", Icon: Package },
   { id: "shipping", label: "กำลังจัดส่ง", Icon: Truck },
-  { id: "shipped", label: "ส่งสำเร็จ", Icon: PackageCheck },
+  { id: "delivered", label: "ส่งสำเร็จ", Icon: PackageCheck },
   { id: "cancelled", label: "ยกเลิก", Icon: PackageX },
-];
-
-type OrderItem = { name: string; option: string; qty: number; price: number; image: number };
-export type ShopOrder = {
-  id: string;
-  status: OrderStatus;
-  date: string;
-  customer: string;
-  phone: string;
-  address: string;
-  shippingMethod: "รับที่ร้าน" | "จัดส่งปกติ" | "จัดส่งด่วน";
-  trackingNumber?: string;
-  reviewScore?: number;
-  // Detail-page fields (same shape as the web OwnerDashboard order).
-  paymentMethod?: string;
-  note?: string;
-  cancelReason?: string;
-  cancelNote?: string;
-  cancelledBy?: "shop" | "customer";
-  // Customer-requested cancellations await the shop's decision ("pending");
-  // deny reverts the order to previousStatus (web flow).
-  cancellationStatus?: "pending" | "approved" | "denied";
-  previousStatus?: OrderStatus;
-  // Customer review (web ReviewModal data) — per-item ratings reference items[].
-  review?: {
-    reviewerName: string;
-    reviewedAt: string;
-    shopRating: number;
-    items: { itemIndex: number; rating: number; comment: string }[];
-  };
-  items: OrderItem[];
-};
-
-// Order line built from the matching shop product — name/image/price always come
-// from the live catalog (SHOP_PRODUCTS), so orders match the web shop. Index wraps.
-const oi = (i: number, option: string, qty: number): OrderItem => {
-  const p = TOP_PRODUCTS[i % TOP_PRODUCTS.length];
-  return { name: p.name, option, qty, price: p.unit * qty, image: p.image };
-};
-
-export const ORDERS: ShopOrder[] = [
-  {
-    id: "ORD-20260204-03521", status: "pending_payment", date: "4 ก.พ. 2569 - 08:12 น.",
-    customer: "คุณสมชาย ใจดี", phone: "081-234-5678",
-    address: "88/12 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "พร้อมเพย์ PromptPay",
-    items: [oi(0, "150 g", 2)],
-  },
-  {
-    id: "ORD-20260204-03520", status: "pending_verify", date: "4 ก.พ. 2569 - 11:08 น.",
-    customer: "คุณสมหญิง รักสุขภาพ", phone: "089-876-5432",
-    address: "120 หมู่ 5 ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งด่วน", paymentMethod: "บัญชีธนาคาร",
-    note: "ฝากแพ็คกันกระแทกด้วยนะคะ สั่งไปเป็นของฝากค่ะ",
-    items: [oi(1, "1 หลอด", 1), oi(2, "20 ซอง", 2)],
-  },
-  {
-    id: "ORD-20260203-03517", status: "ready_ship", date: "3 ก.พ. 2569 - 16:45 น.",
-    customer: "คุณทานตะวัน งามดี", phone: "086-111-2233",
-    address: "55/3 ถ.นิมมานเหมินท์ ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
-    items: [oi(3, "200 g", 1)],
-  },
-  {
-    id: "ORD-20260202-03512", status: "shipping", date: "2 ก.พ. 2569 - 09:20 น.",
-    customer: "คุณสายฝน พรหมมา", phone: "082-555-7788",
-    address: "9 ซ.ลาดพร้าว 71 แขวงลาดพร้าว เขตลาดพร้าว กรุงเทพฯ 10230",
-    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH6829-4471-220K", paymentMethod: "พร้อมเพย์ PromptPay",
-    items: [oi(4, "30 แคปซูล", 1), oi(5, "1 ชุด", 1)],
-  },
-  {
-    id: "ORD-20260131-03505", status: "shipped", date: "31 ม.ค. 2569 - 13:05 น.",
-    customer: "คุณฟ้าใส แจ่มจันทร์", phone: "087-222-9090",
-    address: "203/7 ถ.เพชรเกษม ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
-    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH1180-5523-901P", reviewScore: 5, paymentMethod: "ชำระเงินปลายทาง",
-    review: {
-      reviewerName: "คุณฟ้าใส แจ่มจันทร์",
-      reviewedAt: "2 ก.พ. 2569",
-      shopRating: 5,
-      items: [{ itemIndex: 0, rating: 5, comment: "หอมอร่อยมากค่ะ ชงง่าย แพ็คมาดีมาก ส่งไวกว่าที่คิด จะกลับมาซื้อซ้ำแน่นอนค่ะ" }],
-    },
-    items: [oi(6, "150 g", 3)],
-  },
-  {
-    // Shipped-but-not-yet-reviewed example — no reviewScore/review, so the
-    // detail page shows no review section and no "ดูคะแนน" button.
-    id: "ORD-20260130-03501", status: "shipped", date: "30 ม.ค. 2569 - 09:18 น.",
-    customer: "คุณพิมพ์ใจ บุญมา", phone: "085-666-2211",
-    address: "99/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
-    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH2244-8810-455M", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
-    items: [oi(9, "1 ชุด", 1), oi(10, "1 ขวด", 2)],
-  },
-  {
-    id: "ORD-20260129-03498", status: "cancelled", date: "29 ม.ค. 2569 - 10:41 น.",
-    customer: "คุณมานพ ตั้งใจ", phone: "081-444-1212",
-    address: "17 หมู่ 2 ต.บางพระ อ.ศรีราชา จ.ชลบุรี 20110",
-    shippingMethod: "รับที่ร้าน", paymentMethod: "พร้อมเพย์ PromptPay",
-    cancelledBy: "customer", cancelReason: "ลูกค้าเปลี่ยนใจ", cancelNote: "เปลี่ยนใจ ขอยกเลิกค่ะ",
-    cancellationStatus: "pending", previousStatus: "pending_verify",
-    items: [oi(7, "1 หลอด", 1)],
-  },
-  {
-    // Reviewed multi-item example — 3 products in one order, per-item ratings
-    // (exercises the card's "ดูอีก N รายการ" collapse + the multi-item review page).
-    id: "ORD-20260128-03495", status: "shipped", date: "28 ม.ค. 2569 - 14:02 น.",
-    customer: "คุณชลธิชา แก้วใส", phone: "089-333-8877",
-    address: "8/15 ถ.ศรีจันทร์ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
-    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH7731-0092-114D", paymentMethod: "พร้อมเพย์ PromptPay",
-    reviewScore: 4,
-    review: {
-      reviewerName: "คุณชลธิชา แก้วใส",
-      reviewedAt: "31 ม.ค. 2569",
-      shopRating: 4,
-      items: [
-        { itemIndex: 0, rating: 5, comment: "กลิ่นหอมมาก ใช้แล้วผ่อนคลายสุด ๆ ซื้อซ้ำแน่นอนค่ะ" },
-        { itemIndex: 1, rating: 4, comment: "คุณภาพดี รสชาติเข้มข้น แต่ซองเล็กกว่าที่คิดนิดหน่อย" },
-        { itemIndex: 2, rating: 3, comment: "สินค้าโอเคค่ะ แต่กล่องมาถึงบุบมุมนึง อยากให้แพ็คแน่นกว่านี้" },
-      ],
-    },
-    items: [oi(11, "1 กล่อง", 1), oi(12, "2 ซอง", 2), oi(13, "1 ชุด", 1)],
-  },
-  {
-    // Shop-cancelled example — shows the red "ยกเลิกแล้ว" variant with full
-    // details (ยกเลิกโดย: ร้านค้า + เหตุผล + หมายเหตุ) on the detail page.
-    id: "ORD-20260126-03484", status: "cancelled", date: "26 ม.ค. 2569 - 15:22 น.",
-    customer: "คุณวรรณา สายทอง", phone: "084-777-3344",
-    address: "42/8 ถ.รัถการ ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัญชีธนาคาร",
-    cancelledBy: "shop", cancelReason: "สินค้าหมดสต็อก",
-    cancelNote: "วัตถุดิบล็อตล่าสุดหมด ทางร้านคืนเงินเต็มจำนวนให้แล้ว ขออภัยในความไม่สะดวกค่ะ",
-    cancellationStatus: "approved",
-    items: [oi(8, "250 g", 1)],
-  },
 ];
 
 export const orderTotal = (o: ShopOrder) => o.items.reduce((s, it) => s + it.price, 0);
@@ -5881,13 +5745,13 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
 export function OrdersSection({ showSearch = true, initialFilter, insetsBottom = 24 }: { showSearch?: boolean; initialFilter?: string; insetsBottom?: number }) {
   const [filter, setFilter] = useState<"all" | OrderStatus>((initialFilter as OrderStatus) ?? "all");
   const [query, setQuery] = useState("");
+  const orders = useShopOrders(METAHERB_SHOP);
 
-  const count = (id: "all" | OrderStatus) =>
-    id === "all" ? ORDERS.length : ORDERS.filter((o) => o.status === id).length;
+  const count = (id: "all" | OrderStatus) => orders.filter((o) => matchesShopTab(o.status, id)).length;
 
   const q = query.trim().toLowerCase();
-  const visible = ORDERS.filter((o) => {
-    if (filter !== "all" && o.status !== filter) return false;
+  const visible = orders.filter((o) => {
+    if (!matchesShopTab(o.status, filter)) return false;
     if (!q) return true;
     return (
       o.id.toLowerCase().includes(q) ||
@@ -6133,12 +5997,13 @@ export function OrderCard({ order }: { order: ShopOrder }) {
             <Btn label="ยกเลิก" variant="danger" onPress={() => nav.navigate("CancelOrder", { orderId: order.id })} />
           ) : null}
           {order.status === "pending_verify" ? (
-            <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} />
+            // Confirms the payment and moves the order into "พร้อมจัดส่ง".
+            <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} onPress={() => verifyPayment(order.id)} />
           ) : null}
-          {order.status === "ready_ship" ? (
+          {order.status === "preparing" ? (
             <Btn label="ยืนยันจัดส่ง" variant="primary" Icon={Truck} onPress={() => nav.navigate("ConfirmShip", { orderId: order.id })} />
           ) : null}
-          {order.status === "shipped" && order.reviewScore ? (
+          {(order.status === "delivered" || order.status === "completed") && order.reviewScore ? (
             <Btn
               label={`รีวิว ${order.reviewScore}/5`}
               variant="amber"

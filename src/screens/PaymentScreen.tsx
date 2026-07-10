@@ -7,6 +7,7 @@ import {
   TextInput,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { PAYMENT_METHODS, BANK_APPS } from "../data/paymentMethods";
 import { SAVED_CARDS } from "../data/savedCards";
@@ -18,7 +19,9 @@ import { useRefund } from "../context/RefundContext";
 import { useSecurity } from "../context/SecurityContext";
 import { SHIPPING_METHODS } from "../data/shippingMethods";
 import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
-import { CHECKOUT_ITEMS as ITEMS } from "../data/checkoutItems";
+import { useCart, type CartItem } from "../context/CartContext";
+import { createOrder, markPaid } from "../store/orders";
+import { currentUserId } from "../store/session";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
@@ -75,6 +78,11 @@ export function PaymentScreen() {
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
   const { accounts } = useRefund();
 
+  // The lines the buyer ticked in the cart. Falls back to the whole in-stock
+  // cart when Payment is opened directly (deep link / back-navigation).
+  const { items: cartItems, checkoutItems, finishCheckout } = useCart();
+  const ITEMS: CartItem[] = checkoutItems.length ? checkoutItems : cartItems.filter((i) => i.inStock);
+
   const selectedShippingMethod =
     SHIPPING_METHODS.find((s) => s.id === selectedShipping) ?? SHIPPING_METHODS[0];
 
@@ -118,15 +126,74 @@ export function PaymentScreen() {
     !!selectedCard || !!selectedBankAcc || !!BANK_APPS.find((a) => a.id === selectedPayment);
 
   const placeOrder = async () => {
+    if (ITEMS.length === 0) {
+      Alert.alert("ตะกร้าว่าง", "กรุณาเลือกสินค้าก่อนชำระเงิน");
+      return;
+    }
     if (needsPin) {
       const ok = await requirePin("ยืนยันรหัส PIN เพื่อชำระเงิน");
       if (!ok) return;
     }
-    const orderId = `MH${Date.now().toString().slice(-9)}`;
-    // PromptPay → show a QR for the amount; other methods → straight to success.
+
+    // One order per shop — the cart is supplier-grouped, and each seller sees
+    // only their own order. Shipping/VAT/discount are split across shops in
+    // proportion to each one's subtotal so the order totals still sum to grandTotal.
+    const byShop = new Map<string, CartItem[]>();
+    for (const it of ITEMS) byShop.set(it.shop, [...(byShop.get(it.shop) ?? []), it]);
+    const lineTotal = (ls: CartItem[]) => ls.reduce((s, i) => s + i.price * i.quantity, 0);
+
+    const groups = [...byShop.entries()];
+    const created: string[] = [];
+    let allocated = 0;
+    for (let g = 0; g < groups.length; g++) {
+      const [shopName, lines] = groups[g];
+      // Last group absorbs the rounding remainder.
+      const share =
+        g === groups.length - 1
+          ? grandTotal - allocated
+          : Math.round((lineTotal(lines) / subtotal) * grandTotal);
+      allocated += share;
+
+      const res = createOrder({
+        userId: currentUserId(),
+        shopName,
+        items: lines.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          option: i.option,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.image,
+        })),
+        recipient: {
+          name: selectedAddress.name,
+          phone: selectedAddress.phone,
+          address: `${selectedAddress.detail} ${selectedAddress.area}`.trim(),
+        },
+        total: share,
+        shippingMethod: selectedShippingMethod.name,
+        paymentMethod: selLabel ?? "",
+      });
+
+      if (!res.ok) {
+        const names = res.shortfall
+          .map((sf) => lines.find((l) => l.productId === sf.productId)?.name ?? sf.productId)
+          .join(", ");
+        Alert.alert("สินค้าไม่พอ", `${names} มีไม่พอในสต็อก กรุณาลดจำนวนแล้วลองใหม่`);
+        return;
+      }
+      created.push(res.order.id);
+    }
+
+    finishCheckout(); // the ordered lines leave the cart
+    const orderId = created[0];
+
+    // PromptPay → show a QR; the order stays "รอชำระเงิน" until the buyer confirms.
     if (selectedPayment === "promptpay") {
-      nav.navigate("PromptPayQR", { total: grandTotal, orderId });
+      nav.navigate("PromptPayQR", { total: grandTotal, orderId, orderIds: created });
     } else {
+      // Card / wallet / bank-app: the charge went through, so the shop must verify.
+      created.forEach((id) => markPaid(id));
       nav.navigate("PaymentSuccess", {
         orderId,
         total: grandTotal,
