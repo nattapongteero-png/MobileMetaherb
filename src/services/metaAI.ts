@@ -53,7 +53,7 @@ const NO_MATCH_RULE =
 const USAGE_RULE =
   'สำคัญมาก (ความปลอดภัย): แต่ละสินค้ามีแท็กวิธีใช้ต่อท้าย — [ทานได้]=กิน/ดื่ม/ชงได้ · [ใช้ภายนอกห้ามกิน]=สูดดม/ทาภายนอกเท่านั้น (น้ำมันหอม/อโรมา/พิมเสน/การบูร/น้ำหอม/ก้านกระจายกลิ่น) · [ชุดผสม(มีของห้ามกิน)]=เซตที่มีทั้งของกินและของใช้ภายนอก. ห้ามแนะนำให้ "กิน/ดื่ม/ชง" สินค้าที่เป็น [ใช้ภายนอกห้ามกิน] เด็ดขาด — ให้บอกวิธีใช้ที่ถูก (สูดดม/ทา/วางกระจายกลิ่น). ถ้าลูกค้าถามหาของ "กิน/ดื่ม/บำรุงร่างกาย" ให้แนะนำเฉพาะ [ทานได้] เท่านั้น. สำหรับ [ชุดผสม] ให้เตือนว่าในเซตมีของใช้ภายนอกปนอยู่ อย่ารับประทานส่วนนั้น. (แท็กในวงเล็บ [] เป็นข้อมูลภายใน ห้ามพิมพ์แท็กให้ลูกค้าเห็น ให้พูดเป็นภาษาธรรมชาติแทน)';
 
-function systemPrompt(goals: HealthGoal[] = []): string {
+function systemPrompt(goals: HealthGoal[] = [], cautions: string[] = []): string {
   const bans = goalBans(goals);
   return [
     'คุณคือ "เมต้า" ผู้ช่วยช้อปปิ้งสมุนไพรของร้าน METAHERB เป็นผู้ชาย',
@@ -62,6 +62,7 @@ function systemPrompt(goals: HealthGoal[] = []): string {
     "- ให้ความรู้สมุนไพรทั่วไปได้ แต่ย้ำเสมอว่าไม่ใช่คำแนะนำทางการแพทย์ ควรปรึกษาแพทย์/เภสัชกรหากมีโรคประจำตัวหรือใช้ยาอื่นอยู่",
     USAGE_RULE,
     ...(bans.length ? ["สำคัญมาก (ข้อห้ามเฉพาะคำถามนี้):", ...bans.map((b) => `- ${b}`)] : []),
+    ...(cautions.length ? ["สำคัญที่สุด (บริบทของลูกค้ารายนี้):", ...cautions.map((c) => `- ${c}`)] : []),
     ...(goals.length ? [NO_MATCH_RULE] : []),
     "",
     goals.length ? "สินค้าที่ช่วยเรื่องที่ลูกค้าถาม (มีแท็กวิธีใช้ต่อท้าย):" : "สินค้าในร้าน (มีแท็กวิธีใช้ต่อท้าย):",
@@ -70,7 +71,8 @@ function systemPrompt(goals: HealthGoal[] = []): string {
 }
 
 /** Test seam: the exact system prompt a chat turn would be given. */
-export const __systemPromptFor = (goals: HealthGoal[]): string => systemPrompt(goals);
+export const __systemPromptFor = (goals: HealthGoal[], cautions: string[] = []): string =>
+  systemPrompt(goals, cautions);
 
 // ===== Agent planner — Gemma reads the message and returns a structured plan =====
 export type AIPlan = {
@@ -152,10 +154,12 @@ export async function metaChat(
   grounding?: string,
   /** Health goals detected for this turn — drives the contraindication guard. */
   goals: HealthGoal[] = [],
+  /** Sensitive-context rules (pregnancy, children, chronic meds, emergencies). */
+  cautions: string[] = [],
 ): Promise<string> {
   const turns = history.filter((m) => m.text?.trim()).slice(-8);
   const messages: ChatMsg[] = [
-    { role: "system", content: systemPrompt(goals) },
+    { role: "system", content: systemPrompt(goals, cautions) },
     ...(grounding?.trim()
       ? [{
           role: "system" as const,
@@ -188,7 +192,7 @@ export async function metaChat(
 type VisionPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 type VisionMsg = { role: Role; content: string | VisionPart[] };
 
-function visionSystem(goals: HealthGoal[] = []): string {
+function visionSystem(goals: HealthGoal[] = [], cautions: string[] = []): string {
   const bans = goalBans(goals);
   return [
     'คุณคือ "เมต้า" ผู้ช่วยของร้านสมุนไพร METAHERB (ผู้ชาย ลงท้าย "ครับ" เสมอ ห้าม ค่ะ/คะ)',
@@ -201,6 +205,7 @@ function visionSystem(goals: HealthGoal[] = []): string {
     "- กระชับ 3–6 ประโยค ไม่ใช้ markdown ยาว/ตาราง",
     USAGE_RULE,
     ...(bans.length ? ["สำคัญมาก (ข้อห้ามเฉพาะคำถามนี้):", ...bans.map((b) => `- ${b}`)] : []),
+    ...(cautions.length ? ["สำคัญที่สุด (บริบทของลูกค้ารายนี้):", ...cautions.map((c) => `- ${c}`)] : []),
     ...(goals.length ? [NO_MATCH_RULE] : []),
     "",
     "สินค้าในร้าน (มีแท็กวิธีใช้ต่อท้าย):",
@@ -220,9 +225,10 @@ export async function metaVision(
   grounding?: string,
   /** Health goals read from the caption — drives the contraindication guard. */
   goals: HealthGoal[] = [],
+  cautions: string[] = [],
 ): Promise<string> {
   const messages: VisionMsg[] = [
-    { role: "system", content: visionSystem(goals) },
+    { role: "system", content: visionSystem(goals, cautions) },
     ...(grounding?.trim()
       ? [{
           role: "system" as const,
@@ -266,6 +272,7 @@ export async function metaRecommend(
   candidates: RecommendCandidate[],
   grounding: string,
   signal?: AbortSignal,
+  cautions: string[] = [],
 ): Promise<RecommendResult> {
   const list = candidates
     .map((c) => `${c.id}|${c.name}|[${usageTag(c.id)}]`)
@@ -277,6 +284,7 @@ export async function metaRecommend(
     "- เลือกจากรายการสินค้าที่ให้เท่านั้น ใส่ id ลง productIds (สูงสุด 5 เรียงตรงสุดก่อน)",
     "- ตัดสินความ 'ตรง' จากข้อมูลอ้างอิงที่ค้นมาเป็นหลัก (สรรพคุณสมุนไพร) ไม่ใช่เดาจากชื่อ ถ้าสินค้าไหนไม่เกี่ยวจริงห้ามใส่",
     USAGE_RULE,
+    ...cautions.map((c) => `- ${c}`),
     "- reply = ภาษาไทยสั้นๆ (1–3 ประโยค) สุภาพ ลงท้ายครับ อธิบายว่าทำไมถึงแนะนำตัวที่เลือก (อิงข้อมูลที่ค้นมา) ห้ามพิมพ์แท็กในวงเล็บ []",
     '- ถ้าไม่มีสินค้าไหนตรงเลย ให้ productIds เป็น [] และ reply บอกตามตรงว่ายังไม่มีสินค้าที่ตรง',
     'ตอบเป็น JSON object เท่านั้น: { "productIds": ["id"], "reply": "ข้อความไทย" }',

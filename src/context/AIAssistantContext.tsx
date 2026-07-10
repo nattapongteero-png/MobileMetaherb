@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   detectIntent, extractGoals, extractBudget, extractCategory, goalLabel, categoryLabel,
   searchProducts, recommendForGoals, compareProducts, valueAnalysis, buildBundle, filterProducts,
-  suggestPromos, crossSell, quickReplies, goalExcluded,
+  suggestPromos, crossSell, quickReplies, goalExcluded, extractCautions,
   type Intent, type CustomerProfile, type HealthGoal, type ComparisonRow, type PromoSuggestion,
 } from "../data/aiEngine";
 import { REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
@@ -211,9 +211,10 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           .map((m) => ({ role: m.role as "user" | "ai", text: (m as { text?: string }).text ?? "" }))
           .filter((m) => m.text.trim());
         if (hist[hist.length - 1]?.text !== text) hist.push({ role: "user", text });
-        // Even the plain chat fallback must know the customer's goal, or it will
-        // happily suggest a caffeinated tea to someone who cannot sleep.
-        const ans = await metaChat(hist, undefined, undefined, extractGoals(text));
+        // activeGoals, not this turn's alone: on a follow-up ("มีอะไรแนะนำอีกไหม")
+        // the symptom lives in the profile from the previous turn, and using only
+        // the current text dropped the guard exactly when it mattered.
+        const ans = await metaChat(hist, undefined, undefined, activeGoals, extractCautions(text));
         if (ans) { push({ role: "ai", kind: "text", text: ans }); return true; }
       } catch { /* fall back to rule-based */ }
       return false;
@@ -284,6 +285,8 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
                   plan.query?.trim() || text,
                   candidates.map((p) => ({ id: p.id, name: p.name })),
                   r.grounding,
+                  undefined,
+                  extractCautions(text),
                 );
                 groundedReply = ranked.reply;
                 results = (ranked.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[])
@@ -407,7 +410,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           } catch { /* answer without grounding */ }
           let answered = false;
           try {
-            const ans = await metaChat(hist, undefined, grounding, planGoals);
+            const ans = await metaChat(hist, undefined, grounding, planGoals, extractCautions(text));
             push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
             answered = true;
           }
@@ -581,7 +584,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
         } catch { /* answer without grounding */ }
       }
       // The caption's goal gates the vision prompt the same way it gates chat.
-      const ans = await metaVision(imageDataUrl, cap, undefined, grounding, extractGoals(cap));
+      const ans = await metaVision(imageDataUrl, cap, undefined, grounding, extractGoals(cap), extractCautions(cap));
       push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
       // Close the loop: attach related in-store products from caption/answer goals.
       const goals = extractGoals(`${cap} ${ans}`);

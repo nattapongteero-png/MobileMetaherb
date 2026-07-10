@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { ALL_PRODUCTS } from "../src/data/catalog";
 import { RAW_PRODUCT_BY_ID } from "../src/data/realProducts";
-import { detectIntent, extractBudget, extractGoals, filterProducts, type HealthGoal } from "../src/data/aiEngine";
+import { detectIntent, extractBudget, extractCautions, extractGoals, filterProducts, type HealthGoal } from "../src/data/aiEngine";
 import { goalsOf } from "../src/data/productGoals";
 import { isExternalOnly, usageTag } from "../src/data/productUsage";
 import { searchHerbKB } from "../src/data/herbKB";
@@ -225,5 +225,90 @@ describe("the model cannot improvise a benefit", () => {
     const prompt = __systemPromptFor([]);
     expect(prompt).toContain("น้ำผึ้งมะนาว");
     expect(prompt).toContain("กาแฟดริป");
+  });
+});
+
+// ── scenario matrix ────────────────────────────────────────────
+describe("colloquial and language variants", () => {
+  it('"ง่วงนอนตลอดเวลา" is an ENERGY problem — the old keywords read it as insomnia', () => {
+    const g = extractGoals("ง่วงนอนตลอดเวลา อยากตื่นตัว");
+    expect(g).toContain("energy");
+    expect(g).not.toContain("sleep");
+    // …so coffee is exactly the right suggestion here, not a banned one.
+    const ids = filterProducts(ALL_PRODUCTS, { goals: g, limit: 10 }).map((p) => p.id);
+    expect(ids.some((id) => ["3", "4", "27", "45"].includes(id))).toBe(true);
+  });
+
+  it("still reads every real sleep complaint", () => {
+    for (const q of ["นอนไม่หลับ", "หลับยากมาก", "หลับไม่สนิท ตื่นกลางดึก", "อยากนอนหลับสบาย", "ช่วยให้หลับหน่อย", "นอนน้อยมาก"]) {
+      expect(extractGoals(q), q).toContain("sleep");
+    }
+  });
+
+  it("reads English symptoms", () => {
+    expect(extractGoals("I have insomnia, can't sleep")).toContain("sleep");
+    expect(extractGoals("something for stress please")).toContain("stress");
+  });
+});
+
+describe("several goals at once", () => {
+  it("นอนไม่หลับ + เครียด → both goals, and the pool obeys both", () => {
+    const g = extractGoals("นอนไม่หลับ แล้วก็เครียดมากด้วย");
+    expect(g).toEqual(expect.arrayContaining(["sleep", "stress"]));
+    for (const p of filterProducts(ALL_PRODUCTS, { goals: g, limit: 10 })) {
+      expect(goalsOf(p.id).avoid, named(p.id)).not.toContain("sleep");
+    }
+  });
+
+  it("conflicting goals: the sleep ban beats the energy wish", () => {
+    // Someone tired AND sleepless must not get caffeine, whatever energy would allow.
+    const pool = filterProducts(ALL_PRODUCTS, { goals: ["sleep", "energy"] as HealthGoal[], limit: 10 });
+    for (const p of pool) {
+      expect(["3", "4", "27", "44", "45"], `${named(p.id)} reached a sleep+energy query`).not.toContain(p.id);
+    }
+    expect(pool.length).toBeGreaterThan(0); // still offers the safe overlap
+  });
+});
+
+describe("budget combined with a goal", () => {
+  it("caps the price without loosening the goal filter", () => {
+    const pool = filterProducts(ALL_PRODUCTS, { goals: ["digestion"] as HealthGoal[], maxPrice: 150, limit: 10 });
+    expect(pool.length).toBeGreaterThan(0);
+    for (const p of pool) {
+      expect(p.price).toBeLessThanOrEqual(150);
+      expect(goalsOf(p.id).goals).toContain("digestion");
+    }
+  });
+});
+
+describe("sensitive contexts carry a rule into the prompt", () => {
+  it("pregnancy", () => {
+    const c = extractCautions("ตั้งครรภ์ 4 เดือน กินอบเชยได้ไหมคะ");
+    expect(c).toHaveLength(1);
+    expect(c[0]).toMatch(/ตั้งครรภ์/);
+    expect(__systemPromptFor(["digestion"], c)).toContain("ตั้งครรภ์");
+  });
+
+  it("small children — including via ages", () => {
+    expect(extractCautions("ลูก 3 ขวบ ให้ดมยาดมได้ไหม")[0]).toMatch(/เด็ก/);
+    expect(extractCautions("เด็กเล็กใช้พิมเสนได้ไหม")).toHaveLength(1);
+  });
+
+  it("chronic medication — the cinnamon × diabetes-drug interaction", () => {
+    const c = extractCautions("กินยาเบาหวานอยู่ กินอบเชยเสริมได้ไหม");
+    expect(c).toHaveLength(1);
+    expect(c[0]).toMatch(/ตีกับยา/);
+  });
+
+  it("emergency symptoms tell the model to stop selling", () => {
+    const c = extractCautions("แน่นหน้าอก หายใจไม่สะดวก มีสมุนไพรช่วยไหม");
+    expect(c[0]).toMatch(/1669|ฉุกเฉิน/);
+    expect(c[0]).toMatch(/ห้ามเสนอขาย/);
+  });
+
+  it("does not fire on lookalikes", () => {
+    expect(extractCautions("ท้องอืด อาหารไม่ย่อย")).toEqual([]); // ท้อง ≠ ตั้งครรภ์
+    expect(extractCautions("ลูกจันทน์เทศราคาเท่าไหร่")).toEqual([]); // ลูก… is a nutmeg
+    expect(extractCautions("เป็นเบาหวาน")).toEqual([]); // the disease alone ≠ on medication
   });
 });

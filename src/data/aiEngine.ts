@@ -36,7 +36,10 @@ export function categoryLabel(key: string): string { return CAT_LABEL[key] ?? ke
 
 /** ===== Keyword → canonical mappings (Thai-leaning) ===== */
 const GOAL_KEYWORDS: Record<HealthGoal, string[]> = {
-  sleep:        ["นอน", "หลับ", "อินซอม", "พักผ่อน", "sleep", "insomnia"],
+  // NOT bare "นอน"/"หลับ": "ง่วงนอน" (sleepy) is an ENERGY problem, and the old
+  // keywords read it as insomnia — which then banned coffee for the one person
+  // who actually wanted it.
+  sleep:        ["นอนไม่หลับ", "ไม่หลับ", "หลับยาก", "หลับไม่สนิท", "ตื่นกลางดึก", "นอนหลับ", "นอนน้อย", "อยากหลับ", "ให้หลับ", "หลับสบาย", "อินซอม", "sleep", "insomnia"],
   weight_loss:  ["ลดน้ำหนัก", "ลดความอ้วน", "ผอม", "ดีท็อกซ์", "diet", "burn"],
   weight_gain:  ["เพิ่มน้ำหนัก", "อ้วน", "บำรุงร่างกาย"],
   skin:         ["ผิว", "หน้าใส", "สิว", "ฝ้า", "skin", "คอลลาเจน", "ขาว"],
@@ -44,7 +47,7 @@ const GOAL_KEYWORDS: Record<HealthGoal, string[]> = {
   // began a sentence with it was read as asking about his hair.
   hair:         ["เส้นผม", "ผมร่วง", "ผมบาง", "หัวล้าน", "บำรุงผม", "hair"],
   brain:        ["สมอง", "ความจำ", "บำรุงสมอง", "memory", "focus"],
-  energy:       ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "energy", "บำรุงกำลัง"],
+  energy:       ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "ง่วง", "ตื่นตัว", "ไม่มีแรง", "energy", "บำรุงกำลัง"],
   immune:       ["ภูมิคุ้มกัน", "ป้องกัน", "หวัด", "ไข้หวัด", "immune"],
   digestion:    ["ย่อย", "ท้อง", "ขับถ่าย", "ลำไส้", "stomach"],
   joint:        ["ข้อ", "เข่า", "ปวดข้อ", "joint", "กระดูก"],
@@ -100,6 +103,28 @@ export function extractGoals(text: string): HealthGoal[] {
     if (GOAL_KEYWORDS[g].some((kw) => t.includes(kw.toLowerCase()))) hits.push(g);
   }
   return hits;
+}
+
+/**
+ * Contexts where "which herb helps X" is the wrong question — pregnancy, small
+ * children, chronic medication, or symptoms that belong in an ER. Each returns
+ * a rule the prompt must carry; the model is not asked to notice these itself.
+ */
+const CAUTION_RULES: [RegExp, string][] = [
+  [/ตั้งครรภ์|มีครรภ์|คนท้อง|ให้นมบุตร|ให้นมลูก|pregnan/i,
+   "ลูกค้าตั้งครรภ์หรือให้นมบุตร — ห้ามยืนยันว่าสมุนไพรหรือสินค้าใดปลอดภัยสำหรับคนท้อง/แม่ให้นม ให้แนะนำปรึกษาแพทย์ก่อนใช้ทุกชนิด และอย่าเชียร์ขายสินค้าในคำตอบนี้"],
+  [/(ลูก|เด็ก|หลาน)\s*\d+\s*(ขวบ|เดือน|ปี)|ทารก|เด็กเล็ก|ลูกน้อย/,
+   "คำถามเกี่ยวกับเด็กเล็ก — ห้ามแนะนำให้เด็กใช้หรือกินสมุนไพร/ยาดม/น้ำมันหอมระเหยเองโดยไม่ผ่านแพทย์ ให้แนะนำปรึกษากุมารแพทย์หรือเภสัชกร"],
+  [/ยาประจำ|ยาละลายลิ่มเลือด|วาร์ฟาริน|warfarin|ยาเบาหวาน|ยาลดน้ำตาล|ยาความดัน|ยาหัวใจ|โรคไต|โรคตับ|เคมีบำบัด/,
+   "ลูกค้าใช้ยาประจำหรือมีโรคเรื้อรัง — สมุนไพรอาจตีกับยาได้ (เช่น อบเชยกับยาเบาหวาน) ห้ามบอกว่ากินร่วมกันได้อย่างปลอดภัย ให้แนะนำปรึกษาแพทย์หรือเภสัชกรก่อนเสมอ"],
+  [/เจ็บหน้าอก|แน่นหน้าอก|หายใจไม่ออก|หายใจไม่สะดวก|หมดสติ|เลือดออกมาก|ชักเกร็ง/,
+   "อาการที่เล่ามาอาจเป็นภาวะฉุกเฉิน — สิ่งแรกและสิ่งเดียวที่ควรทำคือแนะนำให้พบแพทย์หรือโทร 1669 ทันที ห้ามเสนอขายสินค้าใด ๆ มาบรรเทาอาการนี้"],
+];
+
+/** The safety rules this message activates, as prompt text. Empty = none. */
+export function extractCautions(text: string): string[] {
+  const t = text.toLowerCase();
+  return CAUTION_RULES.filter(([re]) => re.test(t)).map(([, rule]) => rule);
 }
 
 export function extractBudget(text: string): number | undefined {
