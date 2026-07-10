@@ -10,6 +10,7 @@
 import { useStore } from "../store/db";
 import { catalogStore, type NewProduct, type ProductPatch } from "../store/catalog";
 import { stockStore } from "../store/stock";
+import { pricingFor, promotionsStore, type PromotionState } from "../store/promotions";
 import { REAL_PRODUCTS } from "./realProducts";
 import type { CatalogProduct, CategoryKey, TypeKey } from "./catalog";
 
@@ -32,6 +33,25 @@ function fromNew(p: NewProduct): CatalogProduct {
   } as CatalogProduct;
 }
 
+/**
+ * The price the customer pays. A running flash round or promotion is computed
+ * from the product's pre-discount base; with neither, the seed's own price and
+ * badge stand. (Those seed numbers were hand-matched to the promotion seeds —
+ * now the promotion is the source and the number is derived.)
+ */
+function applyPricing(p: CatalogProduct, promos: PromotionState): CatalogProduct {
+  const base = p.originalPrice ?? p.price;
+  const pricing = pricingFor(p.id, base, promos);
+  if (!pricing) return p;
+  return {
+    ...p,
+    price: pricing.price,
+    originalPrice: pricing.originalPrice,
+    discountPercent: pricing.discountPercent,
+    isFlashSale: pricing.isFlashSale,
+  };
+}
+
 function applyPatch(p: CatalogProduct, patch: ProductPatch | undefined): CatalogProduct {
   if (!patch) return p;
   return {
@@ -50,13 +70,18 @@ function applyPatch(p: CatalogProduct, patch: ProductPatch | undefined): Catalog
  * `closed` (ปิดขาย) and `deleted` both drop the product from the storefront —
  * the console still lists them, reading the overlay directly.
  */
-export function mergeCatalog(overlay = catalogStore.get()): CatalogProduct[] {
+export function mergeCatalog(
+  overlay = catalogStore.get(),
+  promos = promotionsStore.get(),
+): CatalogProduct[] {
   const seeded = REAL_PRODUCTS.filter((p) => {
     const patch = overlay.patches[p.id];
     return !patch?.deleted && !patch?.closed;
-  }).map((p) => applyPatch(p, overlay.patches[p.id]));
+  }).map((p) => applyPricing(applyPatch(p, overlay.patches[p.id]), promos));
 
-  const added = overlay.added.filter((p) => !p.deleted && !p.closed).map(fromNew);
+  const added = overlay.added
+    .filter((p) => !p.deleted && !p.closed)
+    .map((p) => applyPricing(fromNew(p), promos));
   // Newest owner-created products lead the storefront.
   return [...added, ...seeded];
 }
@@ -64,7 +89,8 @@ export function mergeCatalog(overlay = catalogStore.get()): CatalogProduct[] {
 /** Live storefront catalog. Re-renders when the owner edits anything. */
 export function useLiveProducts(): CatalogProduct[] {
   const overlay = useStore(catalogStore);
-  return mergeCatalog(overlay);
+  const promos = useStore(promotionsStore);
+  return mergeCatalog(overlay, promos);
 }
 
 export function useLiveProduct(id: string): CatalogProduct | undefined {
@@ -97,11 +123,12 @@ export type OwnerProduct = CatalogProduct & {
 export function useOwnerProducts(shopName: string): OwnerProduct[] {
   const overlay = useStore(catalogStore);
   const stock = useStore(stockStore);
+  const promos = useStore(promotionsStore);
 
   const seeded = REAL_PRODUCTS.filter((p) => p.shop === shopName).map((p) => {
     const patch = overlay.patches[p.id];
     return {
-      ...applyPatch(p, patch),
+      ...applyPricing(applyPatch(p, patch), promos),
       stock: stock[p.id] ?? 200,
       closed: Boolean(patch?.closed),
       deleted: Boolean(patch?.deleted),
@@ -111,7 +138,7 @@ export function useOwnerProducts(shopName: string): OwnerProduct[] {
   const added = overlay.added
     .filter((p) => p.shop === shopName)
     .map((p) => ({
-      ...fromNew(p),
+      ...applyPricing(fromNew(p), promos),
       stock: stock[p.id] ?? 0,
       closed: Boolean(p.closed),
       deleted: Boolean(p.deleted),
