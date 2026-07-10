@@ -19,23 +19,25 @@ import {
 import { EmptyState } from "../components/EmptyState";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
-import { SHOP_NOTIF_SEED, SHOP_TYPE_META, type NotifMeta } from "../data/shopNotifications";
+import { SHOP_TYPE_META, type NotifMeta } from "../data/shopNotifications";
+import {
+  readAllNotifications,
+  readNotification,
+  useCustomerNotifications,
+  useShopNotifications,
+  type CustomerNotif,
+  type CustomerNotifType,
+} from "../data/notificationView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { currentUserId } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { isTablet } from "../theme/layout";
 
 const SHOP_OPEN = require("../../assets/shop-open.png");
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type NotifType = "order" | "promo" | "chat" | "system" | "payment";
-
-type Notif = {
-  id: string;
-  type: NotifType;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-};
+type NotifType = CustomerNotifType;
+type Notif = CustomerNotif;
 
 const TYPE_META: Record<NotifType, NotifMeta> = {
   // solid = Tailwind 600-shade (clear UI affordance with white icon: ≥3:1).
@@ -46,17 +48,6 @@ const TYPE_META: Record<NotifType, NotifMeta> = {
   system: { Icon: Sparkles, solid: "#9333ea", chipBg: "#faf5ff", chipFg: "#7e22ce", label: "อัพเดทจากเมต้า" },
   payment: { Icon: Wallet, solid: "#0d9488", chipBg: "#f0fdfa", chipFg: "#0f766e", label: "การเงิน" },
 };
-
-// Mirrors the seed data in the web's NotificationContext.
-const SEED_NOTIFS: Notif[] = [
-  { id: "n1", type: "order", title: "คำสั่งซื้อจัดส่งแล้ว", message: "คำสั่งซื้อ ORD-20260218-03573 ถูกจัดส่งแล้ว หมายเลขพัสดุ TH123456789", time: "5 นาทีที่แล้ว", read: false },
-  { id: "n2", type: "promo", title: "🔥 Flash Sale เริ่มแล้ว!", message: "ลดสูงสุด 70% สินค้าสมุนไพรคุณภาพ วันนี้เท่านั้น!", time: "1 ชม. ที่แล้ว", read: false },
-  { id: "n3", type: "promo", title: "คูปองส่วนลดพิเศษ", message: "คุณได้รับคูปองลด 100 บาท ใช้ได้ถึง 31 มี.ค. 2569", time: "3 ชม. ที่แล้ว", read: false },
-  { id: "n4", type: "payment", title: "ยืนยันการชำระเงินสำเร็จ", message: "คำสั่งซื้อ ORD-20260218-03572 ชำระเงินสำเร็จ กำลังจัดเตรียมสินค้า", time: "6 ชม. ที่แล้ว", read: true },
-  { id: "n7", type: "payment", title: "คืนเงินสำเร็จ", message: "คืนเงิน ฿250 เข้าบัญชีของคุณแล้ว จากการยกเลิกคำสั่งซื้อ ORD-20260215-02901", time: "3 วันที่แล้ว", read: false },
-  { id: "n5", type: "chat", title: "ข้อความจาก METAHERB Store", message: "สินค้าจัดเตรียมเรียบร้อยแล้วค่ะ จะจัดส่งภายในวันนี้", time: "1 วันที่แล้ว", read: true },
-  { id: "n6", type: "system", title: "ยินดีต้อนรับสู่ MetaHerb!", message: "ขอบคุณที่สมัครสมาชิก รับส่วนลด 50 บาทสำหรับการสั่งซื้อครั้งแรก", time: "2 วันที่แล้ว", read: true },
-];
 
 type FilterTab = "all" | NotifType;
 
@@ -217,11 +208,20 @@ function VerticalTicker({ items }: { items: TickerItem[] }) {
 export function NotificationScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation<Nav>();
-  const [notifs, setNotifs] = useState<Notif[]>(SEED_NOTIFS);
+  // Real events first (order shipped, refund decided, trial approved…), then the
+  // demo rows. Nothing here is invented: every live row had a domain action behind it.
+  const live = useCustomerNotifications();
+  const shopNotifs = useShopNotifications(METAHERB_SHOP);
+  // Seed rows have no backing event, so their read state stays local.
+  const [readSeeds, setReadSeeds] = useState<Set<string>>(new Set());
+  const notifs = useMemo(
+    () => live.map((n) => (readSeeds.has(n.id) ? { ...n, read: true } : n)),
+    [live, readSeeds],
+  );
   const [filter, setFilter] = useState<FilterTab>("all");
 
   const unreadCount = useMemo(() => notifs.filter((n) => !n.read).length, [notifs]);
-  const shopUnreadItems = useMemo(() => SHOP_NOTIF_SEED.filter((n) => !n.read), []);
+  const shopUnreadItems = useMemo(() => shopNotifs.filter((n) => !n.read), [shopNotifs]);
   const shopTickerItems = useMemo(
     () => shopUnreadItems.map((n) => ({ Icon: SHOP_TYPE_META[n.type].Icon, text: stripLeadingEmoji(n.title) })),
     [shopUnreadItems],
@@ -233,10 +233,11 @@ export function NotificationScreen() {
   );
 
   const markAsRead = (id: string) => {
-    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (!readNotification(id, "customer")) setReadSeeds((prev) => new Set(prev).add(id));
   };
   const markAllRead = () => {
-    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+    readAllNotifications("customer", { userId: currentUserId() });
+    setReadSeeds(new Set(notifs.map((n) => n.id)));
   };
 
   // Shop-notifications card sits ABOVE the category chips, both fixed under the header.

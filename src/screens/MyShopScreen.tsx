@@ -43,6 +43,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   AlertCircle,
   AlertTriangle,
+  Coffee,
   ArrowRightCircle,
   BarChart3,
   Beaker,
@@ -180,6 +181,7 @@ const SHOP_TABS = [
 // sub-menus render as accordion sections inside the sheet).
 export type SectionId =
   | "dashboard"
+  | "cafe_queue"
   | "orders"
   | "hm_quotations"
   | "hm_pr"
@@ -270,6 +272,7 @@ const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[]
   { id: "report_products", label: "รายงานสินค้า", Icon: Package },
   { id: "report_market", label: "รายงานตลาด", Icon: Beaker },
   { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
+  { id: "cafe_queue", label: "คิวคาเฟ่", Icon: Coffee },
 ];
 
 type MenuItem = (typeof SHOP_MENU_GRID)[number];
@@ -516,6 +519,7 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
 // Flat label lookup for the section selector button.
 export const SECTION_LABEL: Record<SectionId, string> = {
   dashboard: "Dashboard",
+  cafe_queue: "คิวคาเฟ่",
   orders: "จัดการคำสั่งซื้อ",
   hm_quotations: "ใบเสนอราคา",
   hm_pr: "ใบ PR",
@@ -999,6 +1003,7 @@ function OverviewScreen() {
   const [pmType, setPmType] = useState<"regular" | "material">("regular");
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
+    if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }
@@ -1068,6 +1073,7 @@ function FinanceScreen() {
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [sub, setSub] = useState<SectionId>("finance_overview");
   const selectSection = (id: SectionId) => {
+    if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }
