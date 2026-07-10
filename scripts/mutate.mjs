@@ -96,6 +96,13 @@ const MUTATIONS = [
     tests: "test/boot.test.ts",
   },
   {
+    name: "multi-shop split loses the negative-share clamp",
+    file: "src/data/checkoutSplit.ts",
+    find: "const share = isLast ? remaining : Math.min(Math.max(0, Math.round(fraction * grand)), remaining);",
+    replace: "const share = isLast ? remaining : Math.round(fraction * grand);",
+    tests: "test/journeys.test.ts",
+  },
+  {
     name: "two buyers share one chat thread again",
     file: "src/store/chat.ts",
     find: "export const threadIdFor = (userId: string, shopName: string): string => `t-${userId}-${shopName}`;",

@@ -21,6 +21,7 @@ import { SHIPPING_METHODS } from "../data/shippingMethods";
 import { useCheckoutCoupons, couponDiscount } from "../data/checkoutCoupons";
 import { useCart, type CartItem } from "../context/CartContext";
 import { createOrder, markPaid } from "../store/orders";
+import { splitByShop } from "../data/checkoutSplit";
 import { currentUserId } from "../store/session";
 import { redeemCoupon } from "../store/coupons";
 import { SubPageHeader } from "../components/SubPageHeader";
@@ -138,24 +139,10 @@ export function PaymentScreen() {
     }
 
     // One order per shop — the cart is supplier-grouped, and each seller sees
-    // only their own order. Shipping/VAT/discount are split across shops in
-    // proportion to each one's subtotal so the order totals still sum to grandTotal.
-    const byShop = new Map<string, CartItem[]>();
-    for (const it of ITEMS) byShop.set(it.shop, [...(byShop.get(it.shop) ?? []), it]);
-    const lineTotal = (ls: CartItem[]) => ls.reduce((s, i) => s + i.price * i.quantity, 0);
-
-    const groups = [...byShop.entries()];
+    // only their own order. The proportional split (and its rounding rules)
+    // lives in data/checkoutSplit.ts where the tests can reach it.
     const created: string[] = [];
-    let allocated = 0;
-    for (let g = 0; g < groups.length; g++) {
-      const [shopName, lines] = groups[g];
-      // Last group absorbs the rounding remainder.
-      const share =
-        g === groups.length - 1
-          ? grandTotal - allocated
-          : Math.round((lineTotal(lines) / subtotal) * grandTotal);
-      allocated += share;
-
+    for (const { shopName, lines, share } of splitByShop(ITEMS, grandTotal, subtotal)) {
       const res = createOrder({
         userId: currentUserId(),
         shopName,
