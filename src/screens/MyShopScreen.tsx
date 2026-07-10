@@ -44,6 +44,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Coffee,
+  MessageSquare,
   ArrowRightCircle,
   BarChart3,
   Beaker,
@@ -182,6 +183,7 @@ const SHOP_TABS = [
 export type SectionId =
   | "dashboard"
   | "cafe_queue"
+  | "shop_chat"
   | "orders"
   | "hm_quotations"
   | "hm_pr"
@@ -273,6 +275,7 @@ const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[]
   { id: "report_market", label: "รายงานตลาด", Icon: Beaker },
   { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
   { id: "cafe_queue", label: "คิวคาเฟ่", Icon: Coffee },
+  { id: "shop_chat", label: "ข้อความลูกค้า", Icon: MessageSquare },
 ];
 
 type MenuItem = (typeof SHOP_MENU_GRID)[number];
@@ -520,6 +523,7 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
 export const SECTION_LABEL: Record<SectionId, string> = {
   dashboard: "Dashboard",
   cafe_queue: "คิวคาเฟ่",
+  shop_chat: "ข้อความลูกค้า",
   orders: "จัดการคำสั่งซื้อ",
   hm_quotations: "ใบเสนอราคา",
   hm_pr: "ใบ PR",
@@ -1004,6 +1008,7 @@ function OverviewScreen() {
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
     if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
+    if (id === "shop_chat") { nav.navigate("ShopChatList"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }
@@ -1074,6 +1079,7 @@ function FinanceScreen() {
   const [sub, setSub] = useState<SectionId>("finance_overview");
   const selectSection = (id: SectionId) => {
     if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
+    if (id === "shop_chat") { nav.navigate("ShopChatList"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }

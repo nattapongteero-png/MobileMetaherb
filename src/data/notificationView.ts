@@ -51,6 +51,7 @@ const CUSTOMER_TYPE: Partial<Record<AppEventType, CustomerNotifType>> = {
   trial_rejected: "system",
   quote_sent: "system",
   cafe_order_ready: "order",
+  chat_message: "chat",
 };
 
 function toCustomerNotif(e: AppEvent): CustomerNotif {
@@ -83,6 +84,7 @@ const SHOP_TYPE: Partial<Record<AppEventType, ShopNotifType>> = {
   quote_rejected: "order",
   cafe_order_placed: "order",
   cafe_order_rated: "order",
+  chat_message: "chat",
 };
 
 function toShopNotif(e: AppEvent): ShopNotif {

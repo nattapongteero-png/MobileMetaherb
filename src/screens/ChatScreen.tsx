@@ -21,7 +21,26 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { PressableScale } from "../components/PressableScale";
 import { getImagePicker } from "../utils/imagePicker";
-import { useChat } from "../context/ChatContext";
+import { useStore } from "../store/db";
+import {
+  chatStore,
+  markThreadRead,
+  messagesOf,
+  sendMessage,
+  threadById,
+  type ChatMessage as StoredMessage,
+  type Sender,
+} from "../store/chat";
+import { METAHERB_SHOP } from "../data/shopOrders";
+
+const useThread = (id: string) => {
+  useStore(chatStore);
+  return threadById(id);
+};
+const useThreadMessages = (id: string) => {
+  useStore(chatStore);
+  return messagesOf(id);
+};
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -35,38 +54,12 @@ import {
  * Shop chat ("คุยกับร้านค้า") — ported from the web ChatModal `UserChat` view,
  * defaulting to the main "METAHERB Store" thread (shopId "metaherb").
  *
- * Web seed messages, quick replies and the 1.5s random shop auto-reply are
- * preserved; the layout is rebuilt as a proper mobile pushed-stack screen.
+ * Messages live in the shared chat table (src/store/chat.ts), so what the buyer
+ * types lands in the shop's inbox and the shop's reply lands here. The screen is
+ * role-aware: pass `role: "shop"` to render it from the seller's side.
  */
 
-type Sender = "user" | "shop";
-
-interface ChatMessage {
-  id: string;
-  sender: Sender;
-  text: string;
-  time: string;
-  image?: string;
-}
-
-// Seeded from mockChatRooms[0] (METAHERB Store) in the web ChatContext.
-const SEED_MESSAGES: ChatMessage[] = [
-  { id: "m1", sender: "shop", text: "สวัสดีค่ะ ยินดีให้บริการ 🌿", time: "10:00" },
-  { id: "m2", sender: "user", text: "สอบถามเรื่องชาออร์แกนิกครับ", time: "10:01" },
-  {
-    id: "m3",
-    sender: "shop",
-    text: "ชาออร์แกนิกของเราเป็นชาสมุนไพร 100% จากดอยเชียงใหม่ค่ะ ปลูกแบบไม่ใช้สารเคมี มี 5 รสชาติให้เลือก",
-    time: "10:02",
-  },
-  { id: "m4", sender: "user", text: "มีรสชาติไหนบ้างครับ?", time: "10:03" },
-  {
-    id: "m5",
-    sender: "shop",
-    text: "มี ดอกคำฝอย, ตะไคร้, ขิง, มะตูม, และใบเตยค่ะ แนะนำรสตะไคร้นะคะ ขายดีที่สุดเลย 😊",
-    time: "10:04",
-  },
-];
+type ChatMessage = StoredMessage;
 
 // Quick-reply suggestions (web `chat_quick_q1..q4`).
 const QUICK_REPLIES = [
@@ -76,8 +69,12 @@ const QUICK_REPLIES = [
   "ขอดูรีวิวหน่อย",
 ];
 
-// Shop auto-reply pool (web `sendMessage`).
-const SHOP_REPLIES = [
+/**
+ * METAHERB Store has a real inbox (ShopChatList), so it never auto-replies.
+ * The other two demo shops have no console behind them — a canned line stands in
+ * so the conversation doesn't dead-end. Nothing here answers for a staffed shop.
+ */
+const UNSTAFFED_REPLIES = [
   "ขอบคุณค่ะ รอสักครู่นะคะ 😊",
   "สินค้ามีพร้อมจัดส่งเลยค่ะ",
   "สามารถสั่งซื้อได้เลยค่ะ ส่งฟรี!",
@@ -87,8 +84,9 @@ const SHOP_REPLIES = [
 
 const SHOP_NAME = "METAHERB Store";
 
-function nowTime() {
-  return new Date().toLocaleTimeString("th-TH", {
+/** "10:04" — the stamp under each bubble. */
+function clockTime(at: number) {
+  return new Date(at).toLocaleTimeString("th-TH", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -127,8 +125,9 @@ function MessageInput(props: {
   );
 }
 
-function Bubble({ msg, shopName }: { msg: ChatMessage; shopName: string }) {
-  const isUser = msg.sender === "user";
+function Bubble({ msg, shopName, role }: { msg: ChatMessage; shopName: string; role: Sender }) {
+  // "Mine" is whichever side is reading, so the shop sees its own replies on the right.
+  const isUser = msg.sender === role;
   return (
     <View style={{ alignItems: isUser ? "flex-end" : "flex-start" }}>
       {msg.image ? (
@@ -178,7 +177,7 @@ function Bubble({ msg, shopName }: { msg: ChatMessage; shopName: string }) {
           marginHorizontal: 4,
         }}
       >
-        {isUser ? msg.time : `${shopName} • ${msg.time}`}
+        {isUser ? clockTime(msg.at) : `${shopName} • ${clockTime(msg.at)}`}
       </Text>
     </View>
   );
@@ -220,11 +219,12 @@ function TypingBubble() {
 
 export function ChatScreen() {
   const nav = useNavigation<Nav>();
-  const { markRead } = useChat();
   const route = useRoute<RouteProp<RootStackParamList, "Chat">>();
   const shopId = route.params?.shopId ?? "metaherb";
-  const shopName = route.params?.shopName ?? SHOP_NAME;
-  const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
+  const role: Sender = route.params?.role ?? "user";
+  const thread = useThread(shopId);
+  const shopName = route.params?.shopName ?? thread?.shopName ?? SHOP_NAME;
+  const messages = useThreadMessages(shopId);
   const [input, setInput] = useState("");
   const [replying, setReplying] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -236,11 +236,11 @@ export function ChatScreen() {
   useEffect(() => { focusOn.value = withTiming(focused ? 1 : 0, { duration: 300 }); }, [focused, focusOn]);
   const composerPad = useAnimatedStyle(() => ({ paddingHorizontal: 16 }));
 
-  // Opening this conversation clears its unread badge.
+  // Opening this conversation clears the reader's own badge.
   useEffect(() => {
-    markRead(shopId);
+    markThreadRead(shopId, role);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopId]);
+  }, [shopId, role]);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
@@ -256,41 +256,34 @@ export function ChatScreen() {
     };
   }, []);
 
-  // Simulated shop auto-reply (web waits 1500ms).
+  // Only shops without a console answer on their own; METAHERB replies for real.
+  const unstaffed = role === "user" && shopName !== METAHERB_SHOP;
+
   const triggerReply = useCallback(() => {
+    if (!unstaffed) return;
     setReplying(true);
     if (replyTimer.current) clearTimeout(replyTimer.current);
     replyTimer.current = setTimeout(() => {
-      const reply: ChatMessage = {
-        id: `m${Date.now() + 1}`,
-        sender: "shop",
-        text: SHOP_REPLIES[Math.floor(Math.random() * SHOP_REPLIES.length)],
-        time: nowTime(),
-      };
       setReplying(false);
-      setMessages((prev) => [...prev, reply]);
+      sendMessage(shopId, "shop", UNSTAFFED_REPLIES[Math.floor(Math.random() * UNSTAFFED_REPLIES.length)]);
     }, 1500);
-  }, []);
+  }, [unstaffed, shopId]);
 
   const send = useCallback(
     (raw: string) => {
-      const text = raw.trim();
-      if (!text) return;
-      const userMsg: ChatMessage = { id: `m${Date.now()}`, sender: "user", text, time: nowTime() };
-      setMessages((prev) => [...prev, userMsg]);
+      if (!sendMessage(shopId, role, raw)) return;
       setInput("");
       triggerReply();
     },
-    [triggerReply],
+    [shopId, role, triggerReply],
   );
 
   const sendImage = useCallback(
     (uri: string) => {
-      const msg: ChatMessage = { id: `m${Date.now()}`, sender: "user", text: "", time: nowTime(), image: uri };
-      setMessages((prev) => [...prev, msg]);
+      sendMessage(shopId, role, "", { image: uri });
       triggerReply();
     },
-    [triggerReply],
+    [shopId, role, triggerReply],
   );
 
   const pickFrom = async (source: "camera" | "library") => {
@@ -362,7 +355,7 @@ export function ChatScreen() {
             onContentSizeChange={scrollToEnd}
           >
             {messages.map((msg) => (
-              <Bubble key={msg.id} msg={msg} shopName={shopName} />
+              <Bubble key={msg.id} msg={msg} shopName={shopName} role={role} />
             ))}
             {replying && <TypingBubble />}
           </ScrollView>

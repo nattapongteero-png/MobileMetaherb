@@ -48,6 +48,7 @@ import { PaymentAccountsScreen } from "../screens/PaymentAccountsScreen";
 import { SecuritySettingsScreen } from "../screens/SecuritySettingsScreen";
 import { ComplaintStatusScreen } from "../screens/ComplaintStatusScreen";
 import { CafeQueueScreen } from "../screens/CafeQueueScreen";
+import { ShopChatListScreen } from "../screens/ShopChatListScreen";
 import { CouponCollectScreen } from "../screens/CouponCollectScreen";
 import { HerbalMarketScreen } from "../screens/HerbalMarketScreen";
 import { HerbalMarketDetailScreen } from "../screens/HerbalMarketDetailScreen";
@@ -187,6 +188,7 @@ export type RootStackParamList = {
   AddBankAccount: { selectForPayment?: boolean } | undefined;
   ComplaintStatus: { complaintId: string };
   CafeQueue: undefined;
+  ShopChatList: undefined;
   CouponCollect: undefined;
   // Pushed from Home "ดูทั้งหมด" (no longer bottom-tab screens).
   Products: undefined;
@@ -232,7 +234,7 @@ export type RootStackParamList = {
   Language: undefined;
   MyTrials: undefined;
   TrialRegister: undefined;
-  Chat: { shopId?: string; shopName?: string } | undefined;
+  Chat: { shopId?: string; shopName?: string; role?: "user" | "shop" } | undefined;
   ChatList: undefined;
   AIAssistant: { context?: string } | undefined;
   AIHistory: undefined;
@@ -465,6 +467,7 @@ export function RootStack() {
       <Stack.Screen name="RefundChannelSelect" component={RefundChannelSelectScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="AddBankAccount" component={AddBankAccountScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="CafeQueue" component={CafeQueueScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopChatList" component={ShopChatListScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="ComplaintStatus" component={ComplaintStatusScreen} options={{ headerShown: true, title: "สถานะการร้องเรียน", animation: "slide_from_right" }} />
       <Stack.Screen name="CouponCollect" component={CouponCollectScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketDetail" component={HerbalMarketDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

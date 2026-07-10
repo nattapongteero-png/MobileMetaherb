@@ -31,7 +31,8 @@ export type AppEventType =
   | "quote_rejected"
   | "cafe_order_placed"
   | "cafe_order_ready"
-  | "cafe_order_rated";
+  | "cafe_order_rated"
+  | "chat_message";
 
 /** Who should see this in their notification feed. */
 export type Audience = "customer" | "shop";
