@@ -15,9 +15,12 @@ import { SalesDatePicker, salesDateLabel, type DateRange } from "../components/S
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   REPORT_DATA, sumField, fmtBaht,
-  CUSTOMERS, CUSTOMER_GROUP_COLOR, TOP_PRODUCTS, CHANNELS, CHANNEL_TYPE_COLOR, GP_RATE,
+  CUSTOMER_GROUP_COLOR, CHANNELS, CHANNEL_TYPE_COLOR, GP_RATE,
   type Period, type SeriesKey,
 } from "../data/salesReport";
+import { useShopOrderRows } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { customerStats, topProducts, totals } from "../store/analytics";
 import { BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 
 export type ReportKind = "customers" | "products" | "market";
@@ -78,26 +81,52 @@ function Row({ children }: { children: ReactNode }) {
 export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: ReportKind; period: Period; setPeriod: (p: Period) => void; dateSel: DateRange }) {
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const data = REPORT_DATA[period];
+
+  // The two tables below are derived from the shop's real orders. The charts and
+  // the visits/conversion KPIs above still read REPORT_DATA — an order cannot
+  // tell us how many people looked at the page.
+  const orderRows = useShopOrderRows(METAHERB_SHOP);
+  const soldProducts = useMemo(() => topProducts(orderRows, 10), [orderRows]);
+  const buyers = useMemo(
+    () =>
+      customerStats(orderRows).map((c) => {
+        // Grouping mirrors the palette's existing buckets rather than inventing one.
+        const group = c.orders >= 3 ? "VIP" : c.orders === 2 ? "ประจำ" : "ใหม่";
+        const initial = c.name.replace(/^คุณ\s*/, "").trim().charAt(0) || "?";
+        const fav =
+          topProducts(orderRows.filter((o) => o.userId === c.userId), 1)[0]?.name ?? "—";
+        return { ...c, group, initial, fav, bg: "#e5f3ea", fg: "#15803d" };
+      }),
+    [orderRows],
+  );
   const scope = salesDateLabel(period, dateSel);
   const days = Math.max(1, data.filter((d) => d.visits > 0).length);
 
   const kpis: Kpi[] = useMemo(() => {
     if (kind === "customers") {
-      const nc = sumField(data, "newCust"), rp = sumField(data, "repeat"), tot = nc + rp;
+      // New vs repeat, counted against the shop's whole order history.
+      // Over a shop's whole history, "new" means bought once and "repeat" means
+      // bought more than once. (`newVsRepeat` answers a different question — who
+      // was new *within a period* — and would call every buyer new here.)
+      const nc = buyers.filter((b) => b.orders === 1).length;
+      const rp = buyers.filter((b) => b.orders > 1).length;
+      const tot = nc + rp;
       return [
-        { label: `ลูกค้าใหม่ ${scope}`, value: `${nc.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(nc / days)} คน/วัน`, accent: "#3b82f6", Icon: UserPlus, SubIcon: TrendingUp },
-        { label: `ลูกค้าซื้อซ้ำ ${scope}`, value: `${rp.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(rp / days)} คน/วัน`, accent: "#319754", Icon: Repeat, SubIcon: TrendingUp },
-        { label: `ลูกค้าทั้งหมด ${scope}`, value: `${tot.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(tot / days)} คน/วัน`, accent: "#0ea5e9", Icon: Users, SubIcon: TrendingUp },
-        { label: "ลูกค้าทั้งหมดในร้าน", value: "1,247 คน", sub: `+${nc} คนใหม่`, accent: "#10b981", Icon: Store, SubIcon: UserPlus },
+        { label: "ลูกค้าใหม่", value: `${nc.toLocaleString()} คน`, sub: "สั่งซื้อครั้งแรก", accent: "#3b82f6", Icon: UserPlus, SubIcon: TrendingUp },
+        { label: "ลูกค้าซื้อซ้ำ", value: `${rp.toLocaleString()} คน`, sub: "สั่งซื้อมากกว่า 1 ครั้ง", accent: "#319754", Icon: Repeat, SubIcon: TrendingUp },
+        { label: "ลูกค้าทั้งหมด", value: `${tot.toLocaleString()} คน`, sub: `${buyers.reduce((s, b) => s + b.orders, 0)} คำสั่งซื้อรวม`, accent: "#0ea5e9", Icon: Users, SubIcon: TrendingUp },
+        { label: "ยอดซื้อเฉลี่ย/คน", value: fmtBaht(tot ? Math.round(buyers.reduce((s, b) => s + b.total, 0) / tot) : 0), sub: "ตลอดอายุลูกค้า", accent: "#10b981", Icon: Store, SubIcon: UserPlus },
       ];
     }
     if (kind === "products") {
-      const u = sumField(data, "units");
+      const t = totals(orderRows);
+      const distinct = soldProducts.length;
       return [
-        { label: `จำนวนขาย ${scope}`, value: `${u.toLocaleString()} ชิ้น`, sub: `เฉลี่ย ${Math.round(u / days)} ชิ้น/วัน`, accent: "#319754", Icon: Package, SubIcon: TrendingUp },
-        { label: "สินค้าทั้งหมดในร้าน", value: "247 รายการ", sub: "9 หมวดหมู่", accent: "#0ea5e9", Icon: Boxes, SubIcon: Boxes },
-        { label: "สต็อกต่ำ / หมด", value: "4 รายการ", sub: "1 รายการสินค้าหมด", accent: "#dc2626", Icon: AlertTriangle, SubIcon: AlertTriangle },
-        { label: "รีวิวเฉลี่ยร้าน", value: "4.6 ★", sub: "1,247 รีวิวรวม", accent: "#f59e0b", Icon: Star, SubIcon: Star },
+        { label: "จำนวนขายรวม", value: `${t.units.toLocaleString()} ชิ้น`, sub: `จาก ${t.orders} คำสั่งซื้อ`, accent: "#319754", Icon: Package, SubIcon: TrendingUp },
+        { label: "สินค้าที่ขายได้", value: `${distinct} รายการ`, sub: "มีอย่างน้อย 1 ออเดอร์", accent: "#0ea5e9", Icon: Boxes, SubIcon: Boxes },
+        { label: "รายได้รวม", value: fmtBaht(t.sales), sub: `ยกเลิก ${fmtBaht(t.cancelled)}`, accent: "#10b981", Icon: TrendingUp, SubIcon: TrendingUp },
+        // No cost-of-goods anywhere in the app, so gross margin cannot be derived.
+        { label: "มูลค่าเฉลี่ย/ออเดอร์", value: fmtBaht(t.aov), sub: "AOV", accent: "#f59e0b", Icon: Star, SubIcon: Star },
       ];
     }
     const v = sumField(data, "visits"), o = sumField(data, "orders"), conv = v > 0 ? (o / v) * 100 : 0;
@@ -107,7 +136,7 @@ export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: Rep
       { label: `อัตราคอนเวิร์ต ${scope}`, value: `${conv.toFixed(2)}%`, sub: `${o} จาก ${v.toLocaleString()} ครั้ง`, accent: "#10b981", Icon: TrendingUp, SubIcon: TrendingUp },
       { label: "คูปองที่ใช้", value: "32 ครั้ง", sub: "8 คูปองล่าสุด", accent: "#ec4899", Icon: Ticket, SubIcon: Ticket },
     ];
-  }, [kind, data, scope, days]);
+  }, [kind, data, scope, days, orderRows, soldProducts, buyers]);
 
   return (
     <View style={{ gap: 12 }}>
@@ -142,10 +171,11 @@ export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: Rep
       <Card>
         <Text style={{ fontSize: 15, fontWeight: "700", color: "#1a1a1a", marginBottom: 6 }}>{TABLE_TITLE[kind]}</Text>
 
-        {kind === "customers" && [...CUSTOMERS].sort((a, b) => b.total - a.total).map((c) => {
+        {/* Real buyers, ranked by what they have actually spent at this shop. */}
+        {kind === "customers" && buyers.map((c) => {
           const g = CUSTOMER_GROUP_COLOR[c.group] ?? { bg: "#f3f4f6", fg: "#525252" };
           return (
-            <Row key={c.id}>
+            <Row key={c.userId}>
               <Avatar text={c.initial} bg={c.bg} fg={c.fg} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: "#1a1a1a" }}>{c.name}</Text>
@@ -159,18 +189,20 @@ export function ShopReportView({ kind, period, setPeriod, dateSel }: { kind: Rep
           );
         })}
 
-        {kind === "products" && [...TOP_PRODUCTS].sort((a, b) => b.sold - a.sold).map((p, i) => (
-          <Row key={p.name}>
+        {/* Best sellers, counted from the shop's real order lines. Was a static
+            list whose "sold" came from the catalog, not from anything anyone bought. */}
+        {kind === "products" && soldProducts.map((p, i) => (
+          <Row key={p.productId}>
             <View style={{ width: 26, alignItems: "center" }}>
               <Text style={{ fontSize: 13, fontWeight: "800", color: i < 3 ? "#b45309" : "#a3a3a3" }}>{i + 1}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: "#1a1a1a" }}>{p.name}</Text>
-              <Text numberOfLines={1} style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>{p.category} · ★ {p.rating} ({p.reviews})</Text>
+              <Text numberOfLines={1} style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>{p.orders} คำสั่งซื้อ</Text>
             </View>
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ fontSize: 13.5, fontWeight: "700", color: BRAND_GREEN_DARK }}>{fmtBaht(p.revenue)}</Text>
-              <Text style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>ขาย {p.sold} ชิ้น</Text>
+              <Text style={{ fontSize: 13.5, fontWeight: "700", color: BRAND_GREEN_DARK }}>{fmtBaht(p.sales)}</Text>
+              <Text style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>ขาย {p.units} ชิ้น</Text>
             </View>
           </Row>
         ))}

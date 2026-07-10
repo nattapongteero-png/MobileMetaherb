@@ -110,6 +110,13 @@ export function matchesShopTab(status: OrderStatus, tab: "all" | OrderStatus): b
   return status === tab;
 }
 
+/** The shop's raw orders — analytics needs `createdAt` and `status`, which the
+ *  ShopOrder projection flattens away. */
+export function useShopOrderRows(shopName: string): Order[] {
+  useStore(ordersStore); // subscribe
+  return ordersForShop(shopName);
+}
+
 /** Live seller view. Re-renders whenever a buyer places or updates an order. */
 export function useShopOrders(shopName: string): ShopOrder[] {
   useStore(ordersStore); // subscribe

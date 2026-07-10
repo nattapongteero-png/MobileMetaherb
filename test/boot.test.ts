@@ -10,6 +10,14 @@ import { describe, expect, it } from "vitest";
 import "../src/store";
 
 import { ordersForShop, ordersForUser, allOrders } from "../src/store/orders";
+import {
+  customerStats,
+  latestActiveMonth,
+  monthlyOrders,
+  monthlySales,
+  topProducts,
+  totals,
+} from "../src/store/analytics";
 import { canFulfill, stockOf } from "../src/store/stock";
 import { walletCoupons, couponsForShop } from "../src/store/coupons";
 import { pricingFor, promotionsStore } from "../src/store/promotions";
@@ -107,6 +115,39 @@ describe("promotions reproduce the storefront's shipped prices", () => {
       expect(f.total).toBeGreaterThan(0);
       expect(f.sold).toBeLessThanOrEqual(f.total);
     }
+  });
+});
+
+describe("the console's dashboard shows real numbers on first open", () => {
+  const shopOrders = () => ordersForShop(SHOP);
+
+  it("opens on a month that actually has orders, so the KPI is not zero", () => {
+    const [year, month] = latestActiveMonth(shopOrders());
+    expect(monthlySales(shopOrders(), year)[month]).toBeGreaterThan(0);
+    expect(monthlyOrders(shopOrders(), year)[month]).toBeGreaterThan(0);
+  });
+
+  it("reports revenue equal to the sum of the shop's non-cancelled orders", () => {
+    const t = totals(shopOrders());
+    const expected = shopOrders()
+      .filter((o) => o.status !== "cancelled")
+      .reduce((s, o) => s + o.total, 0);
+    expect(t.sales).toBe(expected);
+    expect(t.settled + t.pending).toBe(t.sales);
+  });
+
+  it("ranks best sellers from real order lines", () => {
+    const top = topProducts(shopOrders(), 5);
+    expect(top.length).toBeGreaterThan(0);
+    expect(top[0].units).toBeGreaterThan(0);
+    // Sorted by units, descending.
+    expect(top.map((p) => p.units)).toEqual([...top.map((p) => p.units)].sort((a, b) => b - a));
+  });
+
+  it("counts more than one buyer — the shop's seeded customers plus the demo one", () => {
+    const buyers = customerStats(shopOrders());
+    expect(buyers.length).toBeGreaterThan(1);
+    expect(buyers.some((b) => b.userId === BUYER)).toBe(true);
   });
 });
 

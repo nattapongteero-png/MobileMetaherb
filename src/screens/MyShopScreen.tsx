@@ -131,7 +131,9 @@ import {
 } from "../data/shopOrderView";
 import { METAHERB_SHOP } from "../data/shopOrders";
 import { useShopQuotes } from "../data/quoteView";
-import { verifyPayment } from "../store/orders";
+import { useShopOrderRows } from "../data/shopOrderView";
+import { latestActiveMonth, monthlyOrders, monthlySales, pctDelta } from "../store/analytics";
+import { ordersForShop, verifyPayment } from "../store/orders";
 import { useStore } from "../store/db";
 import { catalogStore, deleteProduct, setProductClosed, setProductRecommended } from "../store/catalog";
 import { useOwnerProducts, type OwnerProduct } from "../data/liveCatalog";
@@ -567,9 +569,9 @@ const WALLET = {
 
 // Per-month figures (index 0 = Jan) — same arrays as the web OverviewTab.
 // Selecting a month/day re-scopes everything off these.
+// Page visits have no source in the app — no analytics pipeline exists — so this
+// stays mock. Sales and orders now come from the shop's real orders.
 const MONTHLY_VISITS = [3200, 2800, 4100, 3600, 2900, 3500, 4500, 3100, 2600, 3800, 4200, 2700];
-const MONTHLY_ORDERS = [480, 390, 620, 510, 430, 560, 710, 450, 370, 580, 640, 400];
-const MONTHLY_SALES_DATA = [96000, 78000, 124000, 102000, 86000, 112000, 142000, 90000, 74000, 116000, 128000, 80000];
 
 // Order status grid — exact same 6 buckets as the web Order tracking card.
 const ORDER_STATUS = [
@@ -2505,8 +2507,13 @@ function OverviewTab({
 }) {
   const nav = useNavigation<Nav>();
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
-  // Controlled calendar selection — drives every scoped figure below.
-  const [cal, setCal] = useState<CalSel>({ month: 0, year: 2026, day: 16 });
+  // Controlled calendar selection — drives every scoped figure below. It opens on
+  // the newest month that actually has orders: now that the KPI is real, opening
+  // on the current month would show zeros and read as broken.
+  const [cal, setCal] = useState<CalSel>(() => {
+    const [y, m] = latestActiveMonth(ordersForShop(METAHERB_SHOP));
+    return { month: m, year: y, day: 16 };
+  });
   const { month, year, day } = cal;
   // Sales-report scope — lifted so its date picker can ride on the page title row.
   const [salesPeriod, setSalesPeriod] = useState<Period>("daily");
@@ -2516,24 +2523,28 @@ function OverviewTab({
     return { start: today, end: today }; // start === end → single-point scope
   });
 
-  // ----- Top-level KPI: depend on the selected month (monthly) or whole year.
-  const yearlySales = MONTHLY_SALES_DATA.reduce((a, b) => a + b, 0);
+  // ----- Top-level KPI — sales and orders are REAL, derived from the shop's
+  // orders (they used to be twelve hardcoded numbers). Visits has no source in
+  // the app: there is no analytics pipeline, so it stays mock and is the only
+  // number here that a purchase does not move.
+  const shopOrderRows = useShopOrderRows(METAHERB_SHOP);
+  const salesByMonth = useMemo(() => monthlySales(shopOrderRows, year), [shopOrderRows, year]);
+  const ordersByMonth = useMemo(() => monthlyOrders(shopOrderRows, year), [shopOrderRows, year]);
+
+  const yearlySales = salesByMonth.reduce((a, b) => a + b, 0);
+  const yearlyOrders = ordersByMonth.reduce((a, b) => a + b, 0);
   const yearlyVisits = MONTHLY_VISITS.reduce((a, b) => a + b, 0);
-  const yearlyOrders = MONTHLY_ORDERS.reduce((a, b) => a + b, 0);
   const kpi = period === "yearly"
     ? { sales: yearlySales, visits: yearlyVisits, orders: yearlyOrders }
-    : { sales: MONTHLY_SALES_DATA[month], visits: MONTHLY_VISITS[month], orders: MONTHLY_ORDERS[month] };
+    : { sales: salesByMonth[month], visits: MONTHLY_VISITS[month], orders: ordersByMonth[month] };
 
-  // % change vs previous month (monthly) — simple deterministic mock.
   const prevMonth = month > 0 ? month - 1 : 11;
-  const pct = (cur: number, prev: number) =>
-    prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
   const delta = period === "yearly"
     ? { sales: 15, visits: 12, orders: 9 }
     : {
-        sales: pct(MONTHLY_SALES_DATA[month], MONTHLY_SALES_DATA[prevMonth]),
-        visits: pct(MONTHLY_VISITS[month], MONTHLY_VISITS[prevMonth]),
-        orders: pct(MONTHLY_ORDERS[month], MONTHLY_ORDERS[prevMonth]),
+        sales: pctDelta(salesByMonth[month], salesByMonth[prevMonth]),
+        orders: pctDelta(ordersByMonth[month], ordersByMonth[prevMonth]),
+        visits: pctDelta(MONTHLY_VISITS[month], MONTHLY_VISITS[prevMonth]),
       };
 
   // ----- Line-item breakdowns (memoised) — every sales total below is the sum
@@ -2697,7 +2708,7 @@ function OverviewTab({
       />
       <KpiCard
         label={period === "yearly" ? "คำสั่งซื้อรายเดือน" : "คำสั่งซื้อรายวัน"}
-        value={fmtNum(period === "yearly" ? MONTHLY_ORDERS[month] : dailyOrders(month, day))}
+        value={fmtNum(period === "yearly" ? ordersByMonth[month] : dailyOrders(month, day))}
         unit="รายการ"
         delta={delta.orders}
         deltaLabel={period === "yearly" ? "เดือนก่อน" : "วันก่อน"}
