@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 
 // The side-effectful module App.tsx imports. Seeds run at import time.
-import "../src/store";
+import { SEED_VERSION, hydrateStores } from "../src/store";
+import { __disk } from "./stubs/asyncStorage";
+import { SEED_TODAY } from "../src/data/seedClock";
 
 import { ordersForShop, ordersForUser, allOrders } from "../src/store/orders";
 import { customerStats, monthlyOrders, monthlySales, topProducts, totals } from "../src/store/analytics";
@@ -151,6 +153,31 @@ describe("promotions reproduce the storefront's shipped prices", () => {
       expect(f.total).toBeGreaterThan(0);
       expect(f.sold).toBeLessThanOrEqual(f.total);
     }
+  });
+});
+
+describe("the seed-version gate", () => {
+  it("stamps the version on a first launch, so the next one can hydrate", async () => {
+    await hydrateStores();
+    expect(__disk.snapshot()["mh.seedVersion"]).toBe(SEED_VERSION);
+  });
+
+  it("is idempotent — App.tsx may await it more than once", async () => {
+    await expect(Promise.all([hydrateStores(), hydrateStores()])).resolves.toBeDefined();
+  });
+
+  it("keys the version on both the schema and the seed's anchor day", () => {
+    // Seeds are date-relative, so yesterday's persisted orders would drag
+    // "this month" back to empty. The day is part of the identity.
+    expect(SEED_VERSION).toMatch(/^\d+@\d{4}-\d{2}-\d{2}$/);
+    expect(SEED_VERSION.split("@")[1]).toBe(new Date(SEED_TODAY).toISOString().slice(0, 10));
+  });
+
+  it("leaves the freshly seeded orders in place after hydrating a blank disk", async () => {
+    await hydrateStores();
+    expect(allOrders().length).toBeGreaterThan(200);
+    // Images survived: nothing round-tripped through JSON.
+    expect(allOrders()[0].items[0].image).toBeDefined();
   });
 });
 

@@ -16,6 +16,7 @@ type Listener = () => void;
 export type Persistence = {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
 };
 
 let persistence: Persistence | null = null;
@@ -24,6 +25,29 @@ const registry: { key: string; load: (raw: string) => void; dump: () => string }
 /** Wire real persistence (called once from src/store/index.ts on the app side). */
 export function setPersistence(p: Persistence): void {
   persistence = p;
+}
+
+/** Direct access for metadata that isn't a store (e.g. the seed version). */
+export const readMeta = (key: string): Promise<string | null> =>
+  persistence ? persistence.getItem(key) : Promise.resolve(null);
+
+export const writeMeta = (key: string, value: string): Promise<void> =>
+  persistence ? persistence.setItem(key, value) : Promise.resolve();
+
+/**
+ * Drop every persisted store. Called when the seeds have changed underneath a
+ * stale install — otherwise `hydrateAll` would restore the old seed forever and
+ * no amount of editing the seed files would ever reach the device.
+ */
+export async function clearPersisted(): Promise<void> {
+  if (!persistence) return;
+  for (const s of registry) {
+    try {
+      await persistence.removeItem(s.key);
+    } catch {
+      /* nothing persisted under that key */
+    }
+  }
 }
 
 /** Read every registered store back from disk. Safe to call when unpersisted. */
