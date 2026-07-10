@@ -10,6 +10,7 @@ import { Ban, Check, ChevronRight, CircleAlert, Clock, ClipboardList, Coins, Sta
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { showToast } from "../components/Toast";
+import { approveRegistration, rejectRegistration } from "../store/trials";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import {
   STATUS_CFG,
@@ -71,6 +72,9 @@ export function OwnerTrialRequestDetailScreen() {
 
   const approve = () => {
     setLocalStatus("approved");
+    // Real applicants carry an id — approving moves their MyTrials to "กำลังจัดส่ง".
+    // The demo cohort has none, so it stays a local-only UI change.
+    if (reg.id) approveRegistration(reg.id);
     onApprove?.();
   };
   const reject = () => {
@@ -81,6 +85,7 @@ export function OwnerTrialRequestDetailScreen() {
         style: "destructive",
         onPress: () => {
           setLocalStatus("rejected");
+          if (reg.id) rejectRegistration(reg.id, "คุณสมบัติผู้ทดสอบไม่ตรงเกณฑ์ของรอบนี้");
           onReject?.();
           showToast("ปฏิเสธคำขอเรียบร้อย", "info");
         },

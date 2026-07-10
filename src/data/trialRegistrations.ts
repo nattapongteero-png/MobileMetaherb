@@ -4,36 +4,17 @@ import type { TestObjective } from "./evalQuestions";
 // ── Trial lifecycle ────────────────────────────────────────────────────────────
 // สมัคร → รออนุมัติ → (ถูกปฏิเสธ | ร้านจัดส่ง) → ได้รับแล้วเริ่มทดลอง + ทำแบบประเมิน → เสร็จสิ้น.
 // Some products carry a pre-use survey on top of the post-use one (hasPreEval).
-export type TrialStage =
-  | "pending_approval"
-  | "rejected"
-  | "shipping"
-  | "testing"
-  | "completed";
+import {
+  overallScore,
+  evalComment,
+  type EvalAnswers,
+  type TrialRegistration,
+  type TrialStage,
+} from "../store/trials";
+import { DEMO_USER } from "../store/session";
+import { METAHERB_SHOP } from "./shopOrders";
 
-export type TrialRegistration = {
-  /** Unique registration id (NOT the product id). */
-  id: string;
-  trialId: string;
-  address: string;
-  submittedAt: number;
-  stage: TrialStage;
-  /** Test objectives the shop configured for this trial — drives the eval form. */
-  objectives: TestObjective[];
-  /** Reason the user gave when applying (from the apply form). */
-  reason?: string;
-  /** Parcel tracking — present once the shop has shipped. */
-  trackingNumber?: string;
-  /** Reason shown when the shop rejects the application. */
-  rejectReason?: string;
-  /** Some products require a survey BEFORE the trial begins. */
-  hasPreEval?: boolean;
-  preEvalDone?: boolean;
-  postEvalDone?: boolean;
-  /** Summary answers from the after-use form — overall satisfaction feeds the
-   *  product's overall trial rating. Present once the post-use survey is in. */
-  evaluation?: { overall: number; nps?: number; comment?: string };
-};
+export type { TrialRegistration, TrialStage };
 
 export const STAGE_META: Record<TrialStage, { label: string; tint: string; bg: string }> = {
   pending_approval: { label: "รออนุมัติ", tint: "#f97316", bg: "rgba(249,115,22,0.12)" },
@@ -47,7 +28,20 @@ const DAY = 1000 * 60 * 60 * 24;
 const now = Date.now();
 const ADDR = "459/153 ถ.สุขสวัสดิ์ ราษฎร์บูรณะ กรุงเทพฯ 10140";
 
-export const TRIAL_REGISTRATIONS: TrialRegistration[] = [
+/** Turn a legacy {overall, nps, comment} summary into the full answer shape. */
+const summary = (overall: number, nps: number, comment: string): EvalAnswers => ({
+  scoreById: { core_overall: overall },
+  npsScores: { core_nps: nps },
+  mcAnswers: {},
+  tagAnswers: {},
+  abChoices: {},
+  textAnswers: { core_text: comment },
+  conditionalAnswers: {},
+});
+
+type SeedTrial = Omit<TrialRegistration, "userId" | "shopName" | "applicantName" | "applicantPhone">;
+
+const BASE: SeedTrial[] = [
   // รออนุมัติ — เพิ่งส่งใบสมัคร
   { id: "treg-1", trialId: "trial-1", address: ADDR, submittedAt: now - DAY * 1, stage: "pending_approval", objectives: ["efficacy", "sensory"], reason: "ผิวแห้งและแพ้ง่าย อยากลองครีมอโรมาสูตรอ่อนโยน และช่วยรีวิวเพื่อพัฒนาสินค้า" },
   // ถูกปฏิเสธ — ร้านไม่อนุมัติคำขอ
@@ -63,13 +57,18 @@ export const TRIAL_REGISTRATIONS: TrialRegistration[] = [
   // กำลังทดลอง — ตัวอย่างครบทุกวัตถุประสงค์ (เห็นคำถามครบชุด ทั้งก่อน/หลังใช้)
   { id: "treg-9", trialId: "trial-13", address: ADDR, submittedAt: now - DAY * 5, stage: "testing", trackingNumber: "TH-TRIAL-0110", objectives: ["efficacy", "sensory", "packaging", "market", "formula_ab"], reason: "อยากร่วมทดสอบเต็มรูปแบบ และให้ฟีดแบ็กครบทุกด้านเพื่อช่วยพัฒนาสินค้า", hasPreEval: true, preEvalDone: false, postEvalDone: false },
   // เสร็จสิ้น — ประเมินครบ
-  { id: "treg-7", trialId: "trial-4", address: ADDR, submittedAt: now - DAY * 30, stage: "completed", objectives: ["efficacy", "market"], reason: "เป็นลูกค้าประจำ อยากร่วมทดสอบและสนับสนุนผลิตภัณฑ์ใหม่ของร้าน", hasPreEval: true, preEvalDone: true, postEvalDone: true, evaluation: { overall: 5, nps: 9, comment: "ใช้แล้วเห็นผลจริง ชอบมาก แพ็กเกจสวย จะซื้อซ้ำแน่นอน" } },
-  { id: "treg-8", trialId: "trial-eq", address: ADDR, submittedAt: now - DAY * 20, stage: "completed", objectives: ["packaging", "market"], reason: "สนใจอุปกรณ์รุ่นนี้ อยากลองใช้งานจริงและให้ความเห็นเชิงลึก", postEvalDone: true, evaluation: { overall: 4, nps: 8, comment: "อุปกรณ์ใช้งานดี แข็งแรง คุ้มราคา" } },
+  { id: "treg-7", trialId: "trial-4", address: ADDR, submittedAt: now - DAY * 30, stage: "completed", objectives: ["efficacy", "market"], reason: "เป็นลูกค้าประจำ อยากร่วมทดสอบและสนับสนุนผลิตภัณฑ์ใหม่ของร้าน", hasPreEval: true, preEvalDone: true, postEvalDone: true, postAnswers: summary(5, 9, "ใช้แล้วเห็นผลจริง ชอบมาก แพ็กเกจสวย จะซื้อซ้ำแน่นอน") },
+  { id: "treg-8", trialId: "trial-eq", address: ADDR, submittedAt: now - DAY * 20, stage: "completed", objectives: ["packaging", "market"], reason: "สนใจอุปกรณ์รุ่นนี้ อยากลองใช้งานจริงและให้ความเห็นเชิงลึก", postEvalDone: true, postAnswers: summary(4, 8, "อุปกรณ์ใช้งานดี แข็งแรง คุ้มราคา") },
 ];
 
-export function getTrialRegistration(id: string): TrialRegistration | undefined {
-  return TRIAL_REGISTRATIONS.find((r) => r.id === id);
-}
+/** The demo buyer's trial history — seeded into the shared table at app start. */
+export const TRIAL_REGISTRATIONS: TrialRegistration[] = BASE.map((r) => ({
+  ...r,
+  userId: DEMO_USER.id,
+  shopName: METAHERB_SHOP,
+  applicantName: DEMO_USER.name,
+  applicantPhone: DEMO_USER.phone,
+}));
 
 /** Which survey the user should fill next while testing (null = nothing pending). */
 export type EvalKind = "pre" | "post" | null;
@@ -79,6 +78,10 @@ export function nextEval(reg: TrialRegistration): EvalKind {
   if (!reg.postEvalDone) return "post";
   return null;
 }
+
+/** Legacy accessors — screens still show the overall star / comment summary. */
+export const regOverall = (r: TrialRegistration): number => overallScore(r.postAnswers);
+export const regComment = (r: TrialRegistration): string => evalComment(r.postAnswers);
 
 export const fmtTrialDate = (ts: number) =>
   new Date(ts).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });

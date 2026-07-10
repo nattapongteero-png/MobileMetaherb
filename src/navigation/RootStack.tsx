@@ -184,7 +184,7 @@ export type RootStackParamList = {
   ComplaintTypeSelect: { orderId?: string; current?: "damaged" | "wrong_item" | "return" | "refund" } | undefined;
   RefundChannelSelect: undefined;
   AddBankAccount: { selectForPayment?: boolean } | undefined;
-  ComplaintStatus: undefined;
+  ComplaintStatus: { complaintId: string };
   CouponCollect: undefined;
   // Pushed from Home "ดูทั้งหมด" (no longer bottom-tab screens).
   Products: undefined;

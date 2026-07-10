@@ -63,10 +63,20 @@ export type Evaluation = {
   conditionalAnswers?: Record<string, ConditionalAnswer>;
 };
 
+import {
+  evalComment,
+  overallScore,
+  registrationsForTrial,
+  wouldRecommend,
+  type TrialRegistration as StoredRegistration,
+} from "../store/trials";
+
 export type Gender = "male" | "female" | "lgbtq";
 export type AgeRange = "15-24" | "25-34" | "35-44" | "45-54" | "55+";
 
 export type Registration = {
+  /** Set for real applicants from the shared table; absent on the demo cohort. */
+  id?: string;
   trialId: string;
   name: string;
   phone: string;
@@ -863,10 +873,52 @@ function synthesizeCohort(trialId: string, category: string): Registration[] {
  *                  question set for trials without base rows. Defaults to a
  *                  cosmetic-style efficacy form.
  */
+/**
+ * Real applicants (from the shared trial table) first, then the demo cohort.
+ *
+ * The console used to show ONLY hand-authored rows, or — for trials without any
+ * — a `synthesizeCohort()` of invented testers whose "answers" nobody ever gave.
+ * A customer's application and their survey answers now appear here for real;
+ * the mock rows stay behind them so every dashboard still has data to chart.
+ */
 export function getRegistrationsForTrial(trialId: string, category = "เครื่องสำอาง"): Registration[] {
+  const real = registrationsForTrial(trialId).map(toOwnerRegistration);
   const base = MOCK_REGISTRATIONS.filter((r) => r.trialId === trialId);
-  if (base.length > 0) return base;
-  return synthesizeCohort(trialId, category);
+  const demo = base.length > 0 ? base : synthesizeCohort(trialId, category);
+  return [...real, ...demo];
+}
+
+/** Project a shared registration onto the console's Registration shape. */
+function toOwnerRegistration(r: StoredRegistration): Registration {
+  const a = r.postAnswers;
+  return {
+    id: r.id,
+    trialId: r.trialId,
+    name: r.applicantName,
+    phone: r.applicantPhone,
+    address: r.address,
+    motivation: r.reason,
+    submittedAt: r.submittedAt,
+    approvedAt: r.approvedAt,
+    rejectedAt: r.rejectedAt,
+    evaluatedAt: r.evaluatedAt,
+    evaluation: a
+      ? {
+          overall: overallScore(a),
+          // The legacy per-criterion map has no equivalent in the new form.
+          criteria: {},
+          comment: evalComment(a),
+          wouldRecommend: wouldRecommend(a),
+          scoreById: a.scoreById,
+          npsScores: a.npsScores,
+          mcAnswers: a.mcAnswers,
+          tagAnswers: a.tagAnswers,
+          abChoices: a.abChoices,
+          textAnswers: a.textAnswers,
+          conditionalAnswers: a.conditionalAnswers,
+        }
+      : undefined,
+  };
 }
 
 // Silence "unused" on the shared default objective set — kept for parity / future use.

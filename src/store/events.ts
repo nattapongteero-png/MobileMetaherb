@@ -18,7 +18,13 @@ export type AppEventType =
   | "cancel_requested"
   | "review_submitted"
   | "stock_low"
-  | "product_added";
+  | "product_added"
+  | "complaint_filed"
+  | "complaint_decided"
+  | "trial_applied"
+  | "trial_approved"
+  | "trial_rejected"
+  | "trial_evaluated";
 
 /** Who should see this in their notification feed. */
 export type Audience = "customer" | "shop";

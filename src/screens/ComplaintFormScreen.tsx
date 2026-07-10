@@ -132,6 +132,10 @@ export function ComplaintFormScreen() {
     const createdAt = `${now.getDate()} ${M[now.getMonth()]} ${now.getFullYear() + 543}`;
     // Push the case into the shared store so it appears in the owner's เรื่องร้องเรียน list.
     const complaintId = addComplaint({
+      // The case belongs to a buyer and a shop — that is how the console filters
+      // it, and how the buyer's status screen finds it again.
+      userId: order.userId,
+      shopName: order.shopName,
       orderId: order.id,
       customer: order.recipient?.name ?? "ลูกค้า",
       customerEmail: email.trim() || "-",
@@ -142,13 +146,15 @@ export function ComplaintFormScreen() {
       amount: totalRefund,
       refundChannel,
       createdAt,
-      items: order.items.map((it) => ({ name: it.name, option: it.option, qty: it.quantity, price: it.price, image: it.image! })),
+      items: order.items.map((it) => ({ productId: it.productId, name: it.name, option: it.option, qty: it.quantity, price: it.price, image: it.image! })),
       evidence: images.map((uri) => ({ source: { uri } })),
     });
     Alert.alert(
       "ส่งเรื่องร้องเรียนแล้ว",
       `รหัสคำร้อง ${complaintId}\nยอดเงินคืน ฿${totalRefund.toLocaleString()}\nเราจะติดต่อกลับทางอีเมลของคุณ`,
-      [{ text: "ตกลง", onPress: () => nav.canGoBack() && nav.goBack() }],
+      // Take them to the live status page rather than dropping them back on the
+      // order — the screen existed but nothing ever navigated to it.
+      [{ text: "ดูสถานะ", onPress: () => nav.replace("ComplaintStatus", { complaintId }) }],
     );
   };
 

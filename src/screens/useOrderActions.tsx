@@ -2,6 +2,7 @@ import { Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useOrders } from "../context/OrderContext";
+import { complaintForOrder } from "../store/complaints";
 import type { Order } from "../data/orders";
 import type { OrderAction } from "../components/OrderActionButtons";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -39,9 +40,14 @@ export function useOrderActions() {
       case "rebuy":
         nav.navigate("Products");
         break;
-      case "complaint":
-        nav.navigate("ComplaintSelect", { orderId: order.id });
+      case "complaint": {
+        // Already filed against this order? Show its live status instead of
+        // letting the buyer open a second case.
+        const existing = complaintForOrder(order.userId, order.id);
+        if (existing) nav.navigate("ComplaintStatus", { complaintId: existing.id });
+        else nav.navigate("ComplaintSelect", { orderId: order.id });
         break;
+      }
       case "contact":
         Alert.alert("กำลังพัฒนา", "ฟีเจอร์นี้อยู่ระหว่างพัฒนา");
         break;

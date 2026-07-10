@@ -25,6 +25,7 @@ import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
 import { TRIAL_PRODUCTS } from "./TrialProductsScreen";
 import { STAGE_META, nextEval, fmtTrialDate } from "../data/trialRegistrations";
 import { useTrials } from "../context/TrialContext";
+import { evalComment, overallScore } from "../store/trials";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -115,8 +116,14 @@ export function TrialRequestDetailScreen() {
 
   const showSurvey = reg.stage === "testing" || reg.stage === "completed";
 
-  // Summary answers from the after-use form (overall feeds the product rating).
-  const ev = reg.evaluation;
+  // Summary derived from the stored per-question answers.
+  const ev = reg.postAnswers
+    ? {
+        overall: overallScore(reg.postAnswers),
+        nps: reg.postAnswers.npsScores["core_nps"],
+        comment: evalComment(reg.postAnswers),
+      }
+    : undefined;
   const npsSeg =
     ev?.nps == null
       ? null

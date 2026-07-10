@@ -12,6 +12,7 @@ import { BottomFade } from "../components/BottomFade";
 import { TEXT_MUTED } from "../theme/tokens";
 import { TRIAL_PRODUCTS } from "./TrialProductsScreen";
 import { useTrials } from "../context/TrialContext";
+import type { TestObjective } from "../data/evalQuestions";
 import {
   questionsForPhase,
   PHASE_META,
@@ -70,7 +71,7 @@ export function TrialEvalScreen() {
   const accent = PHASE_META[phase].color;
 
   const questions = useMemo(
-    () => (reg && product ? questionsForPhase(reg.objectives, product.category, !!reg.hasPreEval, phase) : []),
+    () => (reg && product ? questionsForPhase(reg.objectives as TestObjective[], product.category, !!reg.hasPreEval, phase) : []),
     [reg, product, phase]
   );
 
@@ -99,15 +100,9 @@ export function TrialEvalScreen() {
     }
     // Post-eval completes the trial (the pre-eval, if required, is already done by then).
     const willComplete = isPost && (!reg.hasPreEval || !!reg.preEvalDone);
-    // Capture the always-on summary answers (overall feeds the product rating).
-    const result = isPost
-      ? {
-          overall: form.scoreById["core_overall"] ?? 0,
-          nps: form.npsScores["core_nps"],
-          comment: (form.textAnswers["core_text"] ?? "").trim(),
-        }
-      : undefined;
-    markEvalDone(id, kind, result);
+    // Every per-question answer is saved — the owner's "คำตอบแบบประเมิน" screen
+    // reads them. (This used to keep only overall/nps/comment and drop the rest.)
+    markEvalDone(id, kind, form);
     nav.replace("TrialEvalSuccess", {
       productName: product.name,
       points: product.rewardPoints,
