@@ -8,7 +8,6 @@ import {
   markDelivered,
   markPaid,
   orderById,
-  parseThaiDateTime,
   ordersForShop,
   ordersForUser,
   requestCancellation,
@@ -248,31 +247,9 @@ describe("notifications come from real events", () => {
   });
 });
 
-describe("Thai date round-trip (the seeds' sort key)", () => {
-  it("parses both separators the seed rows use", () => {
-    // "·" in the buyer rows, "-" in the old seller rows.
-    const a = parseThaiDateTime("4 ก.พ. 2569 · 08:12 น.");
-    const b = parseThaiDateTime("4 ก.พ. 2569 - 08:12 น.");
-    expect(a).toBe(b);
-    expect(new Date(a).getFullYear()).toBe(2026); // 2569 BE
-    expect(new Date(a).getMonth()).toBe(1); // ก.พ. = February
-    expect(new Date(a).getHours()).toBe(8);
-  });
-
-  it("orders February after January, as the seed list assumes", () => {
-    expect(parseThaiDateTime("4 ก.พ. 2569 · 08:12 น.")).toBeGreaterThan(
-      parseThaiDateTime("31 ม.ค. 2569 · 13:05 น."),
-    );
-  });
-
-  it("survives a format round-trip", () => {
-    const s = "16 ก.พ. 2569 · 10:00 น.";
-    expect(formatThaiDateTime(parseThaiDateTime(s))).toBe(s);
-  });
-
-  it("falls back rather than producing NaN on garbage", () => {
-    expect(parseThaiDateTime("ไม่ใช่วันที่", 42)).toBe(42);
-    expect(parseThaiDateTime("1 XX 2569 · 10:00 น.", 7)).toBe(7);
+describe("Thai date formatting", () => {
+  it("renders a Buddhist year with a padded clock", () => {
+    expect(formatThaiDateTime(new Date(2026, 1, 4, 8, 12).getTime())).toBe("4 ก.พ. 2569 · 08:12 น.");
   });
 });
 

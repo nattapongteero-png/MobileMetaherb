@@ -27,6 +27,20 @@ export const isPending = (o: Order): boolean =>
 
 export const unitsOf = (o: Order): number => o.items.reduce((s, it) => s + it.quantity, 0);
 
+/**
+ * Two different, both-correct notions of "sales":
+ *
+ *   order.total   what the buyer paid — includes shipping and VAT, net of coupons.
+ *                 This is revenue, and what a payout draws on.
+ *   lineRevenue   the goods only (unit price × quantity), summed over the lines.
+ *
+ * They coincide for the seeded orders (no shipping), and diverge the moment a
+ * real checkout adds a carrier fee. The dashboard's sales card sits directly
+ * above a per-product breakdown sheet, so it uses lineRevenue — otherwise the
+ * card and the sheet it opens would show different numbers.
+ */
+export const lineRevenue = (o: Order): number => o.items.reduce((s, it) => s + it.price * it.quantity, 0);
+
 // ── periods ────────────────────────────────────────────────────
 export type Range = { from: number; to: number };
 
@@ -90,6 +104,17 @@ export function monthlySales(orders: Order[], year: number): number[] {
   return out;
 }
 
+/** Goods-only revenue per month. Matches what the breakdown sheet lists. */
+export function monthlyLineRevenue(orders: Order[], year: number): number[] {
+  const out = new Array(12).fill(0);
+  for (const o of orders) {
+    if (!countsAsRevenue(o)) continue;
+    const d = new Date(o.createdAt);
+    if (d.getFullYear() === year) out[d.getMonth()] += lineRevenue(o);
+  }
+  return out;
+}
+
 export function monthlyOrders(orders: Order[], year: number): number[] {
   const out = new Array(12).fill(0);
   for (const o of orders) {
@@ -98,23 +123,6 @@ export function monthlyOrders(orders: Order[], year: number): number[] {
     if (d.getFullYear() === year) out[d.getMonth()] += 1;
   }
   return out;
-}
-
-/**
- * The most recent month that actually has orders, as [year, monthIndex].
- * The console used to open on the current month; with seeded history that is
- * usually empty, and an empty dashboard reads as broken rather than as "no
- * sales yet".
- */
-export function latestActiveMonth(orders: Order[], fallback = Date.now()): [number, number] {
-  const live = orders.filter(countsAsRevenue);
-  if (live.length === 0) {
-    const d = new Date(fallback);
-    return [d.getFullYear(), d.getMonth()];
-  }
-  const newest = live.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
-  const d = new Date(newest.createdAt);
-  return [d.getFullYear(), d.getMonth()];
 }
 
 // ── products ───────────────────────────────────────────────────
@@ -141,6 +149,36 @@ export function topProducts(orders: Order[], limit = 5): ProductStat[] {
     }
   }
   return [...by.values()].sort((a, b) => b.units - a.units || b.sales - a.sales).slice(0, limit);
+}
+
+/** Goods-only revenue per day of a month, index 1 = the 1st. Index 0 is unused. */
+export function dailySales(orders: Order[], year: number, monthIndex: number): number[] {
+  const out = new Array(32).fill(0);
+  for (const o of orders) {
+    if (!countsAsRevenue(o)) continue;
+    const d = new Date(o.createdAt);
+    if (d.getFullYear() === year && d.getMonth() === monthIndex) out[d.getDate()] += lineRevenue(o);
+  }
+  return out;
+}
+
+export function dailyOrderCount(orders: Order[], year: number, monthIndex: number): number[] {
+  const out = new Array(32).fill(0);
+  for (const o of orders) {
+    if (!countsAsRevenue(o)) continue;
+    const d = new Date(o.createdAt);
+    if (d.getFullYear() === year && d.getMonth() === monthIndex) out[d.getDate()] += 1;
+  }
+  return out;
+}
+
+/**
+ * Heat level 1 (low) … 5 (high) per day, or 0 for a day with no sales.
+ * Scaled against the month's own best day, so a quiet month is still readable.
+ */
+export function heatLevels(daily: number[]): number[] {
+  const peak = Math.max(...daily);
+  return daily.map((v) => (v <= 0 || peak <= 0 ? 0 : Math.max(1, Math.ceil((v / peak) * 5))));
 }
 
 // ── customers ──────────────────────────────────────────────────

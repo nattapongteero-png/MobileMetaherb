@@ -132,8 +132,9 @@ import {
 import { METAHERB_SHOP } from "../data/shopOrders";
 import { useShopQuotes } from "../data/quoteView";
 import { useShopOrderRows } from "../data/shopOrderView";
-import { latestActiveMonth, monthlyOrders, monthlySales, pctDelta } from "../store/analytics";
-import { ordersForShop, verifyPayment } from "../store/orders";
+import { dailySales, heatLevels, monthlyLineRevenue, monthlyOrders, pctDelta } from "../store/analytics";
+import { verifyPayment } from "../store/orders";
+import type { Order } from "../store/types";
 import { useStore } from "../store/db";
 import { catalogStore, deleteProduct, setProductClosed, setProductRecommended } from "../store/catalog";
 import { useOwnerProducts, type OwnerProduct } from "../data/liveCatalog";
@@ -1746,18 +1747,6 @@ const MONTH_SHORT = [
 ];
 const DAY_NAMES = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
 
-// Per-day sales intensity (1 low → 5 high). Same seed values as the web.
-const HEAT_DATA: Record<number, number> = {
-  1: 5, 2: 5, 3: 5, 4: 4, 5: 2, 6: 3, 7: 4,
-  8: 1, 9: 2, 10: 2, 11: 3, 12: 1, 13: 2, 14: 2,
-  15: 1, 16: 5, 17: 3, 18: 4, 19: 2, 20: 1, 21: 1,
-  22: 2, 23: 4, 24: 4, 25: 4, 26: 1, 27: 1, 28: 1,
-  29: 2, 30: 5, 31: 5,
-};
-const MONTH_HEAT: Record<number, number> = {
-  0: 5, 1: 4, 2: 3, 3: 4, 4: 2, 5: 3, 6: 2, 7: 3, 8: 1, 9: 1, 10: 2, 11: 1,
-};
-
 function heatColor(level: number): string {
   switch (level) {
     case 5: return "#ea6549";
@@ -1769,14 +1758,13 @@ function heatColor(level: number): string {
   }
 }
 
-// Deterministic mock figures (same seed formula as the web OverviewTab).
+// Page visits have no source in the app — no analytics pipeline exists.
 const seed = (a: number, b: number) => (a * 137 + b * 293 + 7) % 100;
 const dailyVisits = (month: number, day: number) => 50 + seed(month, day) * 3;
-const dailyOrders = (month: number, day: number) => 5 + Math.round(seed(month + 3, day) * 0.5);
-const dailySales = (month: number, day: number) => 1000 + seed(month + 7, day) * 120;
 
-// ---- Per-day sales line items (the "ดูรายละเอียด" breakdown). Deterministic so
-// the same day always shows the same basket; total drives the contextual card.
+// ---- Sales line items (the "ดูรายละเอียด" breakdown), aggregated from the
+// shop's real order lines. They used to be generated from a seed formula, so the
+// big sales card showed an invented number next to a REAL month-on-month delta.
 export type SalesLine = {
   name: string;
   cat: string;
@@ -1787,42 +1775,50 @@ export type SalesLine = {
   image: number;
 };
 
-function dayLines(month: number, day: number): SalesLine[] {
-  const s0 = seed(month + 5, day);
-  const count = 3 + (s0 % 4); // 3–6 distinct products
-  const start = s0 % TOP_PRODUCTS.length;
-  const lines: SalesLine[] = [];
-  for (let i = 0; i < count; i++) {
-    const p = TOP_PRODUCTS[(start + i) % TOP_PRODUCTS.length];
-    const s = seed(month + i + 1, day + i * 3);
-    const qty = 1 + (s % 4); // 1–4 pcs
-    const sales = p.unit * qty;
-    // Cost ≈ 45% (margin 55%); a rare day sells one item at a loss → red row.
-    const lossy = s % 11 === 0;
-    const cost = lossy ? Math.round(sales * 1.54) : Math.round(sales * 0.45);
-    lines.push({ name: p.name, cat: p.cat, unit: p.unit, qty, sales, cost, image: p.image });
-  }
-  return lines.sort((a, b) => b.sales - a.sales);
-}
+/** No cost of goods exists anywhere in the app; 45% is a stated assumption. */
+const COST_RATIO = 0.45;
 
-// Aggregate a whole month's lines by product (for the monthly/“ดูรายละเอียด” scope).
-function monthLines(month: number, year: number): SalesLine[] {
-  const dim = new Date(year, month + 1, 0).getDate();
+function linesFrom(orders: Order[]): SalesLine[] {
   const byName = new Map<string, SalesLine>();
-  for (let d = 1; d <= dim; d++) {
-    for (const l of dayLines(month, d)) {
-      const cur = byName.get(l.name);
+  for (const o of orders) {
+    if (o.status === "cancelled") continue;
+    for (const it of o.items) {
+      const sales = it.price * it.quantity;
+      const cur = byName.get(it.name);
       if (cur) {
-        cur.qty += l.qty;
-        cur.sales += l.sales;
-        cur.cost += l.cost;
+        cur.qty += it.quantity;
+        cur.sales += sales;
+        cur.cost += Math.round(sales * COST_RATIO);
       } else {
-        byName.set(l.name, { ...l });
+        byName.set(it.name, {
+          name: it.name,
+          cat: webCategoryLabel(RAW_PRODUCT_BY_ID[it.productId]?.category ?? ""),
+          unit: it.price,
+          qty: it.quantity,
+          sales,
+          cost: Math.round(sales * COST_RATIO),
+          image: it.image as number,
+        });
       }
     }
   }
   return [...byName.values()].sort((a, b) => b.sales - a.sales);
 }
+
+const onDay = (orders: Order[], year: number, month: number, day: number) =>
+  orders.filter((o) => {
+    const d = new Date(o.createdAt);
+    return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+  });
+
+const inMonth = (orders: Order[], year: number, month: number) =>
+  orders.filter((o) => {
+    const d = new Date(o.createdAt);
+    return d.getFullYear() === year && d.getMonth() === month;
+  });
+
+const inYear = (orders: Order[], year: number) =>
+  orders.filter((o) => new Date(o.createdAt).getFullYear() === year);
 
 const linesTotal = (ls: SalesLine[]) => ls.reduce((s, l) => s + l.sales, 0);
 const linesQty = (ls: SalesLine[]) => ls.reduce((s, l) => s + l.qty, 0);
@@ -1915,6 +1911,10 @@ function DashboardCalendar({
   onChange: (next: CalSel) => void;
 }) {
   const { month, year, day: selectedDate } = sel;
+  // Real per-day intensity, scaled against this month's own best day.
+  const orderRows = useShopOrderRows(METAHERB_SHOP);
+  const dayHeat = useMemo(() => heatLevels(dailySales(orderRows, year, month)), [orderRows, year, month]);
+  const monthHeat = useMemo(() => heatLevels(monthlyLineRevenue(orderRows, year)), [orderRows, year]);
   const setMonth = (fn: (m: number) => number) => onChange({ ...sel, month: fn(month) });
   const setYear = (fn: (y: number) => number) => onChange({ ...sel, year: fn(year) });
   const setSelectedDate = (d: number) => onChange({ ...sel, day: d });
@@ -1930,7 +1930,7 @@ function DashboardCalendar({
     cells.push({ day: prevMonthDays - startOffset + 1 + i, inMonth: false, heat: 0 });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ day: d, inMonth: true, heat: HEAT_DATA[d] || 0 });
+    cells.push({ day: d, inMonth: true, heat: dayHeat[d] ?? 0 });
   }
   // Trailing days belong to next month → count from 1, not from cells.length.
   let nextDay = 1;
@@ -2084,7 +2084,7 @@ function DashboardCalendar({
                     borderRadius: 10,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: selected ? "#f1340c" : heatColor(MONTH_HEAT[mi] || 0),
+                    backgroundColor: selected ? "#f1340c" : heatColor(monthHeat[mi] ?? 0),
                   }}
                 >
                   <Text
@@ -2507,12 +2507,12 @@ function OverviewTab({
 }) {
   const nav = useNavigation<Nav>();
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
-  // Controlled calendar selection — drives every scoped figure below. It opens on
-  // the newest month that actually has orders: now that the KPI is real, opening
-  // on the current month would show zeros and read as broken.
+  // Controlled calendar selection — drives every scoped figure below. Opens on
+  // today: the seeded orders are anchored to the current date (data/seedClock.ts),
+  // so this month always has sales to show.
   const [cal, setCal] = useState<CalSel>(() => {
-    const [y, m] = latestActiveMonth(ordersForShop(METAHERB_SHOP));
-    return { month: m, year: y, day: 16 };
+    const d = new Date();
+    return { month: d.getMonth(), year: d.getFullYear(), day: d.getDate() };
   });
   const { month, year, day } = cal;
   // Sales-report scope — lifted so its date picker can ride on the page title row.
@@ -2528,7 +2528,8 @@ function OverviewTab({
   // the app: there is no analytics pipeline, so it stays mock and is the only
   // number here that a purchase does not move.
   const shopOrderRows = useShopOrderRows(METAHERB_SHOP);
-  const salesByMonth = useMemo(() => monthlySales(shopOrderRows, year), [shopOrderRows, year]);
+  // Goods-only, so the sales card equals the breakdown sheet it opens.
+  const salesByMonth = useMemo(() => monthlyLineRevenue(shopOrderRows, year), [shopOrderRows, year]);
   const ordersByMonth = useMemo(() => monthlyOrders(shopOrderRows, year), [shopOrderRows, year]);
 
   const yearlySales = salesByMonth.reduce((a, b) => a + b, 0);
@@ -2549,20 +2550,10 @@ function OverviewTab({
 
   // ----- Line-item breakdowns (memoised) — every sales total below is the sum
   // of these, so each card matches its "ดูรายละเอียด" sheet exactly.
-  const monthBd = useMemo(() => monthLines(month, year), [month, year]);
-  const yearBd = useMemo(() => {
-    const byName = new Map<string, SalesLine>();
-    for (let m = 0; m < 12; m++)
-      for (const l of monthLines(m, year)) {
-        const cur = byName.get(l.name);
-        if (cur) { cur.qty += l.qty; cur.sales += l.sales; cur.cost += l.cost; }
-        else byName.set(l.name, { ...l });
-      }
-    return [...byName.values()].sort((a, b) => b.sales - a.sales);
-  }, [year]);
-
+  const monthBd = useMemo(() => linesFrom(inMonth(shopOrderRows, year, month)), [shopOrderRows, year, month]);
+  const yearBd = useMemo(() => linesFrom(inYear(shopOrderRows, year)), [shopOrderRows, year]);
   // Contextual (small) card: day in monthly view, month in yearly view.
-  const ctxLines = period === "yearly" ? monthBd : dayLines(month, day);
+  const ctxLines = period === "yearly" ? monthBd : linesFrom(onDay(shopOrderRows, year, month, day));
   const ctxSales = linesTotal(ctxLines);
   const ctxLabel = period === "yearly"
     ? `${MONTH_NAMES[month]} ${year + 543}`
@@ -2708,7 +2699,7 @@ function OverviewTab({
       />
       <KpiCard
         label={period === "yearly" ? "คำสั่งซื้อรายเดือน" : "คำสั่งซื้อรายวัน"}
-        value={fmtNum(period === "yearly" ? ordersByMonth[month] : dailyOrders(month, day))}
+        value={fmtNum(period === "yearly" ? ordersByMonth[month] : onDay(shopOrderRows, year, month, day).filter((o) => o.status !== "cancelled").length)}
         unit="รายการ"
         delta={delta.orders}
         deltaLabel={period === "yearly" ? "เดือนก่อน" : "วันก่อน"}

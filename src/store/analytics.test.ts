@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   countByStatus,
   countsAsRevenue,
+  dailyOrderCount,
+  dailySales,
   customerStats,
+  heatLevels,
   isSettled,
-  latestActiveMonth,
+  lineRevenue,
+  monthlyLineRevenue,
   monthRange,
   monthlyOrders,
   monthlySales,
@@ -126,19 +130,6 @@ describe("periods", () => {
     expect(monthlyOrders(rows, 2026)[1]).toBe(2);
   });
 
-  it("finds the newest month that has orders, so the dashboard doesn't open empty", () => {
-    const rows = [order({ createdAt: at(2026, 1, 5) }), order({ createdAt: at(2026, 3, 9) })];
-    expect(latestActiveMonth(rows)).toEqual([2026, 3]);
-  });
-
-  it("ignores cancelled orders when picking that month", () => {
-    const rows = [order({ createdAt: at(2026, 1, 5) }), order({ createdAt: at(2026, 8, 9), status: "cancelled" })];
-    expect(latestActiveMonth(rows)).toEqual([2026, 1]);
-  });
-
-  it("falls back to the given clock when the shop has never sold anything", () => {
-    expect(latestActiveMonth([], at(2026, 6, 10))).toEqual([2026, 6]);
-  });
 });
 
 describe("top products", () => {
@@ -214,5 +205,71 @@ describe("a whole year", () => {
     expect(ordersIn([order({ createdAt: at(2026, 0, 1) })], y)).toHaveLength(1);
     expect(ordersIn([order({ createdAt: at(2026, 11, 31) })], y)).toHaveLength(1);
     expect(ordersIn([order({ createdAt: at(2027, 0, 1) })], y)).toHaveLength(0);
+  });
+});
+
+describe("per-day series", () => {
+  const rows = [
+    order({ createdAt: at(2026, 6, 3), total: 100 }),
+    order({ createdAt: at(2026, 6, 3), total: 300 }),
+    order({ createdAt: at(2026, 6, 9), total: 200 }),
+    order({ createdAt: at(2026, 6, 9), total: 999, status: "cancelled" }),
+    order({ createdAt: at(2026, 5, 9), total: 999 }), // previous month
+  ];
+
+  it("buckets by day of the selected month, 1-indexed", () => {
+    const d = dailySales(rows, 2026, 6);
+    expect(d[3]).toBe(400);
+    expect(d[9]).toBe(200); // cancellation excluded
+    expect(d[1]).toBe(0);
+    expect(dailyOrderCount(rows, 2026, 6)[3]).toBe(2);
+  });
+
+  it("scales the heatmap against the month's own best day", () => {
+    const levels = heatLevels(dailySales(rows, 2026, 6));
+    expect(levels[3]).toBe(5); // the peak
+    expect(levels[9]).toBe(3); // 200/400 → ceil(2.5)
+    expect(levels[1]).toBe(0); // no sales at all
+  });
+
+  it("gives a month with no sales no heat at all, rather than dividing by zero", () => {
+    expect(heatLevels(dailySales([], 2026, 6)).every((l) => l === 0)).toBe(true);
+  });
+
+  it("never renders a day with sales as level 0", () => {
+    const levels = heatLevels([0, 1, 1000]);
+    expect(levels[1]).toBe(1);
+    expect(levels[2]).toBe(5);
+  });
+});
+
+describe("goods revenue vs paid revenue", () => {
+  // A real checkout adds shipping and subtracts a coupon, so `total` is not the
+  // sum of the lines. Both numbers are correct; they answer different questions.
+  const withShipping = order({
+    items: [{ productId: "1", name: "a", option: "", quantity: 2, price: 100 }],
+    total: 235, // 200 goods + 50 shipping − 15 coupon
+  });
+
+  it("keeps them apart", () => {
+    expect(lineRevenue(withShipping)).toBe(200);
+    expect(totals([withShipping]).sales).toBe(235);
+  });
+
+  it("uses goods-only for the sales card's series, so it matches the breakdown sheet", () => {
+    const rows = [order({ ...withShipping, createdAt: at(2026, 6, 3) })];
+    expect(monthlyLineRevenue(rows, 2026)[6]).toBe(200);
+    expect(monthlySales(rows, 2026)[6]).toBe(235);
+  });
+
+  it("excludes cancellations from both", () => {
+    const c = order({ ...withShipping, status: "cancelled" });
+    expect(monthlyLineRevenue([c], 2026).every((v) => v === 0)).toBe(true);
+    expect(totals([c]).sales).toBe(0);
+  });
+
+  it("bases the heatmap on goods revenue, like the card above it", () => {
+    const rows = [order({ ...withShipping, createdAt: at(2026, 6, 3) })];
+    expect(dailySales(rows, 2026, 6)[3]).toBe(200);
   });
 });

@@ -57,15 +57,6 @@ export function formatThaiDateTime(epoch: number): string {
   return `${d.getDate()} ${TH_MONTH[d.getMonth()]} ${d.getFullYear() + 543} · ${hh}:${mm} น.`;
 }
 
-/** Inverse of `formatThaiDateTime`, tolerant of the `·` and `-` separators the seeds use. */
-export function parseThaiDateTime(s: string, fallback = 0): number {
-  const m = s.match(/(\d{1,2})\s+(\S+)\s+(\d{4})[^\d]+(\d{1,2}):(\d{2})/);
-  if (!m) return fallback;
-  const month = TH_MONTH.indexOf(m[2]);
-  if (month < 0) return fallback;
-  return new Date(Number(m[3]) - 543, month, Number(m[1]), Number(m[4]), Number(m[5])).getTime();
-}
-
 let orderSeq = 0;
 /**
  * "ORD-20260710-04821" — the same namespace the seeded buyer and seller rows

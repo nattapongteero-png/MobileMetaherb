@@ -10,14 +10,7 @@ import { describe, expect, it } from "vitest";
 import "../src/store";
 
 import { ordersForShop, ordersForUser, allOrders } from "../src/store/orders";
-import {
-  customerStats,
-  latestActiveMonth,
-  monthlyOrders,
-  monthlySales,
-  topProducts,
-  totals,
-} from "../src/store/analytics";
+import { customerStats, monthlyOrders, monthlySales, topProducts, totals } from "../src/store/analytics";
 import { canFulfill, stockOf } from "../src/store/stock";
 import { walletCoupons, couponsForShop } from "../src/store/coupons";
 import { pricingFor, promotionsStore } from "../src/store/promotions";
@@ -46,10 +39,13 @@ describe("orders: the buyer's and the seller's arrays really merged", () => {
     for (const o of buyersOrdersAtThisShop) expect(shopOrders).toContain(o);
   });
 
-  it("parses every seeded Thai date into a real timestamp", () => {
+  it("stamps every seeded order in the recent past, never the future", () => {
+    const now = Date.now();
     for (const o of allOrders()) {
-      expect(o.createdAt, `${o.id} has date "${o.date}"`).toBeGreaterThan(0);
-      expect(new Date(o.createdAt).getFullYear()).toBeGreaterThanOrEqual(2026);
+      expect(o.createdAt, `${o.id}`).toBeGreaterThan(0);
+      expect(o.createdAt).toBeLessThanOrEqual(now);
+      // The whole demo history spans the last ~25 days.
+      expect(now - o.createdAt).toBeLessThan(30 * 86_400_000);
     }
   });
 
@@ -123,10 +119,34 @@ describe("promotions reproduce the storefront's shipped prices", () => {
 describe("the console's dashboard shows real numbers on first open", () => {
   const shopOrders = () => ordersForShop(SHOP);
 
-  it("opens on a month that actually has orders, so the KPI is not zero", () => {
-    const [year, month] = latestActiveMonth(shopOrders());
-    expect(monthlySales(shopOrders(), year)[month]).toBeGreaterThan(0);
-    expect(monthlyOrders(shopOrders(), year)[month]).toBeGreaterThan(0);
+  it("has sales in the CURRENT month — the dashboard opens on today", () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    expect(monthlySales(shopOrders(), y)[m]).toBeGreaterThan(0);
+    expect(monthlyOrders(shopOrders(), y)[m]).toBeGreaterThan(0);
+  });
+
+  it("has sales in the PREVIOUS month too, so the month-on-month delta is meaningful", () => {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    expect(monthlySales(shopOrders(), prev.getFullYear())[prev.getMonth()]).toBeGreaterThan(0);
+  });
+
+  it("stamps today's newest order in the current month, not in a fixed 2569", () => {
+    const newest = shopOrders().reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
+    const d = new Date(newest.createdAt);
+    const now = new Date();
+    expect(d.getFullYear()).toBe(now.getFullYear());
+    expect(d.getMonth()).toBe(now.getMonth());
+  });
+
+  it("gives every order an id whose date matches its own timestamp", () => {
+    for (const o of allOrders()) {
+      const d = new Date(o.createdAt);
+      const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+      expect(o.id, `${o.id} vs ${o.date}`).toContain(ymd);
+    }
   });
 
   it("reports revenue equal to the sum of the shop's non-cancelled orders", () => {
