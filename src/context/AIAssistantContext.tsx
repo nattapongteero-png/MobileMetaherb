@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   detectIntent, extractGoals, extractBudget, extractCategory, goalLabel, categoryLabel,
   searchProducts, recommendForGoals, compareProducts, valueAnalysis, buildBundle, filterProducts,
-  suggestPromos, crossSell, quickReplies,
+  suggestPromos, crossSell, quickReplies, goalExcluded,
   type Intent, type CustomerProfile, type HealthGoal, type ComparisonRow, type PromoSuggestion,
 } from "../data/aiEngine";
 import { REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
@@ -231,7 +231,13 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
 
     const executePlan = async (plan: AIPlan, hist: { role: "user" | "ai"; text: string }[]): Promise<boolean> => {
       const intro = plan.reply?.trim();
-      const planGoals: HealthGoal[] = plan.goal ? ([plan.goal] as HealthGoal[]) : activeGoals;
+      // The UNION of what the planner inferred and what the raw text says. If
+      // Gemma mislabels an insomnia question as "energy", the sleep exclusions
+      // must still bite — a contraindication is only as good as the goal it is
+      // checked against.
+      const planGoals: HealthGoal[] = [
+        ...new Set<HealthGoal>([...(plan.goal ? [plan.goal as HealthGoal] : []), ...activeGoals]),
+      ];
       switch (plan.action) {
         case "search": {
           const applyHardFilters = (p: P) =>
@@ -257,7 +263,14 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
               // hard-filtered, capped. Gives the ranker real options to choose from.
               const pool: P[] = [];
               const seen = new Set<string>();
-              const addCand = (p?: P) => { if (p && !seen.has(p.id) && applyHardFilters(p)) { seen.add(p.id); pool.push(p); } };
+              // Never hand a contraindicated product to the ranker: an LLM asked
+              // nicely not to suggest coffee for insomnia will sometimes do it anyway.
+              const addCand = (p?: P) => {
+                if (!p || seen.has(p.id) || !applyHardFilters(p)) return;
+                if (goalExcluded(p, planGoals)) return;
+                seen.add(p.id);
+                pool.push(p);
+              };
               (plan.productIds ?? []).forEach((id) => addCand(byId.get(String(id))));
               filterProducts(products, { query: plan.query, goals: planGoals, category: plan.category, maxPrice: plan.maxPrice, minPrice: plan.minPrice, minRating: plan.minRating, promoOnly: plan.promoOnly, limit: 10 }).forEach(addCand);
               const candidates = pool.slice(0, 10);
@@ -271,7 +284,10 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
                   r.grounding,
                 );
                 groundedReply = ranked.reply;
-                results = ranked.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[];
+                results = (ranked.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[])
+                  // Belt and braces: the model can only pick from the pool, but a
+                  // hallucinated id must not slip a contraindicated product through.
+                  .filter((p) => !goalExcluded(p, planGoals));
               }
             } catch { /* fall through to the name-based matcher below */ }
           }
