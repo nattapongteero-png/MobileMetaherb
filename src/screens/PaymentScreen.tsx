@@ -18,10 +18,11 @@ import { usePayment } from "../context/PaymentContext";
 import { useRefund } from "../context/RefundContext";
 import { useSecurity } from "../context/SecurityContext";
 import { SHIPPING_METHODS } from "../data/shippingMethods";
-import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
+import { useCheckoutCoupons, couponDiscount } from "../data/checkoutCoupons";
 import { useCart, type CartItem } from "../context/CartContext";
 import { createOrder, markPaid } from "../store/orders";
 import { currentUserId } from "../store/session";
+import { redeemCoupon } from "../store/coupons";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
@@ -69,7 +70,7 @@ export function PaymentScreen() {
     selectedPayment,
     trueMoneyPhone,
     selectedShipping,
-    selectedCouponIdx,
+    selectedCouponId,
     coinsUsed,
     setCoinsUsed,
     addresses,
@@ -87,9 +88,10 @@ export function PaymentScreen() {
     SHIPPING_METHODS.find((s) => s.id === selectedShipping) ?? SHIPPING_METHODS[0];
 
   // Pricing math
-  const selectedCoupon = selectedCouponIdx !== null ? COUPONS[selectedCouponIdx] : null;
+  const walletCoupons = useCheckoutCoupons();
+  const selectedCoupon = walletCoupons.find((c) => c.id === selectedCouponId) ?? null;
   const subtotal = ITEMS.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const discount = selectedCoupon ? couponDiscount(selectedCoupon, subtotal) : 0;
+  const discount = couponDiscount(selectedCoupon, subtotal);
   const vat = Math.round((subtotal - discount) * 0.07);
   // A free-shipping coupon waives the carrier fee.
   const freeShip = selectedCoupon?.type === "freeship";
@@ -185,6 +187,9 @@ export function PaymentScreen() {
       created.push(res.order.id);
     }
 
+    // Spend the coupon: bumps its usage counter (visible in the shop console)
+    // and marks it used in the buyer's wallet.
+    if (selectedCoupon) redeemCoupon(currentUserId(), selectedCoupon.id);
     finishCheckout(); // the ordered lines leave the cart
     const orderId = created[0];
 
@@ -562,7 +567,7 @@ export function PaymentScreen() {
               </View>
             ) : (
               <Text style={{ flex: 1, fontSize: 14, color: "#525252", lineHeight: 18 }}>
-                เลือกคูปองส่วนลด / ส่งฟรี ({COUPONS.length} คูปองพร้อมใช้)
+                เลือกคูปองส่วนลด / ส่งฟรี ({walletCoupons.length} คูปองพร้อมใช้)
               </Text>
             )}
           </Pressable>

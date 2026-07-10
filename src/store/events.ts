@@ -17,7 +17,8 @@ export type AppEventType =
   | "order_cancelled"
   | "cancel_requested"
   | "review_submitted"
-  | "stock_low";
+  | "stock_low"
+  | "product_added";
 
 /** Who should see this in their notification feed. */
 export type Audience = "customer" | "shop";

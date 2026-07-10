@@ -12,9 +12,11 @@ type PaymentValue = {
   /** Currently selected shipping-carrier id. */
   selectedShipping: string;
   setSelectedShipping: (id: string) => void;
-  /** Index of the applied checkout coupon, or null when none. */
-  selectedCouponIdx: number | null;
-  setSelectedCouponIdx: (idx: number | null) => void;
+  /** Id of the applied checkout coupon, or null when none. (Was an array index
+   * into a frozen coupon list — meaningless now that the list is the buyer's
+   * own wallet and can change between screens.) */
+  selectedCouponId: string | null;
+  setSelectedCouponId: (id: string | null) => void;
   /** MetaHerb Coins applied as discount (1,000 coins = ฿1). */
   coinsUsed: number;
   setCoinsUsed: (n: number) => void;
@@ -40,7 +42,7 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   const [selectedPayment, setSelectedPayment] = useState<string>("promptpay");
   const [trueMoneyPhone, setTrueMoneyPhone] = useState<string | null>(null);
   const [selectedShipping, setSelectedShipping] = useState<string>(DEFAULT_SHIPPING_ID);
-  const [selectedCouponIdx, setSelectedCouponIdx] = useState<number | null>(null);
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [coinsUsed, setCoinsUsed] = useState<number>(0);
   const [addresses, setAddresses] = useState<Address[]>(INITIAL_ADDRESSES);
   const [selectedAddressId, setSelectedAddressId] = useState<string>(
@@ -83,8 +85,8 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
         setTrueMoneyPhone,
         selectedShipping,
         setSelectedShipping,
-        selectedCouponIdx,
-        setSelectedCouponIdx,
+        selectedCouponId,
+        setSelectedCouponId,
         coinsUsed,
         setCoinsUsed,
         addresses,

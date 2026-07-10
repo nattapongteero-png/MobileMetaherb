@@ -129,6 +129,9 @@ import {
 } from "../data/shopOrderView";
 import { METAHERB_SHOP } from "../data/shopOrders";
 import { verifyPayment } from "../store/orders";
+import { useStore } from "../store/db";
+import { catalogStore, deleteProduct, setProductClosed, setProductRecommended } from "../store/catalog";
+import { useOwnerProducts, type OwnerProduct } from "../data/liveCatalog";
 // Re-exported so the shop sub-screens keep their existing import site.
 export { ORDER_STATUS_CFG, useShopOrders, type ShopOrder };
 import { webCategoryLabel, SHOP_STOCK } from "../data/catalog";
@@ -623,9 +626,13 @@ export const PM_STATUS_COLOR: Record<PMStatus, string> = {
 // always match what the storefront cards actually display. Products whose
 // detail page offers variant options (VARIANT_GROUPS) show "มีตัวเลือก" with
 // the min–max price across their SKUs instead of "ราคาเดียว".
-export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
-  const m = SHOP_STOCK[p.id] ?? { stock: 200 };
-  const status: PMStatus = m.closed ? "ปิดขาย" : m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
+/**
+ * The shop's own products, as management cards. Derived from the LIVE catalog
+ * (seed + the owner's edits + owner-created products) and the LIVE stock table,
+ * so a sale that drains stock is visible here immediately.
+ */
+function pmFromOwner(p: OwnerProduct): PMProduct {
+  const status: PMStatus = p.closed ? "ปิดขาย" : p.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
   const group = GROUP_BY_ID[p.id];
   let priceText = `฿ ${p.price.toFixed(2)}`;
   if (group) {
@@ -642,75 +649,61 @@ export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
     type: group ? "มีตัวเลือก" : "ราคาเดียว",
     typeColor: group ? "#0088ff" : "#ff9500",
     priceText,
-    stockText: `${m.stock.toLocaleString()} ชิ้น`,
+    stockText: `${p.stock.toLocaleString()} ชิ้น`,
     status,
     statusColor: PM_STATUS_COLOR[status],
     flash: !!p.isFlashSale,
     recommended: !!p.isRecommended,
   };
-});
+}
 
-export const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
-  const status: PMStatus = m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
-  return {
-    id: m.id,
-    name: m.name,
-    category: m.category,
-    image: m.image as number,
-    type: "วัตถุดิบ",
-    typeColor: "#475569",
-    priceText: `฿ ${m.pricePerKg.toLocaleString()} / กก.`,
-    stockText: `${m.stock.toLocaleString()} กก.`,
-    status,
-    statusColor: PM_STATUS_COLOR[status],
-    flash: false,
-    recommended: false,
-  };
-});
-
-/* ── PM store — status overrides + deletions shared by the list, search, and
-   detail pages (same in-memory pattern as the coupons/promotions stores).
-   Base data stays the derived PM_REGULAR / PM_MATERIAL arrays; overrides
-   layer on top so every surface re-renders together. ── */
-type PMOverrides = Record<string, { status?: PMStatus; recommended?: boolean; deleted?: boolean }>;
-let pmOverrides: PMOverrides = {};
-const pmListeners = new Set<() => void>();
-const pmEmit = () => pmListeners.forEach((l) => l());
-const pmSubscribe = (l: () => void) => {
-  pmListeners.add(l);
-  return () => {
-    pmListeners.delete(l);
-  };
-};
+/* ── Product management writes go to the shared catalog overlay
+   (src/store/catalog.ts), so hiding, renaming, recommending or deleting a
+   product changes what the CUSTOMER sees. They used to land in a private
+   `pmOverrides` map that no storefront surface ever read. ── */
 export function setPMStatus(id: string, status: PMStatus) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], status } };
-  pmEmit();
+  setProductClosed(id, status === "ปิดขาย");
 }
 export function deletePMProduct(id: string) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], deleted: true } };
-  pmEmit();
+  deleteProduct(id);
 }
 export function setPMRecommended(id: string, recommended: boolean) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], recommended } };
-  pmEmit();
+  setProductRecommended(id, recommended);
 }
-function applyPMOverrides(base: PMProduct[], o: PMOverrides): PMProduct[] {
-  return base
-    .filter((p) => !o[p.id]?.deleted)
-    .map((p) => {
-      const ov = o[p.id];
-      if (!ov) return p;
-      return {
-        ...p,
-        ...(ov.status ? { status: ov.status, statusColor: PM_STATUS_COLOR[ov.status] } : null),
-        ...(ov.recommended != null ? { recommended: ov.recommended } : null),
-      };
-    });
+
+/** Herbal-Market materials aren't catalog products, but share the overlay for status/deletion. */
+function useMaterialPM(): PMProduct[] {
+  const overlay = useStore(catalogStore);
+  return useMemo(
+    () =>
+      MATERIALS.filter((m) => !overlay.patches[m.id]?.deleted).map((m) => {
+        const closed = Boolean(overlay.patches[m.id]?.closed);
+        const status: PMStatus = closed ? "ปิดขาย" : m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
+        return {
+          id: m.id,
+          name: m.name,
+          category: m.category,
+          image: m.image as number,
+          type: "วัตถุดิบ",
+          typeColor: "#475569",
+          priceText: `฿ ${m.pricePerKg.toLocaleString()} / กก.`,
+          stockText: `${m.stock.toLocaleString()} กก.`,
+          status,
+          statusColor: PM_STATUS_COLOR[status],
+          flash: false,
+          recommended: false,
+        };
+      }),
+    [overlay],
+  );
 }
-/** Live product list (overrides applied) — re-renders on toggle / delete. */
+
+/** Live product list — re-renders on toggle / delete / new product / stock change. */
 export function usePMProducts(type: "regular" | "material"): PMProduct[] {
-  const o = useSyncExternalStore(pmSubscribe, () => pmOverrides, () => pmOverrides);
-  return useMemo(() => applyPMOverrides(type === "regular" ? PM_REGULAR : PM_MATERIAL, o), [type, o]);
+  const owned = useOwnerProducts(METAHERB_SHOP);
+  const materials = useMaterialPM();
+  const regular = useMemo(() => owned.map(pmFromOwner), [owned]);
+  return type === "regular" ? regular : materials;
 }
 
 // ===================== FLASH SALE (sidebar → Flash Sale) ====================

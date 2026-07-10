@@ -11,9 +11,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { hydrateAll, setPersistence } from "./db";
 import { rehydrateImages, seedOrders } from "./orders";
 import { seedStock } from "./stock";
+import { seedCoupons } from "./coupons";
 import { sessionStore, DEMO_USER } from "./session";
 import { MOCK_ORDERS } from "../data/orders";
 import { SHOP_SEED_ORDERS } from "../data/shopOrders";
+import { SEED_COUPONS, SEED_WALLET } from "../data/couponSeed";
 import { SHOP_STOCK } from "../data/catalog";
 import { getRealProductImage } from "../data/realProducts";
 
@@ -23,6 +25,7 @@ setPersistence(AsyncStorage);
 // swap in whatever the user actually did on their last run.
 seedOrders([...MOCK_ORDERS, ...SHOP_SEED_ORDERS]);
 seedStock(Object.fromEntries(Object.entries(SHOP_STOCK).map(([id, s]) => [id, s.stock])));
+seedCoupons(SEED_COUPONS, SEED_WALLET);
 if (!sessionStore.get().user) sessionStore.reset({ user: DEMO_USER, shopName: null });
 
 let hydrated: Promise<void> | null = null;

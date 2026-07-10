@@ -9,7 +9,7 @@ import { ChevronRight, Clock, Ticket, ShoppingCart } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { PressableScale } from "../components/PressableScale";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
-import { COUPONS, type Coupon } from "../data/coupons";
+import { useWalletCoupons, type Coupon } from "../data/coupons";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -35,12 +35,12 @@ const matches = (c: Coupon, f: FilterKey) =>
           : c.status === "expired";
 
 // Glass filter chips — same language as the order status tabs / notification filters.
-function FilterChips({ filter, setFilter }: { filter: FilterKey; setFilter: (f: FilterKey) => void }) {
+function FilterChips({ filter, setFilter, coupons }: { filter: FilterKey; setFilter: (f: FilterKey) => void; coupons: Coupon[] }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}>
       {FILTERS.map((f) => {
         const active = filter === f.key;
-        const count = COUPONS.filter((c) => matches(c, f.key)).length;
+        const count = coupons.filter((c) => matches(c, f.key)).length;
         return (
           <PressableScale key={f.key} onPress={() => setFilter(f.key)} scaleTo={0.92}>
             <GlassView
@@ -112,8 +112,9 @@ export function CouponsScreen() {
   const nav = useNavigation<Nav>();
   const [filter, setFilter] = useState<FilterKey>("all");
 
-  const activeCount = COUPONS.filter((c) => c.status === "active").length;
-  const filtered = COUPONS.filter((c) => matches(c, filter));
+  const coupons = useWalletCoupons();
+  const activeCount = coupons.filter((c) => c.status === "active").length;
+  const filtered = coupons.filter((c) => matches(c, filter));
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
@@ -124,7 +125,7 @@ export function CouponsScreen() {
         subtitle={`${activeCount} คูปองพร้อมใช้`}
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}
-        bottomSlot={<FilterChips filter={filter} setFilter={setFilter} />}
+        bottomSlot={<FilterChips filter={filter} setFilter={setFilter} coupons={coupons} />}
       />
 
       <View style={{ flex: 1 }}>

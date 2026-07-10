@@ -37,9 +37,11 @@ import {
   addCoupon,
   updateCoupon,
   getCouponById,
+  nextCouponId,
   type Coupon,
   type CouponDiscountType,
 } from "../data/ownerCoupons";
+import { METAHERB_SHOP } from "../data/shopOrders";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_DISABLED, DIVIDER_GRAY } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -234,7 +236,7 @@ export function CouponCreateScreen() {
   const submit = () => {
     if (!canSubmit || !from || !to) return;
     const coupon: Coupon = {
-      id: editing ? editing.id : `coupon-${Date.now()}`,
+      id: editing ? editing.id : nextCouponId(),
       code: code.trim().toUpperCase(),
       name: name.trim(),
       description: description.trim() || undefined,
@@ -250,6 +252,9 @@ export function CouponCreateScreen() {
       firstOrderOnly,
       used: editing ? editing.used : 0,
       status: editing ? editing.status : "active",
+      // Scope it to this shop so buyers see it under "ส่วนลดจากร้านค้า" and it
+      // only applies to baskets containing this shop's products.
+      shopName: editing ? editing.shopName : METAHERB_SHOP,
     };
     if (editing) {
       updateCoupon(coupon);

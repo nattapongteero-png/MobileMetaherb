@@ -43,6 +43,7 @@ import { type HerbalSortKey } from "../data/herbalSort";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOPS, getShop } from "../data/shops";
 import { REAL_PRODUCTS } from "../data/realProducts";
+import { useLiveProducts } from "../data/liveCatalog";
 import { useSeller } from "../context/SellerContext";
 import { appWidth, gridColumns, gridCardWidth } from "../theme/layout";
 
@@ -243,9 +244,12 @@ export function ShopScreen() {
   // This shop's storefront products — every shop (METAHERB included) draws its
   // share from the main catalog, split evenly per shop by the `shop` field, so
   // each of the three shops shows ~1/3 of the products.
+  // Live catalog, so a product the owner adds/hides/renames in จัดการสินค้า
+  // shows up (or disappears) on their public storefront.
+  const liveProducts = useLiveProducts();
   const shopProducts = useMemo(
-    () => REAL_PRODUCTS.filter((p) => p.shop === shopName) as ShopProduct[],
-    [shopName],
+    () => liveProducts.filter((p) => p.shop === shopName) as ShopProduct[],
+    [liveProducts, shopName],
   );
 
   // Categories with counts derived from products — same derivation as the web

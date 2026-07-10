@@ -14,6 +14,10 @@ import * as Haptics from "expo-haptics";
 import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { getImagePicker } from "../utils/imagePicker";
+import { addProduct, patchProduct } from "../store/catalog";
+import { setStock as setStock_ } from "../store/stock";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import type { CategoryKey, TypeKey } from "../data/catalog";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_MUTED, TEXT_SECONDARY } from "../theme/tokens";
@@ -37,6 +41,28 @@ const REGULAR_CATEGORIES = ["ผลิตภัณฑ์สมุนไพร", 
 const MATERIAL_CATEGORIES = ["ราก/หัว", "ใบ", "ดอก", "เปลือก", "ผล/เมล็ด", "เห็ด", "สมุนไพรรวม"];
 const UNITS = ["ชิ้น", "กล่อง", "ซอง", "ขวด"];
 const FORMATS = ["ผง", "แคปซูล", "เม็ด", "ชา / ชงดื่ม", "น้ำมันหอมระเหย", "ครีม / เจล", "ของเหลว", "แห้ง (ทั้งใบ/ชิ้น)", "อื่นๆ"];
+
+// The form's Thai labels differ slightly from the catalog taxonomy's, so map
+// them explicitly rather than string-matching and silently landing on "all".
+const CATEGORY_KEY: Record<string, CategoryKey> = {
+  "ผลิตภัณฑ์สมุนไพร": "herbal",
+  "เครื่องหอม & อโรม่า": "aroma",
+  "อาหารและเครื่องดื่ม": "food",
+  "ผลิตภัณฑ์สุขภาพ": "health",
+  "ชุดของชำร่วย/ของขวัญ": "gift",
+};
+
+const TYPE_KEY: Record<string, TypeKey> = {
+  "ผง": "powder",
+  "แคปซูล": "capsule",
+  "เม็ด": "capsule",
+  "ชา / ชงดื่ม": "beverage",
+  "ของเหลว": "beverage",
+  "น้ำมันหอมระเหย": "aroma",
+  "ครีม / เจล": "aroma",
+  "แห้ง (ทั้งใบ/ชิ้น)": "powder",
+  "อื่นๆ": "food",
+};
 const PROCESSING = ["อบแห้ง", "สับ / ฝาน", "บด (ผง)", "คั่ว", "สกัด", "น้ำมันหอมระเหย", "อื่นๆ"];
 const PACKAGING = ["ถุงสุญญากาศ 1 กก.", "ถุง 5 กก.", "ถุง 10 กก.", "กระสอบ 25 กก.", "ตามที่ลูกค้ากำหนด"];
 const GRADES = ["พรีเมียม", "คัดสรร", "มาตรฐาน", "ทั่วไป", "ประหยัด"];
@@ -256,6 +282,36 @@ export function AddProductScreen() {
     } else if (!price.trim() || !stock.trim()) {
       return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกราคาและสต็อก");
     }
+    if (isMaterial) {
+      // Herbal-Market materials live outside the product catalog — the console
+      // lists them, but there is no customer storefront row to create yet.
+      showToast(`${title} "${name}" เรียบร้อย`);
+      if (nav.canGoBack()) nav.goBack();
+      return;
+    }
+
+    // Variant products price off their cheapest SKU on the storefront card.
+    const unitPrice = hasVariants
+      ? Math.min(...variants.map((v) => Number(v.price) || 0))
+      : Number(price) || 0;
+    const initialStock = hasVariants
+      ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+      : Number(stock) || 0;
+
+    const created = addProduct({
+      shop: METAHERB_SHOP,
+      name: name.trim(),
+      price: unitPrice,
+      category: CATEGORY_KEY[category] ?? "herbal",
+      type: TYPE_KEY[format] ?? "food",
+      imageUri: images.find((u): u is string => Boolean(u)),
+      closed: !active,
+      recommended,
+    });
+    // Stock is tracked centrally, so the first sale decrements it.
+    setStock_(created.id, initialStock);
+    if (flash) patchProduct(created.id, { isFlashSale: true });
+
     showToast(`${title} "${name}" เรียบร้อย`);
     if (nav.canGoBack()) nav.goBack();
   };

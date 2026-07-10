@@ -42,7 +42,7 @@ import {
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
-import { COUPONS } from "../data/coupons";
+import { useActiveCouponCount } from "../data/coupons";
 import { useOrders } from "../context/OrderContext";
 import { useChat } from "../context/ChatContext";
 import { useSeller } from "../context/SellerContext";
@@ -74,7 +74,6 @@ const AVATAR = {
 // Member stats shown on the premium card. Coupon count is live (active codes in
 // the same COUPONS source the coupon page reads); points are mock.
 const POINTS = 1250;
-const ACTIVE_COUPONS = COUPONS.filter((c) => c.status === "active").length;
 const groupNum = (n: number) => n.toLocaleString("en-US");
 
 type OrderTab = "all" | "pending_group" | "preparing" | "shipping" | "delivered" | "completed";
@@ -250,6 +249,7 @@ export function AccountScreen() {
   const scrollY = useSharedValue(0);
   // One identity, shared with AccountInfoScreen and every order's recipient.
   const { user } = useStore(sessionStore);
+  const ACTIVE_COUPONS = useActiveCouponCount();
 
   // Live order counts from the shared store so the chips match the orders list/detail.
   const { orders } = useOrders();

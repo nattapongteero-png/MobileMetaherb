@@ -9,37 +9,13 @@ import { Clock, CheckCircle2 } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { PressableScale } from "../components/PressableScale";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { useCollectibleCoupons, type CollectibleCoupon as Coupon } from "../data/couponView";
+import { collectCoupon } from "../store/coupons";
+import { currentUserId } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type CouponType = "all" | "discount" | "free_shipping";
-
-interface Coupon {
-  id: string;
-  type: "MH" | "FREE" | "VIP";
-  label: string;
-  sublabel: string;
-  title: string;
-  minSpend: string;
-  tag?: string;
-  tagColor?: string;
-  expiry: string;
-  collected: boolean;
-  bgColor: string;
-}
-
-const mockCoupons: Coupon[] = [
-  { id: "1", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด ฿30", minSpend: "ขั้นต่ำ ฿150", tag: "ทุกร้านค้า", tagColor: "#319754", expiry: "ใช้ได้ถึง: 25.03.2026", collected: true, bgColor: "#319754" },
-  { id: "2", type: "FREE", label: "FREE", sublabel: "โค้ดส่งฟรี", title: "ส่งฟรี", minSpend: "ขั้นต่ำ ฿0", tag: "ส่งด่วน", tagColor: "#00bfa5", expiry: "ใช้ได้ในอีก: 1 วัน", collected: true, bgColor: "#00bfa5" },
-  { id: "3", type: "FREE", label: "FREE", sublabel: "โค้ดส่งฟรี", title: "ส่งฟรี", minSpend: "ขั้นต่ำ ฿0", tag: "ส่งด่วน", tagColor: "#00bfa5", expiry: "ใช้ได้ในอีก: 1 วัน", collected: true, bgColor: "#00bfa5" },
-  { id: "4", type: "FREE", label: "FREE", sublabel: "โค้ดส่งฟรี", title: "ส่งฟรี", minSpend: "ขั้นต่ำ ฿0", tag: "ส่งด่วน", tagColor: "#00bfa5", expiry: "ใช้ได้ในอีก: 1 วัน", collected: true, bgColor: "#00bfa5" },
-  { id: "5", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 27% ลดสูงสุด ฿1,000", minSpend: "ขั้นต่ำ ฿500", expiry: "ใช้ได้ตั้งแต่: 24.03.2026", collected: false, bgColor: "#319754" },
-  { id: "6", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 27% ลดสูงสุด ฿1,000", minSpend: "ขั้นต่ำ ฿500", expiry: "ใช้ได้ตั้งแต่: 24.03.2026", collected: false, bgColor: "#319754" },
-  { id: "7", type: "FREE", label: "FREE", sublabel: "โค้ดส่งฟรี", title: "ส่งฟรี", minSpend: "ขั้นต่ำ ฿0", tag: "ส่งด่วน", tagColor: "#00bfa5", expiry: "ใช้ได้ในอีก: 12 ชั่วโมง", collected: true, bgColor: "#00bfa5" },
-  { id: "8", type: "VIP", label: "VIP", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 50% ลดสูงสุด ฿100", minSpend: "ขั้นต่ำ ฿199", expiry: "ใช้ได้ในอีก: 1 วัน", collected: false, bgColor: "#9c27b0" },
-  { id: "9", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 23% ลดสูงสุด ฿1,000", minSpend: "ขั้นต่ำ ฿500", expiry: "ใช้ได้ตั้งแต่: 24.03.2026", collected: false, bgColor: "#319754" },
-  { id: "10", type: "MH", label: "MH", sublabel: "โค้ดส่วนลด", title: "ส่วนลด 17% ลดสูงสุด ฿3,000", minSpend: "ขั้นต่ำ ฿200", expiry: "ใช้ได้ตั้งแต่: 24.03.2026", collected: false, bgColor: "#319754" },
-];
 
 const matches = (c: Coupon, tab: CouponType) =>
   tab === "all" ? true : tab === "discount" ? c.type === "MH" || c.type === "VIP" : c.type === "FREE";
@@ -119,14 +95,16 @@ function CouponCard({ coupon, onCollect }: { coupon: Coupon; onCollect: (id: str
 
 export function CouponCollectScreen() {
   const nav = useNavigation<Nav>();
-  const [coupons, setCoupons] = useState(mockCoupons);
+  // Every live coupon in the system — including the ones the shop just created.
+  // (This screen used to render its own inline `mockCoupons` array.)
+  const coupons = useCollectibleCoupons();
   const [tab, setTab] = useState<CouponType>("all");
 
   const [showToast, setShowToast] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
   const handleCollect = (id: string) => {
-    setCoupons((prev) => prev.map((c) => (c.id === id ? { ...c, collected: true } : c)));
+    collectCoupon(currentUserId(), id); // lands in the buyer's wallet + checkout picker
     setShowToast(true);
     toastOpacity.setValue(0);
     Animated.sequence([
