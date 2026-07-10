@@ -40,7 +40,9 @@ const GOAL_KEYWORDS: Record<HealthGoal, string[]> = {
   weight_loss:  ["ลดน้ำหนัก", "ลดความอ้วน", "ผอม", "ดีท็อกซ์", "diet", "burn"],
   weight_gain:  ["เพิ่มน้ำหนัก", "อ้วน", "บำรุงร่างกาย"],
   skin:         ["ผิว", "หน้าใส", "สิว", "ฝ้า", "skin", "คอลลาเจน", "ขาว"],
-  hair:         ["ผม", "หัวล้าน", "ผมร่วง", "hair"],
+  // NOT bare "ผม": in Thai that is also the male pronoun "I", so every man who
+  // began a sentence with it was read as asking about his hair.
+  hair:         ["เส้นผม", "ผมร่วง", "ผมบาง", "หัวล้าน", "บำรุงผม", "hair"],
   brain:        ["สมอง", "ความจำ", "บำรุงสมอง", "memory", "focus"],
   energy:       ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "energy", "บำรุงกำลัง"],
   immune:       ["ภูมิคุ้มกัน", "ป้องกัน", "หวัด", "ไข้หวัด", "immune"],

@@ -211,7 +211,9 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           .map((m) => ({ role: m.role as "user" | "ai", text: (m as { text?: string }).text ?? "" }))
           .filter((m) => m.text.trim());
         if (hist[hist.length - 1]?.text !== text) hist.push({ role: "user", text });
-        const ans = await metaChat(hist);
+        // Even the plain chat fallback must know the customer's goal, or it will
+        // happily suggest a caffeinated tea to someone who cannot sleep.
+        const ans = await metaChat(hist, undefined, undefined, extractGoals(text));
         if (ans) { push({ role: "ai", kind: "text", text: ans }); return true; }
       } catch { /* fall back to rule-based */ }
       return false;
@@ -405,7 +407,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           } catch { /* answer without grounding */ }
           let answered = false;
           try {
-            const ans = await metaChat(hist, undefined, grounding);
+            const ans = await metaChat(hist, undefined, grounding, planGoals);
             push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
             answered = true;
           }
@@ -578,7 +580,8 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           sources = r.sources;
         } catch { /* answer without grounding */ }
       }
-      const ans = await metaVision(imageDataUrl, cap, undefined, grounding);
+      // The caption's goal gates the vision prompt the same way it gates chat.
+      const ans = await metaVision(imageDataUrl, cap, undefined, grounding, extractGoals(cap));
       push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
       // Close the loop: attach related in-store products from caption/answer goals.
       const goals = extractGoals(`${cap} ${ans}`);

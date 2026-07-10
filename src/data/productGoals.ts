@@ -102,6 +102,10 @@ export const goalsOf = (productId: string): ProductGoals => PRODUCT_GOALS[produc
 export const goalMatchCount = (productId: string, goals: HealthGoal[]): number =>
   goals.filter((g) => goalsOf(productId).goals.includes(g)).length;
 
+/** Serves at least one of the goals asked about. */
+export const servesAnyGoal = (productId: string, goals: HealthGoal[]): boolean =>
+  goalMatchCount(productId, goals) > 0;
+
 /**
  * True when the product must not be offered for ANY of these goals. Checked
  * before ranking, and applied to whatever the LLM proposes as well — a model
@@ -112,3 +116,21 @@ export const isContraindicated = (productId: string, goals: HealthGoal[]): boole
 
 /** The reason, for logs and review. Never shown to a customer. */
 export const contraindicationReason = (productId: string): string | undefined => goalsOf(productId).why;
+
+/**
+ * Spelled out for the LLM. Removing a product from the catalog it can see stops
+ * it recommending that product; this stops it recommending the CLASS — a model
+ * that has just explained why caffeine ruins sleep will still cheerfully suggest
+ * a tea, which is what it did before this existed.
+ */
+const GOAL_BAN: Partial<Record<HealthGoal, string>> = {
+  sleep: "ลูกค้ามีปัญหาเรื่องการนอน — ห้ามแนะนำหรือชักชวนให้ดื่ม/กินสิ่งที่มีคาเฟอีน (กาแฟ ชา ช็อกโกแลต) แม้จะเตือนข้อเสียไปแล้วก็ห้ามแนะนำ",
+  pressure: "ลูกค้ามีปัญหาความดัน — ห้ามแนะนำเครื่องดื่มที่มีคาเฟอีน",
+  diabetes: "ลูกค้าเป็นเบาหวาน — ห้ามแนะนำของหวาน น้ำผึ้ง เบเกอรี่ หรือน้ำผลไม้ที่มีน้ำตาลสูง",
+  weight_loss: "ลูกค้าต้องการลดน้ำหนัก — ห้ามแนะนำของหวาน เบเกอรี่ หรือคุกกี้",
+};
+
+/** The safety constraints that apply to this question, as prompt text. */
+export function goalBans(goals: HealthGoal[]): string[] {
+  return goals.map((g) => GOAL_BAN[g]).filter((x): x is string => Boolean(x));
+}
