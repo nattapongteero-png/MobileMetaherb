@@ -24,7 +24,11 @@ export type AppEventType =
   | "trial_applied"
   | "trial_approved"
   | "trial_rejected"
-  | "trial_evaluated";
+  | "trial_evaluated"
+  | "quote_requested"
+  | "quote_sent"
+  | "quote_accepted"
+  | "quote_rejected";
 
 /** Who should see this in their notification feed. */
 export type Audience = "customer" | "shop";

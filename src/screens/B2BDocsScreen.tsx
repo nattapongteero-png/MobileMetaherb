@@ -14,6 +14,7 @@ import {
   DOC_TITLE, DOC_TABS, docsForKind, statusBadge, PRIORITY_STYLE,
   type DocKind, type AnyDoc, type PRRecord, type QuoteRecord,
 } from "../data/b2bDocs";
+import { useBuyerQuotes } from "../data/quoteView";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -136,7 +137,9 @@ export function B2BDocsScreen() {
   const { kind } = useRoute<DocsRoute>().params;
   const [tab, setTab] = useState<string>("all");
 
-  const docs = docsForKind(kind);
+  // The buyer's own submitted RFQs, live from the shared table.
+  const ownQuotes = useBuyerQuotes();
+  const docs = docsForKind(kind, ownQuotes as unknown as QuoteRecord[]);
   const list = tab === "all" ? docs : docs.filter((d) => (d as any).status === tab);
   const countFor = (k: string) => (k === "all" ? docs.length : docs.filter((d) => (d as any).status === k).length);
 

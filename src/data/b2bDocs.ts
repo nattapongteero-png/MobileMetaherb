@@ -113,7 +113,8 @@ export const PRIORITY_STYLE: Record<PRPriority, { bg: string; color: string }> =
 };
 
 // ── RFQ (Quotation received) ────────────────────────────────────────────────
-export type QuoteStatus = "received" | "expired";
+/** `pending` = the buyer sent an RFQ and the shop has not priced it yet. */
+export type QuoteStatus = "pending" | "received" | "expired";
 export type QuoteRecord = {
   id: string;
   date: string;
@@ -161,6 +162,7 @@ const RAW_QUOTES: QuoteRecord[] = [
 export const MOCK_QUOTES: QuoteRecord[] = withTotals(RAW_QUOTES);
 
 export const QT_STATUS: Record<QuoteStatus, { label: string; color: string }> = {
+  pending: { label: "รอร้านเสนอราคา", color: "#f59e0b" },
   received: { label: "ได้รับใบเสนอราคา", color: "#10b981" },
   expired: { label: "หมดอายุ", color: "#9ca3af" },
 };
@@ -242,8 +244,14 @@ export const DOC_TABS: Record<DocKind, { key: string; label: string }[]> = {
 
 export type AnyDoc = PRRecord | QuoteRecord | PORecord;
 
-export function docsForKind(kind: DocKind): AnyDoc[] {
-  return kind === "rfq" ? MOCK_QUOTES : kind === "pr" ? MOCK_PRS : MOCK_POS;
+/**
+ * The buyer's documents. RFQs the buyer actually submitted come first (read
+ * live from the shared quote table); the demo rows stay behind them so the PR/PO
+ * tabs and the charts still have data.
+ */
+export function docsForKind(kind: DocKind, ownQuotes: QuoteRecord[] = []): AnyDoc[] {
+  if (kind === "rfq") return [...ownQuotes, ...MOCK_QUOTES];
+  return kind === "pr" ? MOCK_PRS : MOCK_POS;
 }
 
 export function getDoc(kind: DocKind, id: string): AnyDoc | undefined {

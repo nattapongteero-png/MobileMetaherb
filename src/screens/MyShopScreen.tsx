@@ -128,6 +128,7 @@ import {
   type ShopOrder,
 } from "../data/shopOrderView";
 import { METAHERB_SHOP } from "../data/shopOrders";
+import { useShopQuotes } from "../data/quoteView";
 import { verifyPayment } from "../store/orders";
 import { useStore } from "../store/db";
 import { catalogStore, deleteProduct, setProductClosed, setProductRecommended } from "../store/catalog";
@@ -3568,6 +3569,8 @@ export type MarketDoc = {
 // Status pill colors per document kind (ported from the web *_STATUS_CFG).
 export const DOC_STATUS: Record<DocKind, Record<string, { label: string; color: string }>> = {
   qt: {
+    // A customer RFQ the shop has not priced yet.
+    requested: { label: "รอเสนอราคา", color: "#0088ff" },
     sent: { label: "รอตอบกลับ", color: "#f59e0b" },
     accepted: { label: "ตอบรับแล้ว", color: "#10b981" },
     expired: { label: "หมดอายุ", color: "#9ca3af" },
@@ -3700,6 +3703,7 @@ export const docSubtotal = (d: MarketDoc) => d.items.reduce((s, it) => s + docLi
 // Quotation filter chips — web QT_STATUS_STYLE statuses + "ทั้งหมด".
 const QT_TABS = [
   { id: "all", label: "ทั้งหมด", Icon: FileText },
+  { id: "requested", label: "รอเสนอราคา", Icon: ScanSearch },
   { id: "sent", label: "รอตอบกลับ", Icon: Clock },
   { id: "accepted", label: "ตอบรับแล้ว", Icon: Check },
   { id: "expired", label: "หมดอายุ", Icon: AlertCircle },
@@ -3715,11 +3719,15 @@ export function QuotationSection({ showSearch = true, initialFilter, insetsBotto
     (initialFilter as (typeof QT_TABS)[number]["id"]) ?? "all",
   );
 
+  // Real RFQs from customers first, then the demo rows.
+  const liveQuotes = useShopQuotes(METAHERB_SHOP) as unknown as MarketDoc[];
+  const quotations = [...liveQuotes, ...QUOTATIONS];
+
   const count = (id: string) =>
-    id === "all" ? QUOTATIONS.length : QUOTATIONS.filter((d) => d.status === id).length;
+    id === "all" ? quotations.length : quotations.filter((d) => d.status === id).length;
 
   const q = query.trim().toLowerCase();
-  const visible = QUOTATIONS.filter((d) => {
+  const visible = quotations.filter((d) => {
     if (filter !== "all" && d.status !== filter) return false;
     if (!q) return true;
     return (
