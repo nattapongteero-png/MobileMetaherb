@@ -145,6 +145,38 @@ describe("the buyer's answer reaches the shop", () => {
     expect(eventsFor("shop", { shopName: SHOP }).map((e) => e.type)).toEqual(["quote_accepted"]);
   });
 
+  it("issues a PO number when the caller does not supply one", () => {
+    const { id } = createQuoteRequest(rfq());
+    sendQuote(id, { now: NOW });
+    acceptQuote(id, undefined, NOW + DAY);
+    expect(quoteById(id)!.poNumber).toMatch(/^PO-\d{4}-\d{4}$/);
+  });
+
+  it("issues a distinct PO per accepted quote", () => {
+    const a = createQuoteRequest(rfq());
+    const b = createQuoteRequest(rfq());
+    sendQuote(a.id, { now: NOW });
+    sendQuote(b.id, { now: NOW });
+    acceptQuote(a.id, undefined, NOW + DAY);
+    acceptQuote(b.id, undefined, NOW + DAY);
+    expect(quoteById(a.id)!.poNumber).not.toBe(quoteById(b.id)!.poNumber);
+  });
+
+  it("names the PO in the shop's notification", () => {
+    const { id } = createQuoteRequest(rfq());
+    sendQuote(id, { now: NOW });
+    __resetEvents();
+    acceptQuote(id, undefined, NOW + DAY);
+    expect(eventsFor("shop", { shopName: SHOP })[0].body).toContain(quoteById(id)!.poNumber!);
+  });
+
+  it("leaves a rejected quote without a PO", () => {
+    const { id } = createQuoteRequest(rfq());
+    sendQuote(id, { now: NOW });
+    rejectQuote(id, "แพงไป", NOW + DAY);
+    expect(quoteById(id)!.poNumber).toBeUndefined();
+  });
+
   it("reject carries the reason back to the shop", () => {
     const { id } = createQuoteRequest(rfq());
     sendQuote(id, { now: NOW });

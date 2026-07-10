@@ -1,6 +1,16 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { DEFAULT_SHIPPING_ID } from "../data/shippingMethods";
-import { INITIAL_ADDRESSES, type Address } from "../data/addresses";
+import type { Address } from "../data/addresses";
+import { useStore } from "../store/db";
+import {
+  addAddress as addAddressAction,
+  addresses as addressList,
+  prefsStore,
+  removeAddress as removeAddressAction,
+  selectAddress,
+  setDefaultAddress as setDefaultAddressAction,
+  updateAddress as updateAddressAction,
+} from "../store/prefs";
 
 type PaymentValue = {
   /** Currently selected payment-method id (e.g. "promptpay", "truemoney", a card id). */
@@ -44,37 +54,17 @@ export function PaymentProvider({ children }: { children: ReactNode }) {
   const [selectedShipping, setSelectedShipping] = useState<string>(DEFAULT_SHIPPING_ID);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [coinsUsed, setCoinsUsed] = useState<number>(0);
-  const [addresses, setAddresses] = useState<Address[]>(INITIAL_ADDRESSES);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(
-    INITIAL_ADDRESSES.find((a) => a.isDefault)?.id ?? INITIAL_ADDRESSES[0].id,
-  );
+  // Addresses live in the persisted preferences store — an address the buyer
+  // typed used to vanish on restart while the order shipped to it persisted.
+  const prefs = useStore(prefsStore);
+  const addresses = prefs.addresses;
+  const selectedAddressId = prefs.selectedAddressId || addresses[0]?.id || "";
 
-  const addAddress = (a: Omit<Address, "id">) => {
-    const id = `addr-${Date.now().toString(36)}`;
-    setAddresses((prev) => {
-      const cleared = a.isDefault ? prev.map((p) => ({ ...p, isDefault: false })) : prev;
-      return [...cleared, { ...a, id }];
-    });
-    setSelectedAddressId(id);
-  };
-
-  const updateAddress = (id: string, a: Omit<Address, "id">) =>
-    setAddresses((prev) => {
-      let next = prev.map((p) => (p.id === id ? { ...a, id } : p));
-      if (a.isDefault) next = next.map((p) => ({ ...p, isDefault: p.id === id }));
-      return next;
-    });
-
-  const removeAddress = (id: string) => {
-    setAddresses((prev) => prev.filter((p) => p.id !== id));
-    if (selectedAddressId === id) {
-      const remaining = addresses.filter((p) => p.id !== id);
-      setSelectedAddressId(remaining.find((p) => p.isDefault)?.id ?? remaining[0]?.id ?? "");
-    }
-  };
-
-  const setDefaultAddress = (id: string) =>
-    setAddresses((prev) => prev.map((p) => ({ ...p, isDefault: p.id === id })));
+  const addAddress = (a: Omit<Address, "id">) => void addAddressAction(a);
+  const updateAddress = (id: string, a: Omit<Address, "id">) => updateAddressAction(id, a);
+  const removeAddress = removeAddressAction;
+  const setDefaultAddress = setDefaultAddressAction;
+  const setSelectedAddressId = selectAddress;
 
   return (
     <PaymentContext.Provider

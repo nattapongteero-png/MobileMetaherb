@@ -26,6 +26,8 @@ import { registrationsForUser } from "../src/store/trials";
 import { cafeHistory, cafeQueue } from "../src/store/cafe";
 import { threadsForShop, threadsForUser } from "../src/store/chat";
 import { eventsStore } from "../src/store/events";
+import { addresses, selectedAddress, wishlistIds } from "../src/store/prefs";
+import { allQuotes } from "../src/store/quotes";
 import { DEMO_USER } from "../src/store/session";
 
 const SHOP = "METAHERB Store";
@@ -177,5 +179,17 @@ describe("the other tables seed", () => {
 
   it("starts with an empty event log — seeding is not an event", () => {
     expect(eventsStore.get()).toHaveLength(0);
+  });
+
+  it("seeds the buyer's wishlist and a selected delivery address", () => {
+    expect(wishlistIds().length).toBe(8);
+    expect(addresses().length).toBeGreaterThan(0);
+    // The selection must point at a real row, or checkout reads undefined.
+    const sel = selectedAddress()!;
+    expect(addresses().map((a) => a.id)).toContain(sel.id);
+  });
+
+  it("seeds no quotes — a purchase order can only exist once one is accepted", () => {
+    expect(allQuotes()).toHaveLength(0);
   });
 });

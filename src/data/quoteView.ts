@@ -16,7 +16,7 @@ import {
   type QuoteRequest,
 } from "../store/quotes";
 import { currentUserId } from "../store/session";
-import type { DocItem, QuoteRecord, QuoteStatus as BuyerQuoteStatus } from "./b2bDocs";
+import type { DocItem, PORecord, QuoteRecord, QuoteStatus as BuyerQuoteStatus } from "./b2bDocs";
 
 const TH_MONTH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
@@ -122,6 +122,35 @@ export function toShopQuote(q: QuoteRequest, now = Date.now()): ShopQuoteView {
     daysRemaining: daysRemaining(q, now),
     poNumber: q.poNumber,
   };
+}
+
+// ── purchase orders ────────────────────────────────────────────
+/**
+ * A PO is not a table: it exists exactly because a quote was accepted, and it
+ * carries that quote's lines. Derived rather than stored, so the two can never
+ * disagree.
+ */
+export function toPurchaseOrder(q: QuoteRequest): PORecord {
+  return {
+    id: q.poNumber!,
+    date: fmtDocDate(q.decidedAt ?? q.createdAt),
+    deliveryDate: q.neededBy ?? "ตามตกลง",
+    supplier: q.shopName,
+    paymentTerms: "เครดิต 30 วัน",
+    totalAmount: quoteTotal(q),
+    status: "pending",
+    refQuoteId: q.id,
+    items: toDocItems(q),
+    note: q.shopNote,
+  };
+}
+
+/** POs issued from this buyer's accepted quotes, newest first. */
+export function useBuyerPurchaseOrders(): PORecord[] {
+  useStore(quotesStore);
+  return quotesForUser(currentUserId())
+    .filter((q) => q.status === "accepted" && q.poNumber)
+    .map(toPurchaseOrder);
 }
 
 /** Live quote requests for this shop, newest first. */

@@ -104,6 +104,12 @@ const ACTIONS: { fn: string; definedIn: string; why: string }[] = [
   { fn: "signIn", definedIn: "store/session.ts", why: "login must produce a session" },
   { fn: "signUp", definedIn: "store/session.ts", why: "register must produce a session" },
   { fn: "setShopName", definedIn: "store/session.ts", why: "seller registration must name the shop" },
+  { fn: "signOut", definedIn: "store/session.ts", why: "logging out must end the session, not just navigate" },
+
+  { fn: "toggleWishlist", definedIn: "store/prefs.ts", why: "the heart button must persist" },
+  { fn: "addAddress", definedIn: "store/prefs.ts", why: "a typed address must persist" },
+  { fn: "removeAddress", definedIn: "store/prefs.ts", why: "the buyer must be able to delete one" },
+  { fn: "setDefaultAddress", definedIn: "store/prefs.ts", why: "the buyer must be able to pick a default" },
 
   { fn: "markEventRead", definedIn: "store/events.ts", why: "notifications must be markable read" },
 ];

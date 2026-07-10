@@ -17,6 +17,7 @@ import { seedComplaints } from "./complaints";
 import { seedTrials } from "./trials";
 import { seedCafeOrders } from "./cafe";
 import { seedChat } from "./chat";
+import { seedPrefs } from "./prefs";
 import { sessionStore, DEMO_USER } from "./session";
 import { MOCK_ORDERS } from "../data/orders";
 import { SHOP_SEED_ORDERS } from "../data/shopOrders";
@@ -27,6 +28,8 @@ import { SHOP_COMPLAINTS } from "../data/shopComplaints";
 import { TRIAL_REGISTRATIONS } from "../data/trialRegistrations";
 import { INITIAL_CAFE_HISTORY } from "../data/cafePayment";
 import { SEED_MESSAGES, SEED_THREADS } from "../data/chatSeed";
+import { INITIAL_ADDRESSES } from "../data/addresses";
+import { ALL_PRODUCTS } from "../data/catalog";
 import { SHOP_STOCK } from "../data/catalog";
 import { getRealProductImage } from "../data/realProducts";
 
@@ -42,6 +45,12 @@ seedComplaints(SHOP_COMPLAINTS);
 seedTrials(TRIAL_REGISTRATIONS);
 seedCafeOrders(INITIAL_CAFE_HISTORY);
 seedChat(SEED_THREADS, SEED_MESSAGES);
+seedPrefs({
+  // A few liked products so the wishlist isn't empty on a fresh install.
+  wishlist: ALL_PRODUCTS.slice(0, 8).map((p) => p.id),
+  addresses: INITIAL_ADDRESSES,
+  selectedAddressId: INITIAL_ADDRESSES.find((a) => a.isDefault)?.id ?? INITIAL_ADDRESSES[0]?.id ?? "",
+});
 if (!sessionStore.get().user) sessionStore.reset({ user: DEMO_USER, shopName: null });
 
 let hydrated: Promise<void> | null = null;

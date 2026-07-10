@@ -249,9 +249,11 @@ export type AnyDoc = PRRecord | QuoteRecord | PORecord;
  * live from the shared quote table); the demo rows stay behind them so the PR/PO
  * tabs and the charts still have data.
  */
-export function docsForKind(kind: DocKind, ownQuotes: QuoteRecord[] = []): AnyDoc[] {
-  if (kind === "rfq") return [...ownQuotes, ...MOCK_QUOTES];
-  return kind === "pr" ? MOCK_PRS : MOCK_POS;
+export function docsForKind(kind: DocKind, own: { quotes?: QuoteRecord[]; pos?: PORecord[] } = {}): AnyDoc[] {
+  if (kind === "rfq") return [...(own.quotes ?? []), ...MOCK_QUOTES];
+  if (kind === "po") return [...(own.pos ?? []), ...MOCK_POS];
+  // PRs are still demo rows — nothing in the app raises one yet.
+  return MOCK_PRS;
 }
 
 export function getDoc(kind: DocKind, id: string): AnyDoc | undefined {

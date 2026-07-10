@@ -16,7 +16,7 @@ import {
   DOC_TITLE, getDoc, statusBadge,
   type DocKind, type PRRecord, type QuoteRecord, type PORecord, type DocItem,
 } from "../data/b2bDocs";
-import { useBuyerQuotes } from "../data/quoteView";
+import { useBuyerQuotes, useBuyerPurchaseOrders } from "../data/quoteView";
 import { acceptQuote, rejectQuote } from "../store/quotes";
 import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -56,8 +56,13 @@ export function B2BDocDetailScreen() {
   // The buyer's own RFQs live in the shared quote table; the demo rows in the
   // mock arrays. `getDoc` only knows the latter, so check the live ones first.
   const liveQuotes = useBuyerQuotes();
+  const livePos = useBuyerPurchaseOrders();
   const liveQuote = kind === "rfq" ? liveQuotes.find((q) => q.id === id) : undefined;
-  const doc = (liveQuote as unknown as QuoteRecord | undefined) ?? getDoc(kind, id);
+  const livePo = kind === "po" ? livePos.find((o) => o.id === id) : undefined;
+  const doc =
+    (liveQuote as unknown as QuoteRecord | undefined) ??
+    (livePo as unknown as QuoteRecord | undefined) ??
+    getDoc(kind, id);
 
   if (!doc) {
     return (

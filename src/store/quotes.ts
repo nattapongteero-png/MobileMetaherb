@@ -173,11 +173,24 @@ export function sendQuote(id: string, input: SendQuoteInput = {}): QuoteRequest 
   return q;
 }
 
-/** The buyer accepts. A lapsed quote can't be accepted. */
+let poSeq = 0;
+/** "PO-2569-0001" — issued the moment a quote is accepted. */
+export function nextPoNumber(now = Date.now()): string {
+  poSeq += 1;
+  const be = new Date(now).getFullYear() + 543;
+  return `PO-${be}-${String(poSeq).padStart(4, "0")}`;
+}
+
+/**
+ * The buyer accepts, which issues a purchase order. A lapsed quote can't be
+ * accepted. (The PO number used to be an optional argument nobody passed, so an
+ * accepted quote linked to nothing.)
+ */
 export function acceptQuote(id: string, poNumber?: string, now = Date.now()): QuoteRequest | undefined {
   const current = quoteById(id);
   if (!current || effectiveQuoteStatus(current, now) !== "quoted") return undefined;
-  const q = patch(id, (prev) => ({ ...prev, status: "accepted", decidedAt: now, poNumber }));
+  const po = poNumber ?? nextPoNumber(now);
+  const q = patch(id, (prev) => ({ ...prev, status: "accepted", decidedAt: now, poNumber: po }));
   if (q) {
     emit({
       type: "quote_accepted",
@@ -186,7 +199,7 @@ export function acceptQuote(id: string, poNumber?: string, now = Date.now()): Qu
       userId: q.userId,
       shopName: q.shopName,
       title: "ลูกค้าตอบรับใบเสนอราคา",
-      body: `${q.id} · ${q.company.name}`,
+      body: `${q.id} · ${q.company.name} · ออก ${po}`,
     });
   }
   return q;
@@ -214,4 +227,5 @@ export function rejectQuote(id: string, reason?: string, now = Date.now()): Quot
 export function __resetQuotes(): void {
   quotesStore.reset([]);
   seq = 0;
+  poSeq = 0;
 }

@@ -48,7 +48,7 @@ import { useChat } from "../context/ChatContext";
 import { useSeller } from "../context/SellerContext";
 import type { OrderStatus } from "../data/orders";
 import { useStore } from "../store/db";
-import { sessionStore } from "../store/session";
+import { sessionStore, signOut } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { isTablet } from "../theme/layout";
 
@@ -250,6 +250,21 @@ export function AccountScreen() {
   // One identity, shared with AccountInfoScreen and every order's recipient.
   const { user } = useStore(sessionStore);
   const ACTIVE_COUPONS = useActiveCouponCount();
+
+  // "ออกจากระบบ" used to just navigate to Login, leaving the session intact —
+  // backing out landed the user straight back in their account.
+  const logout = () =>
+    Alert.alert("ออกจากระบบ", "ต้องการออกจากระบบใช่ไหม?", [
+      { text: "ยกเลิก", style: "cancel" },
+      {
+        text: "ออกจากระบบ",
+        style: "destructive",
+        onPress: () => {
+          signOut();
+          nav.reset({ index: 0, routes: [{ name: "Login" }] });
+        },
+      },
+    ]);
 
   // Live order counts from the shared store so the chips match the orders list/detail.
   const { orders } = useOrders();
@@ -578,7 +593,7 @@ export function AccountScreen() {
 
           {/* Logout */}
           <Card style={{ padding: 0, overflow: "hidden" }}>
-            <Pressable onPress={() => go("Login")} className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
+            <Pressable onPress={logout} className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
               <LogOut size={18} color="#ef4444" strokeWidth={2.2} />
               <Text style={{ fontSize: 15, fontWeight: "600", color: "#ef4444" }}>ออกจากระบบ</Text>
             </Pressable>
