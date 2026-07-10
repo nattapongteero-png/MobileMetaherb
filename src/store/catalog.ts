@@ -87,10 +87,6 @@ export function deleteProduct(id: string): void {
   mutate(id, { deleted: true });
 }
 
-export function restoreProduct(id: string): void {
-  mutate(id, { deleted: false });
-}
-
 let addedSeq = 0;
 /** Ids sit outside the seed's "1".."45" range so they can never collide. */
 export function nextProductId(now = Date.now()): string {

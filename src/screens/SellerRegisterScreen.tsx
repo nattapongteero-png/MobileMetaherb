@@ -12,6 +12,8 @@ import { Chip } from "../components/Chip";
 import { getImagePicker } from "../utils/imagePicker";
 import { useSeller } from "../context/SellerContext";
 import { BRAND_GREEN, TEXT_MUTED, TEXT_SECONDARY } from "../theme/tokens";
+import { setShopName as setSessionShopName } from "../store/session";
+import { METAHERB_SHOP } from "../data/shopOrders";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -79,6 +81,9 @@ export function SellerRegisterScreen() {
       phone: phone.trim(),
     });
     setIsSeller(true);
+    // The session now knows which shop this account owns — the console's data
+    // is scoped by shop name, not by a global constant.
+    setSessionShopName(shopName.trim() || METAHERB_SHOP);
     nav.replace("SellerSuccess");
   };
 

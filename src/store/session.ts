@@ -48,6 +48,18 @@ export function signIn(email?: string): User {
   return user;
 }
 
+/**
+ * Mock sign-up. It updates the demo buyer's profile rather than minting a new
+ * user: every seeded order, coupon, complaint and trial hangs off DEMO_USER.id,
+ * so a fresh id would sign the user into an empty app. With a real backend this
+ * would create a row.
+ */
+export function signUp(input: { name: string; email: string; phone: string }): User {
+  const user: User = { ...DEMO_USER, ...input };
+  sessionStore.set({ ...sessionStore.get(), user });
+  return user;
+}
+
 export function signOut(): void {
   sessionStore.set({ user: null, shopName: null });
 }

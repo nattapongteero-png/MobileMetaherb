@@ -9,7 +9,6 @@ import {
   nextProductId,
   patchFor,
   patchProduct,
-  restoreProduct,
   setProductClosed,
   setProductRecommended,
 } from "./catalog";
@@ -67,12 +66,10 @@ describe("owner-created products", () => {
     expect(catalogStore.get().patches[p.id]).toBeUndefined();
   });
 
-  it("can be deleted and restored", () => {
+  it("can be deleted", () => {
     const p = addProduct(newInput());
     deleteProduct(p.id);
     expect(isDeleted(p.id)).toBe(true);
-    restoreProduct(p.id);
-    expect(isDeleted(p.id)).toBe(false);
   });
 });
 

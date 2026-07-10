@@ -6,11 +6,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Ban, Check, ChevronRight, CircleAlert, Clock, ClipboardList, Coins, Star, X, type LucideIcon } from "lucide-react-native";
+import { Ban, Check, ChevronRight, CircleAlert, Clock, ClipboardList, Coins, Star, Truck, X, type LucideIcon } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { showToast } from "../components/Toast";
-import { approveRegistration, rejectRegistration } from "../store/trials";
+import { approveRegistration, registrationById, rejectRegistration } from "../store/trials";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import {
   STATUS_CFG,
@@ -245,6 +245,25 @@ export function OwnerTrialRequestDetailScreen() {
         <LinearGradient pointerEvents="none" colors={["#fafafa", "rgba(250,250,250,0)"]} style={{ position: "absolute", top: 0, left: 0, right: 0, height: 28 }} />
         <BottomFade />
       </View>
+
+      {/* Approved but not yet shipped — the sample still has to go out. This
+          button was missing entirely, so an approved tester waited forever. */}
+      {status === "approved" && reg.id && registrationById(reg.id)?.stage === "shipping" ? (
+        <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+          <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+              <Pressable
+                onPress={() => nav.navigate("ConfirmShip", { orderId: reg.id!, kind: "trial" })}
+                className="flex-row items-center justify-center active:opacity-90"
+                style={{ flex: 1, height: 50, borderRadius: 999, gap: 6, backgroundColor: BRAND_GREEN }}
+              >
+                <Truck size={16} color="#fff" strokeWidth={2.4} />
+                <Text style={{ fontSize: 14.5, fontWeight: "700", color: "#fff" }}>ยืนยันจัดส่งตัวอย่าง</Text>
+              </Pressable>
+            </GlassView>
+          </View>
+        </View>
+      ) : null}
 
       {/* Floating actions — pending requests only (Liquid Glass bar) */}
       {status === "pending_approval" ? (

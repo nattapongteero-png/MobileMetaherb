@@ -255,7 +255,8 @@ export type RootStackParamList = {
   ShopOrderSearch: undefined;
   ShopOrderDetail: { orderId: string };
   CancelOrder: { orderId: string; onConfirm?: (reason: string, note: string) => void };
-  ConfirmShip: { orderId: string; onConfirm?: (tracking: string) => void };
+  /** `kind` picks which table the tracking number lands on. */
+  ConfirmShip: { orderId: string; kind?: "order" | "trial"; onConfirm?: (tracking: string) => void };
   ShopOrderReview: { orderId: string };
   ShopQuoteSearch: undefined;
   ShopDocSearch: { kind: DocKind };

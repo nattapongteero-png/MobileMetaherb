@@ -24,13 +24,17 @@ import { getImagePicker } from "../utils/imagePicker";
 import { useStore } from "../store/db";
 import {
   chatStore,
+  findThread,
   markThreadRead,
   messagesOf,
+  openThread,
   sendMessage,
   threadById,
+  threadIdFor,
   type ChatMessage as StoredMessage,
   type Sender,
 } from "../store/chat";
+import { currentUserId } from "../store/session";
 import { METAHERB_SHOP } from "../data/shopOrders";
 
 const useThread = (id: string) => {
@@ -220,11 +224,22 @@ function TypingBubble() {
 export function ChatScreen() {
   const nav = useNavigation<Nav>();
   const route = useRoute<RouteProp<RootStackParamList, "Chat">>();
-  const shopId = route.params?.shopId ?? "metaherb";
   const role: Sender = route.params?.role ?? "user";
+  const paramShopName = route.params?.shopName ?? SHOP_NAME;
+  // Callers that only know the shop NAME (product page, B2B doc) used to fall
+  // through to a hardcoded "metaherb" id and message the wrong shop.
+  const shopId =
+    route.params?.shopId ??
+    findThread(currentUserId(), paramShopName)?.id ??
+    threadIdFor(currentUserId(), paramShopName);
   const thread = useThread(shopId);
-  const shopName = route.params?.shopName ?? thread?.shopName ?? SHOP_NAME;
+  const shopName = thread?.shopName ?? paramShopName;
   const messages = useThreadMessages(shopId);
+
+  // First contact with a shop opens the thread. Never during render.
+  useEffect(() => {
+    if (role === "user") openThread(currentUserId(), paramShopName);
+  }, [role, paramShopName]);
   const [input, setInput] = useState("");
   const [replying, setReplying] = useState(false);
   const [focused, setFocused] = useState(false);

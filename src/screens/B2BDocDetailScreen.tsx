@@ -16,6 +16,9 @@ import {
   DOC_TITLE, getDoc, statusBadge,
   type DocKind, type PRRecord, type QuoteRecord, type PORecord, type DocItem,
 } from "../data/b2bDocs";
+import { useBuyerQuotes } from "../data/quoteView";
+import { acceptQuote, rejectQuote } from "../store/quotes";
+import { showToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -50,7 +53,11 @@ export function B2BDocDetailScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { kind, id } = useRoute<DetailRoute>().params;
-  const doc = getDoc(kind, id);
+  // The buyer's own RFQs live in the shared quote table; the demo rows in the
+  // mock arrays. `getDoc` only knows the latter, so check the live ones first.
+  const liveQuotes = useBuyerQuotes();
+  const liveQuote = kind === "rfq" ? liveQuotes.find((q) => q.id === id) : undefined;
+  const doc = (liveQuote as unknown as QuoteRecord | undefined) ?? getDoc(kind, id);
 
   if (!doc) {
     return (
@@ -76,6 +83,35 @@ export function B2BDocDetailScreen() {
   const canDownload = !["expired", "rejected"].includes((doc as any).status);
   // PO awaiting payment → chat + pay actions in a floating bar.
   const showPayBar = !!po && po.status === "pending";
+  // A real quote the shop has priced and that hasn't lapsed — the buyer owes an answer.
+  const answerable = !!liveQuote && liveQuote.status === "received" && liveQuote.daysRemaining > 0;
+
+  const onAccept = () =>
+    Alert.alert("ตอบรับใบเสนอราคา", `ยืนยันตอบรับ ${id} มูลค่า ฿${(doc as QuoteRecord).totalAmount.toLocaleString()}?`, [
+      { text: "ยกเลิก", style: "cancel" },
+      {
+        text: "ตอบรับ",
+        onPress: () => {
+          acceptQuote(id);
+          showToast("ตอบรับใบเสนอราคาแล้ว — ร้านจะติดต่อกลับ");
+          nav.goBack();
+        },
+      },
+    ]);
+
+  const onReject = () =>
+    Alert.alert("ปฏิเสธใบเสนอราคา", `ปฏิเสธ ${id}?`, [
+      { text: "ยกเลิก", style: "cancel" },
+      {
+        text: "ปฏิเสธ",
+        style: "destructive",
+        onPress: () => {
+          rejectQuote(id, "ลูกค้าปฏิเสธข้อเสนอ");
+          showToast("ปฏิเสธใบเสนอราคาแล้ว", "info");
+          nav.goBack();
+        },
+      },
+    ]);
   const onChat = () => nav.navigate("Chat", { shopName: supplierName });
   const onPay = () => po && nav.navigate("PromptPayQR", { total: po.totalAmount, orderId: po.id });
   // The doc-info section is empty for a rejected/expired PR (no supplier, no PO link)
@@ -134,7 +170,7 @@ export function B2BDocDetailScreen() {
       />
 
       <View style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: showPayBar ? 120 + insets.bottom : 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: showPayBar || answerable ? 120 + insets.bottom : 40 }}>
           {/* Status banner — same language as the order detail page */}
           <View style={{ backgroundColor: "#fff", marginTop: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -321,6 +357,29 @@ export function B2BDocDetailScreen() {
         <BottomFade />
 
         {/* PO awaiting payment — chat icon + pay, inside one floating glass bar */}
+        {answerable ? (
+          <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
+            <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Pressable
+                  onPress={onReject}
+                  className="active:opacity-80 items-center justify-center"
+                  style={{ flex: 1, height: 50, borderRadius: 999, borderWidth: 1.5, borderColor: "#ff3b30", backgroundColor: "rgba(255,59,48,0.06)" }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#ff3b30" }}>ปฏิเสธ</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onAccept}
+                  className="active:opacity-90 items-center justify-center"
+                  style={{ flex: 1.3, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>ตอบรับใบเสนอราคา</Text>
+                </Pressable>
+              </GlassView>
+            </View>
+          </View>
+        ) : null}
+
         {showPayBar ? (
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>

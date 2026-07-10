@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   __resetChat,
   ensureThread,
+  findThread,
   lastMessageOf,
+  openThread,
   markThreadRead,
   messagesOf,
   sendMessage,
@@ -90,6 +92,47 @@ describe("messages", () => {
     const a = sendMessage("metaherb", "user", "a", { now: NOW })!;
     const b = sendMessage("metaherb", "user", "b", { now: NOW })!;
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe("opening a thread by shop name", () => {
+  it("finds the existing thread instead of starting a second one", () => {
+    const t = openThread(BUYER, SHOP);
+    expect(t.id).toBe("metaherb");
+    expect(threadsForUser(BUYER)).toHaveLength(1);
+  });
+
+  it("creates one on first contact with a shop the buyer has never messaged", () => {
+    const t = openThread(BUYER, "กรีนลีฟ ออร์แกนิก");
+    expect(t.shopName).toBe("กรีนลีฟ ออร์แกนิก");
+    expect(threadsForUser(BUYER)).toHaveLength(2);
+    // …and it is a different thread, not METAHERB's.
+    expect(t.id).not.toBe("metaherb");
+  });
+
+  it("keeps two buyers' threads with the same shop apart", () => {
+    const a = openThread(BUYER, "กรีนลีฟ ออร์แกนิก");
+    const b = openThread("u-2", "กรีนลีฟ ออร์แกนิก");
+    expect(a.id).not.toBe(b.id);
+    expect(threadsForShop("กรีนลีฟ ออร์แกนิก")).toHaveLength(2);
+    // Neither buyer can read the other's conversation.
+    expect(threadsForUser(BUYER).map((t) => t.id)).not.toContain(b.id);
+    expect(threadsForUser("u-2").map((t) => t.id)).toEqual([b.id]);
+  });
+
+  it("does not put one buyer's message in another buyer's thread", () => {
+    const mine = openThread(BUYER, "กรีนลีฟ ออร์แกนิก");
+    const theirs = openThread("u-2", "กรีนลีฟ ออร์แกนิก");
+    sendMessage(theirs.id, "user", "ของคนอื่น", { now: NOW });
+    expect(messagesOf(mine.id)).toHaveLength(0);
+  });
+
+  it("routes a message to the shop the buyer actually named", () => {
+    openThread(BUYER, "กรีนลีฟ ออร์แกนิก");
+    const t = findThread(BUYER, "กรีนลีฟ ออร์แกนิก")!;
+    sendMessage(t.id, "user", "มีของไหมคะ", { now: NOW });
+    expect(unreadTotalForShop("กรีนลีฟ ออร์แกนิก")).toBe(1);
+    expect(unreadTotalForShop(SHOP)).toBe(0); // the old bug delivered this here
   });
 });
 

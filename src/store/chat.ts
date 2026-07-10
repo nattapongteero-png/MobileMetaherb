@@ -78,6 +78,31 @@ export function nextMessageId(now = Date.now()): string {
   return `msg-${now.toString(36)}-${seq}`;
 }
 
+/**
+ * The id of the thread between a buyer and a shop. It carries the buyer: keying
+ * it on the shop alone let a second buyer messaging the same shop land inside
+ * the first buyer's conversation.
+ */
+export const threadIdFor = (userId: string, shopName: string): string => `t-${userId}-${shopName}`;
+
+/** The buyer's thread with a given shop, if they have one. */
+export const findThread = (userId: string, shopName: string): ChatThread | undefined =>
+  chatStore.get().threads.find((t) => t.userId === userId && t.shopName === shopName);
+
+/**
+ * The thread for this buyer + shop, created on first contact.
+ *
+ * Screens that open a chat from a product or a document know the shop's NAME,
+ * not a thread id — and used to fall through to a hardcoded "metaherb" default,
+ * which quietly pointed a conversation about another shop's product at the
+ * wrong thread.
+ */
+export function openThread(userId: string, shopName: string): ChatThread {
+  const existing = findThread(userId, shopName);
+  if (existing) return existing;
+  return ensureThread(threadIdFor(userId, shopName), userId, shopName);
+}
+
 /** Open (or find) the thread between this buyer and this shop. */
 export function ensureThread(id: string, userId: string, shopName: string): ChatThread {
   const existing = threadById(id);
