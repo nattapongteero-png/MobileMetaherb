@@ -100,10 +100,18 @@ function MiniCountdown({ initialSeconds }: { initialSeconds: number }) {
  * single definition avoids visual drift between surfaces (Jakob's Law +
  * Consistency Heuristic).
  */
-export function ProductCard({ product, width, preview, onPress }: { product: Product; width: number; preview?: boolean; onPress?: () => void }) {
+export function ProductCard({ product, width, preview, onPress }: {
+ product: Product; width: number; preview?: boolean; onPress?: () => void }) {
   const nav = useNavigation<Nav>();
   const tag = getCardTag(product);
   const priceColor = product.discountPercent ? "#e62e05" : "#226a3b";
+  // A merged variant card can carry the flash flag without a discountPercent —
+  // derive the cut from the price pair, else show no pill at all.
+  const discountPct =
+    product.discountPercent ??
+    (product.originalPrice && product.originalPrice > product.price
+      ? Math.round((1 - product.price / product.originalPrice) * 100)
+      : 0);
 
   return (
     <Pressable
@@ -127,10 +135,13 @@ export function ProductCard({ product, width, preview, onPress }: { product: Pro
           resizeMode="cover"
         />
 
-        {/* Top-right discount tag — "ลด N%" (matches web home cards) */}
-        {tag === "flashsale" || tag === "discount" ? (
+        {/* Top-right discount tag — "ลด N%" (matches web home cards). A merged
+            variant card can carry the flash flag without a discountPercent —
+            derive it from the price pair, and show no pill when there is no
+            real cut (it used to print "ลด undefined%"). */}
+        {(tag === "flashsale" || tag === "discount") && discountPct > 0 ? (
           <View className="absolute top-0 right-0 p-1.5">
-            <TagPill color="#e62e05" label={`ลด ${product.discountPercent}%`} />
+            <TagPill color="#e62e05" label={`ลด ${discountPct}%`} />
           </View>
         ) : null}
         {tag === "recommended" ? (
