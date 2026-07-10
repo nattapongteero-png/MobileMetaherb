@@ -65,7 +65,8 @@
     "postinstall": "patch-package",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:mutation": "node scripts/mutate.mjs"
   },
   "private": true
 }

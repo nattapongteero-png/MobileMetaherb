@@ -96,18 +96,15 @@ export type Pricing = {
 };
 
 function amountOff(p: Promotion, base: number): number {
-  // Never trust the stored numbers: a 150% promotion (or a negative one) must
-  // not reverse the till. Fuzzing found exactly that — percent above 100 with
-  // no maxDiscount priced the product below zero.
-  const value = Math.max(0, p.discountValue);
-  let raw: number;
-  if (p.discountType === "percent") {
-    raw = Math.round((base * Math.min(value, 100)) / 100);
-    if (p.maxDiscount != null) raw = Math.min(raw, Math.max(0, p.maxDiscount));
-  } else {
-    raw = value;
-  }
-  return Math.min(raw, base);
+  // The final clamp is the one that matters: fuzzing found a 150% promotion
+  // with no maxDiscount pricing the product below zero. (An earlier fix added
+  // per-field clamps too — mutation testing then showed them all redundant
+  // behind this line, so this is the whole defence. Negative or zero values
+  // fall out via the `off <= 0` gate in pricingFor.)
+  const raw =
+    p.discountType === "percent" ? Math.round((base * p.discountValue) / 100) : p.discountValue;
+  const capped = p.maxDiscount != null ? Math.min(raw, p.maxDiscount) : raw;
+  return Math.min(capped, base);
 }
 
 /**
