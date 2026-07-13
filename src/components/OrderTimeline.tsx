@@ -21,7 +21,7 @@ const STEPS: { key: "ordered" | OrderStatus; label: string; Icon: LucideIcon }[]
   { key: "pending_payment", label: "รอการชำระ", Icon: CreditCard },
   { key: "pending_verify", label: "ตรวจสอบการชำระ", Icon: Eye },
   { key: "preparing", label: "กำลังจัดเตรียม", Icon: Package },
-  { key: "shipped", label: "กำลังจัดส่ง", Icon: Truck },
+  { key: "shipping", label: "กำลังจัดส่ง", Icon: Truck },
   { key: "delivered", label: "จัดส่งสำเร็จ", Icon: Home },
   { key: "completed", label: "เสร็จสมบูรณ์", Icon: Star },
 ];

@@ -42,11 +42,13 @@ import {
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
-import { COUPONS } from "../data/coupons";
+import { useActiveCouponCount } from "../data/coupons";
 import { useOrders } from "../context/OrderContext";
 import { useChat } from "../context/ChatContext";
 import { useSeller } from "../context/SellerContext";
 import type { OrderStatus } from "../data/orders";
+import { useStore } from "../store/db";
+import { sessionStore, signOut } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { isTablet } from "../theme/layout";
 
@@ -72,16 +74,15 @@ const AVATAR = {
 // Member stats shown on the premium card. Coupon count is live (active codes in
 // the same COUPONS source the coupon page reads); points are mock.
 const POINTS = 1250;
-const ACTIVE_COUPONS = COUPONS.filter((c) => c.status === "active").length;
 const groupNum = (n: number) => n.toLocaleString("en-US");
 
-type OrderTab = "all" | "pending_group" | "preparing" | "shipped" | "delivered" | "completed";
+type OrderTab = "all" | "pending_group" | "preparing" | "shipping" | "delivered" | "completed";
 // `status` drives the live count (from OrderContext); `tab` is the filter opened on tap.
 const ORDER_STATUS: { label: string; Icon: LucideIcon; status: OrderStatus; tint: string; bg: string; tab: OrderTab }[] = [
   { label: "รอชำระเงิน", Icon: Wallet, status: "pending_payment", tint: "#f97316", bg: "rgba(249,115,22,0.12)", tab: "pending_group" },
   { label: "รอตรวจสอบ", Icon: ClipboardCheck, status: "pending_verify", tint: "#0ea5e9", bg: "rgba(14,165,233,0.12)", tab: "pending_group" },
   { label: "รอจัดส่ง", Icon: Package, status: "preparing", tint: "#a855f7", bg: "rgba(168,85,247,0.12)", tab: "preparing" },
-  { label: "จัดส่งแล้ว", Icon: Truck, status: "shipped", tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)", tab: "shipped" },
+  { label: "จัดส่งแล้ว", Icon: Truck, status: "shipping", tint: BRAND_GREEN, bg: "rgba(49,151,84,0.12)", tab: "shipping" },
   // iPad only — the wider card fits 6 tiles (colors from STATUS_COLOR in data/orders).
   { label: "ได้รับสินค้าแล้ว", Icon: PackageCheck, status: "delivered", tint: "#0d9488", bg: "rgba(13,148,136,0.12)", tab: "delivered" },
   { label: "สำเร็จ", Icon: CircleCheckBig, status: "completed", tint: "#16a34a", bg: "rgba(22,163,74,0.12)", tab: "completed" },
@@ -246,6 +247,24 @@ export function AccountScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
+  // One identity, shared with AccountInfoScreen and every order's recipient.
+  const { user } = useStore(sessionStore);
+  const ACTIVE_COUPONS = useActiveCouponCount();
+
+  // "ออกจากระบบ" used to just navigate to Login, leaving the session intact —
+  // backing out landed the user straight back in their account.
+  const logout = () =>
+    Alert.alert("ออกจากระบบ", "ต้องการออกจากระบบใช่ไหม?", [
+      { text: "ยกเลิก", style: "cancel" },
+      {
+        text: "ออกจากระบบ",
+        style: "destructive",
+        onPress: () => {
+          signOut();
+          nav.reset({ index: 0, routes: [{ name: "Login" }] });
+        },
+      },
+    ]);
 
   // Live order counts from the shared store so the chips match the orders list/detail.
   const { orders } = useOrders();
@@ -388,10 +407,10 @@ export function AccountScreen() {
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={{ fontSize: 18, fontWeight: "700", color: "#ffffff", lineHeight: 22 }} numberOfLines={1}>
-                    Ethan Walker
+                    {user?.name ?? "ผู้ใช้ทั่วไป"}
                   </Text>
                   <Text style={{ fontSize: 12.5, color: "rgba(255,255,255,0.8)", lineHeight: 16 }} numberOfLines={1}>
-                    ethan.walker@gmail.com
+                    {user?.email ?? ""}
                   </Text>
                 </View>
               </View>
@@ -574,7 +593,7 @@ export function AccountScreen() {
 
           {/* Logout */}
           <Card style={{ padding: 0, overflow: "hidden" }}>
-            <Pressable onPress={() => go("Login")} className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
+            <Pressable onPress={logout} className="flex-row items-center justify-center active:opacity-60" style={{ height: 52, gap: 8 }}>
               <LogOut size={18} color="#ef4444" strokeWidth={2.2} />
               <Text style={{ fontSize: 15, fontWeight: "600", color: "#ef4444" }}>ออกจากระบบ</Text>
             </Pressable>

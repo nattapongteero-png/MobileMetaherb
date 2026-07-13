@@ -16,7 +16,7 @@ import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const TRUE_ORANGE = "#f37021";
-const TRUEMONEY_LOGO = require("../../assets/payment/truemoney.png");
+const TRUEMONEY_LOGO = require("../../assets/payment/truemoney-account.png");
 const mask = (no: string) => `•••• ${no.slice(-4)}`;
 
 const card = { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececed", overflow: "hidden" } as const;

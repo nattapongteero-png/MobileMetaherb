@@ -90,7 +90,7 @@ export function OrderActionButtons({
       ) : null}
       {/* pending_verify has no action — the system verifies the payment automatically. */}
       {order.status === "preparing" ? <Btn label="ติดต่อร้าน" variant="outline" Icon={MessageCircle} height={h} fill={fill} onPress={() => onAction("contact")} /> : null}
-      {order.status === "shipped" ? <Btn label="ยืนยันรับสินค้า" variant="primary" height={h} fill={fill} onPress={() => onAction("received")} /> : null}
+      {order.status === "shipping" ? <Btn label="ยืนยันรับสินค้า" variant="primary" height={h} fill={fill} onPress={() => onAction("received")} /> : null}
       {order.status === "delivered" && !order.review ? (
         <>
           <Btn label="แจ้งปัญหาสินค้า" variant="gray" height={h} fill={fill} onPress={() => onAction("complaint")} />

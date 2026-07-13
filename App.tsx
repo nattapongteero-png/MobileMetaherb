@@ -1,4 +1,7 @@
 import "./src/styles/global.css";
+// Boots the local mock backend: persistence adapter + seeded tables.
+// Must come before any screen imports so the first paint has data.
+import { hydrateStores } from "./src/store";
 import { useEffect, useState } from "react";
 import { Platform, Text, View, TextInput } from "react-native";
 import { NavigationContainer, type LinkingOptions } from "@react-navigation/native";
@@ -115,9 +118,16 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
+  // Restore orders / stock / session from the last run. Seeded defaults are
+  // already in place, so hydration only swaps in the user's own data.
+  const [storesReady, setStoresReady] = useState(false);
+  useEffect(() => {
+    void hydrateStores().finally(() => setStoresReady(true));
+  }, []);
+
   if (fontsLoaded) applyThaiFontDefault();
 
-  if (!fontsLoaded || !minTimeElapsed) {
+  if (!fontsLoaded || !minTimeElapsed || !storesReady) {
     return <SplashScreen />;
   }
 

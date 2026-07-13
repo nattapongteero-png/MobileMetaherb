@@ -4,36 +4,22 @@ import { Banknote } from "lucide-react-native";
 
 export type CafePayMethodId = "promptpay" | "cash";
 
-/** A lightweight order-line snapshot passed to the café success screen (no image). */
-export type CafeOrderItem = { name: string; qty: number; summary: string; total: number };
+import { queueAheadOf, type CafeOrder, type CafeOrderItem } from "../store/cafe";
+import { currentUserId, DEMO_USER } from "../store/session";
+import { METAHERB_SHOP } from "./shopOrders";
 
-/** A placed café order — the single source of truth for the success screen and
- *  the "order in progress" queue banner on the café landing. */
-export type CafeOrder = {
-  orderId: string;
-  payLabel: string;
-  receiveLabel: string;
-  items: CafeOrderItem[];
-  total: number;
-  /** Your running queue number (e.g. #23). */
-  queueNo: number;
-  /** Orders ahead of you. */
-  queueAhead: number;
-  /** Rough prep estimate in minutes. */
-  waitMinutes: number;
-  /** Estimated ready time as an epoch (ms). */
-  readyAt: number;
-};
+export type { CafeOrder, CafeOrderItem };
 
 /** A favourited menu item + the saved options to reorder it with. */
 export type CafeFavorite = { itemId: string; summary: string; opts: { sweet: number; milk: number; shot: number; note: string } };
 
 /** A completed order kept in history, with the customer's review (ratings 0 = unrated). */
-export type CafeHistoryOrder = CafeOrder & { ratingService: number; ratingTaste: number; comment: string };
+/** Kept for the history screen's prop types; the store row already carries ratings. */
+export type CafeHistoryOrder = CafeOrder;
 
 // Sample past orders so the history screen isn't empty on first open. queue/timing
 // fields are placeholders — history cards only use id / items / total / ratings.
-export const INITIAL_CAFE_HISTORY: CafeHistoryOrder[] = [
+const RAW_HISTORY: Omit<CafeOrder, "userId" | "shopName" | "status">[] = [
   {
     orderId: "CAFE20486135",
     payLabel: "พร้อมเพย์ (PromptPay)",
@@ -69,6 +55,15 @@ export const INITIAL_CAFE_HISTORY: CafeHistoryOrder[] = [
   },
 ];
 
+/** Past orders so the history screen isn't empty on first open. */
+export const INITIAL_CAFE_HISTORY: CafeOrder[] = RAW_HISTORY.map((o) => ({
+  ...o,
+  userId: DEMO_USER.id,
+  shopName: METAHERB_SHOP,
+  status: "picked_up" as const,
+  pickedUpAt: o.readyAt || Date.now(),
+}));
+
 /** Build a placed order from checkout data — queue figures are a deterministic
  *  mock from the order id; readyAt is stamped from the current time. */
 export function buildCafeOrder(input: {
@@ -77,13 +72,22 @@ export function buildCafeOrder(input: {
   payLabel: string;
   receiveLabel: string;
   items: CafeOrderItem[];
-}): CafeOrder {
+}) {
   const seed = parseInt(input.orderId.replace(/\D/g, "").slice(-4) || "0", 10);
   const queueNo = 10 + (seed % 40); // running counter #10..#49
-  const queueAhead = 1 + (seed % 5); // 1..5 orders ahead
-  const waitMinutes = queueAhead * 4 + 3; // ~7..23 min depending on queue
+  // Orders ahead is now the REAL queue depth, not a hash of the order id.
+  const queueAhead = queueAheadOf(METAHERB_SHOP, queueNo);
+  const waitMinutes = queueAhead * 4 + 3; // ~3..23 min depending on queue
   const readyAt = Date.now() + waitMinutes * 60000;
-  return { ...input, queueNo, queueAhead, waitMinutes, readyAt };
+  return {
+    ...input,
+    userId: currentUserId(),
+    shopName: METAHERB_SHOP,
+    queueNo,
+    queueAhead,
+    waitMinutes,
+    readyAt,
+  };
 }
 
 export type CafePayMethod = {

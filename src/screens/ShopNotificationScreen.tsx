@@ -6,7 +6,13 @@ import { useNavigation } from "@react-navigation/native";
 import { CheckCheck } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { NotifChip, NotifRow, EmptyNotifs } from "./NotificationScreen";
-import { SHOP_NOTIF_SEED, SHOP_TYPE_META, SHOP_FILTER_TABS, type ShopNotif, type ShopNotifType } from "../data/shopNotifications";
+import { SHOP_TYPE_META, SHOP_FILTER_TABS, type ShopNotifType } from "../data/shopNotifications";
+import {
+  readAllNotifications,
+  readNotification,
+  useShopNotifications,
+} from "../data/notificationView";
+import { METAHERB_SHOP } from "../data/shopOrders";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 
 type FilterTab = "all" | ShopNotifType;
@@ -14,7 +20,15 @@ type FilterTab = "all" | ShopNotifType;
 export function ShopNotificationScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
-  const [notifs, setNotifs] = useState<ShopNotif[]>(SHOP_NOTIF_SEED);
+  // Live events (new order, low stock, complaint filed, RFQ…) ahead of the demo
+  // rows. The seed list used to be the entire feed.
+  const live = useShopNotifications(METAHERB_SHOP);
+  // Seed rows have no backing event, so their read state stays local.
+  const [readSeeds, setReadSeeds] = useState<Set<string>>(new Set());
+  const notifs = useMemo(
+    () => live.map((n) => (readSeeds.has(n.id) ? { ...n, read: true } : n)),
+    [live, readSeeds],
+  );
   const [filter, setFilter] = useState<FilterTab>("all");
 
   const unreadCount = useMemo(() => notifs.filter((n) => !n.read).length, [notifs]);
@@ -23,8 +37,13 @@ export function ShopNotificationScreen() {
     [notifs, filter],
   );
 
-  const markAsRead = (id: string) => setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  const markAllRead = () => setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAsRead = (id: string) => {
+    if (!readNotification(id, "shop")) setReadSeeds((prev) => new Set(prev).add(id));
+  };
+  const markAllRead = () => {
+    readAllNotifications("shop", { shopName: METAHERB_SHOP });
+    setReadSeeds(new Set(notifs.map((n) => n.id)));
+  };
 
   const filterBar = (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -14 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>

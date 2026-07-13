@@ -7,8 +7,8 @@ import { X, Check, Clock, ChevronUp, ChevronDown, Ban } from "lucide-react-nativ
 import { GlassIconButton } from "../components/GlassIconButton";
 import { usePayment } from "../context/PaymentContext";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
-import { CHECKOUT_COUPONS, couponEligible, type CheckoutCoupon } from "../data/checkoutCoupons";
-import { CHECKOUT_SUBTOTAL } from "../data/checkoutItems";
+import { useCheckoutCoupons, couponEligible, type CheckoutCoupon } from "../data/checkoutCoupons";
+import { useCart } from "../context/CartContext";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const GROUPED_BG = "#f2f2f7";
@@ -101,21 +101,31 @@ function CouponTicket({
 export function CouponSelectScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { selectedCouponIdx, setSelectedCouponIdx } = usePayment();
+  const { selectedCouponId, setSelectedCouponId } = usePayment();
+
+  // Coupon eligibility must reflect what is actually being bought — this used
+  // to compare against CHECKOUT_SUBTOTAL, the total of a hardcoded 2-item array.
+  const { items, checkoutItems } = useCart();
+  const lines = checkoutItems.length ? checkoutItems : items.filter((i) => i.inStock);
+  const subtotal = lines.reduce((s, i) => s + i.price * i.quantity, 0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const choose = (idx: number | null) => {
-    setSelectedCouponIdx(idx);
+  // A shop coupon only applies when the basket actually contains that shop's goods.
+  const shops = [...new Set(lines.map((i) => i.shop))];
+  const coupons = useCheckoutCoupons();
+
+  const choose = (id: string | null) => {
+    setSelectedCouponId(id);
     nav.goBack();
   };
 
-  // Group coupons by `group`, keeping each one's original index.
-  const groups: { group: string; items: { coupon: CheckoutCoupon; idx: number }[] }[] = [];
-  CHECKOUT_COUPONS.forEach((coupon, idx) => {
-    const last = groups[groups.length - 1];
-    if (last && last.group === coupon.group) last.items.push({ coupon, idx });
-    else groups.push({ group: coupon.group, items: [{ coupon, idx }] });
-  });
+  // Group coupons by section header, preserving wallet order within a group.
+  const groups: { group: string; items: { coupon: CheckoutCoupon }[] }[] = [];
+  for (const coupon of coupons) {
+    const found = groups.find((g) => g.group === coupon.group);
+    if (found) found.items.push({ coupon });
+    else groups.push({ group: coupon.group, items: [{ coupon }] });
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
@@ -150,10 +160,10 @@ export function CouponSelectScreen() {
           <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#f1f1f3", alignItems: "center", justifyContent: "center" }}>
             <Ban size={18} color="#9ca3af" />
           </View>
-          <Text style={{ flex: 1, fontSize: 15, color: LABEL, fontWeight: selectedCouponIdx === null ? "600" : "400" }}>
+          <Text style={{ flex: 1, fontSize: 15, color: LABEL, fontWeight: selectedCouponId === null ? "600" : "400" }}>
             ไม่ใช้คูปอง
           </Text>
-          <SelectMark active={selectedCouponIdx === null} />
+          <SelectMark active={selectedCouponId === null} />
         </Pressable>
 
         {groups.map((g) => {
@@ -169,14 +179,14 @@ export function CouponSelectScreen() {
                 {isCollapsed ? <ChevronDown size={20} color="#8a8f8a" /> : <ChevronUp size={20} color="#8a8f8a" />}
               </Pressable>
               {!isCollapsed
-                ? g.items.map(({ coupon, idx }) => (
+                ? g.items.map(({ coupon }) => (
                     <CouponTicket
-                      key={coupon.code}
+                      key={coupon.id}
                       coupon={coupon}
-                      active={selectedCouponIdx === idx}
-                      eligible={couponEligible(coupon, CHECKOUT_SUBTOTAL)}
-                      shortfall={coupon.minSpendValue - CHECKOUT_SUBTOTAL}
-                      onPress={() => choose(idx)}
+                      active={selectedCouponId === coupon.id}
+                      eligible={couponEligible(coupon, subtotal, shops)}
+                      shortfall={coupon.minSpendValue - subtotal}
+                      onPress={() => choose(coupon.id)}
                     />
                   ))
                 : null}

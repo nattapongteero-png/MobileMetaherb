@@ -4,6 +4,7 @@ import {
   type CatalogProduct,
   type CategoryKey,
 } from "../data/catalog";
+import { useLiveProducts } from "../data/liveCatalog";
 
 export type CatFilter = CategoryKey | "all";
 export type KindFilter = "all" | "flash" | "promo" | "recommended";
@@ -12,6 +13,8 @@ export type SortKey = "newest" | "popular" | "priceAsc" | "priceDesc";
 // Price slider bounds — derived from the catalog, rounded up to a tidy ceiling.
 export const PRICE_MIN = 0;
 export const PRICE_MAX = Math.ceil(Math.max(...ALL_PRODUCTS.map((p) => p.price)) / 10) * 10;
+
+const idOrder = (p: CatalogProduct) => Number(p.id) || Number.POSITIVE_INFINITY;
 
 type Ctx = {
   query: string;
@@ -43,9 +46,14 @@ export function ProductFilterProvider({ children }: { children: ReactNode }) {
   const [priceMax, setPriceMax] = useState(PRICE_MAX);
   const [sort, setSort] = useState<SortKey>("newest");
 
+  // The live catalog — the seed with the shop owner's edits applied and their
+  // own products merged in. (This used to read the frozen ALL_PRODUCTS, so an
+  // owner could never change what a customer sees.)
+  const catalog = useLiveProducts();
+
   const products = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = ALL_PRODUCTS.filter((p) => {
+    const list = catalog.filter((p) => {
       const inCat = cat === "all" || p.category === cat;
       const inKind =
         kind === "all" ||
@@ -59,10 +67,11 @@ export function ProductFilterProvider({ children }: { children: ReactNode }) {
     const sorted = [...list];
     if (sort === "priceAsc") sorted.sort((a, b) => a.price - b.price);
     else if (sort === "priceDesc") sorted.sort((a, b) => b.price - a.price);
-    else if (sort === "newest") sorted.sort((a, b) => Number(b.id) - Number(a.id));
+    // Owner-created ids ("new-…") aren't numeric — treat them as newest.
+    else if (sort === "newest") sorted.sort((a, b) => idOrder(b) - idOrder(a));
     else sorted.sort((a, b) => b.rating - a.rating); // popular
     return sorted;
-  }, [query, cat, kind, priceMin, priceMax, sort]);
+  }, [catalog, query, cat, kind, priceMin, priceMax, sort]);
 
   const activeCount =
     (cat !== "all" ? 1 : 0) +

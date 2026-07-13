@@ -1,4 +1,14 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useStore } from "../store/db";
+import {
+  chatStore,
+  lastMessageOf,
+  markThreadRead,
+  threadsForUser,
+  unreadTotalForUser,
+} from "../store/chat";
+import { currentUserId } from "../store/session";
+import { timeAgo } from "../store/events";
 
 export type Conversation = {
   id: string;
@@ -9,34 +19,40 @@ export type Conversation = {
   online: boolean;
 };
 
-// Shop names match SHOPS in data/shops.ts so the real shop logos resolve.
-const SEED: Conversation[] = [
-  { id: "metaherb", shopName: "METAHERB Store", lastMessage: "มี ดอกคำฝอย, ตะไคร้, ขิง, มะตูม และใบเตยค่ะ 😊", time: "10:04", unread: 2, online: true },
-  { id: "green", shopName: "กรีนลีฟ ออร์แกนิก", lastMessage: "สินค้าพร้อมส่งพรุ่งนี้เช้าค่ะ", time: "เมื่อวาน", unread: 1, online: true },
-  { id: "baan", shopName: "บ้านสมุนไพรไทย", lastMessage: "ขอบคุณที่อุดหนุนนะคะ 🙏", time: "เมื่อวาน", unread: 0, online: false },
-];
-
+/**
+ * The buyer's conversation list, derived from the shared chat table
+ * (src/store/chat.ts). The last message and the unread badge are now real:
+ * they move when the shop actually replies from its inbox.
+ */
 type ChatContextValue = {
   conversations: Conversation[];
   unreadTotal: number;
   markRead: (id: string) => void;
 };
 
-const ChatContext = createContext<ChatContextValue | undefined>(undefined);
-
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [conversations, setConversations] = useState<Conversation[]>(SEED);
-
-  const markRead = (id: string) =>
-    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
-
-  const unreadTotal = conversations.reduce((s, c) => s + c.unread, 0);
-
-  return <ChatContext.Provider value={{ conversations, unreadTotal, markRead }}>{children}</ChatContext.Provider>;
+  return <>{children}</>;
 }
 
-export function useChat() {
-  const ctx = useContext(ChatContext);
-  if (!ctx) throw new Error("useChat must be used within ChatProvider");
-  return ctx;
+export function useChat(): ChatContextValue {
+  useStore(chatStore); // subscribe
+  const userId = currentUserId();
+
+  const conversations: Conversation[] = threadsForUser(userId).map((t) => {
+    const last = lastMessageOf(t.id);
+    return {
+      id: t.id,
+      shopName: t.shopName,
+      lastMessage: last?.text ?? "เริ่มต้นการสนทนา",
+      time: last ? timeAgo(last.at) : "",
+      unread: t.unreadCustomer,
+      online: t.online,
+    };
+  });
+
+  return {
+    conversations,
+    unreadTotal: unreadTotalForUser(userId),
+    markRead: (id) => markThreadRead(id, "user"),
+  };
 }

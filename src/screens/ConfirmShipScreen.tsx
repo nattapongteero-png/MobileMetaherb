@@ -8,7 +8,10 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { ORDERS } from "./MyShopScreen";
+import { useShopOrder } from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { shipOrder } from "../store/orders";
+import { registrationById, shipTrial } from "../store/trials";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -17,14 +20,17 @@ const LABEL = "#6b7280";
 /**
  * ยืนยันการจัดส่ง — slide-up modal in the AddCard style, porting the web's
  * ship-confirm modal: order summary box + required tracking-number input.
- * Confirm hands the tracking number back and flips the order to "กำลังจัดส่ง".
+ * Confirm writes the tracking number to the shared order, which flips it to
+ * "กำลังจัดส่ง" and notifies the buyer.
  */
 export function ConfirmShipScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, "ConfirmShip">>();
-  const { orderId, onConfirm } = route.params;
-  const order = ORDERS.find((o) => o.id === orderId);
+  const { orderId, kind = "order", onConfirm } = route.params;
+  const isTrial = kind === "trial";
+  const order = useShopOrder(METAHERB_SHOP, isTrial ? undefined : orderId);
+  const trial = isTrial ? registrationById(orderId) : undefined;
 
   const [tracking, setTracking] = useState("");
   const canSubmit = tracking.trim().length > 0;
@@ -32,18 +38,27 @@ export function ConfirmShipScreen() {
   const submit = () => {
     if (!canSubmit) return;
     nav.goBack();
+    // Trial samples and product orders live in different tables but share this modal.
+    if (isTrial) shipTrial(orderId, tracking.trim());
+    else shipOrder(orderId, tracking.trim());
     onConfirm?.(tracking.trim());
     showToast("อัปเดตสถานะการจัดส่งเรียบร้อย — ลูกค้าจะติดตามพัสดุได้");
   };
 
-  const SUMMARY: { label: string; value: string }[] = order
+  const SUMMARY: { label: string; value: string }[] = trial
     ? [
-        { label: "คำสั่งซื้อ", value: order.id },
-        { label: "ผู้รับ", value: `${order.customer} · ${order.phone}` },
-        { label: "วิธีจัดส่ง", value: order.shippingMethod },
-        { label: "ที่อยู่", value: order.address },
+        { label: "คำขอทดลอง", value: trial.id },
+        { label: "ผู้รับ", value: `${trial.applicantName} · ${trial.applicantPhone}` },
+        { label: "ที่อยู่", value: trial.address },
       ]
-    : [];
+    : order
+      ? [
+          { label: "คำสั่งซื้อ", value: order.id },
+          { label: "ผู้รับ", value: `${order.customer} · ${order.phone}` },
+          { label: "วิธีจัดส่ง", value: order.shippingMethod },
+          { label: "ที่อยู่", value: order.address },
+        ]
+      : [];
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>

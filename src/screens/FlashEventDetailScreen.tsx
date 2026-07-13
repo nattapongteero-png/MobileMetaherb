@@ -16,6 +16,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { FlashProductCard, FlashCardMenu, FlashSummaryCard, FLASH_PRODUCTS, type FlashProduct } from "./MyShopScreen";
 import { cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
 import { showToast } from "../components/Toast";
+import { removeFlash } from "../store/promotions";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_PRIMARY } from "../theme/tokens";
 
@@ -44,6 +45,9 @@ export function FlashEventDetailScreen() {
       onDone: (p) => setProducts((prev) => [p, ...prev.filter((x) => x.id !== p.id)]),
     });
   const removeProduct = (p: FlashProduct) => {
+    // Drop the round from the shared store too, or the storefront keeps selling
+    // it at the flash price after the owner pulled it.
+    removeFlash(p.id);
     setProducts((prev) => prev.filter((x) => x.id !== p.id));
     showToast("นำสินค้าออกแล้ว", "info");
   };

@@ -3,12 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   detectIntent, extractGoals, extractBudget, extractCategory, goalLabel, categoryLabel,
   searchProducts, recommendForGoals, compareProducts, valueAnalysis, buildBundle, filterProducts,
-  suggestPromos, crossSell, quickReplies,
+  suggestPromos, crossSell, quickReplies, goalExcluded, extractCautions,
   type Intent, type CustomerProfile, type HealthGoal, type ComparisonRow, type PromoSuggestion,
 } from "../data/aiEngine";
 import { REAL_PRODUCTS, getRealProductImage } from "../data/realProducts";
 import type { CatalogProduct } from "../data/catalog";
-import { metaChat, metaPlan, metaVision, maleify, type AIPlan } from "../services/metaAI";
+import { metaChat, metaPlan, metaVision, metaRecommend, maleify, type AIPlan } from "../services/metaAI";
 import { research, type ResearchSource } from "../services/herbResearch";
 import { useCart } from "./CartContext";
 import { useOrders } from "./OrderContext";
@@ -211,7 +211,10 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           .map((m) => ({ role: m.role as "user" | "ai", text: (m as { text?: string }).text ?? "" }))
           .filter((m) => m.text.trim());
         if (hist[hist.length - 1]?.text !== text) hist.push({ role: "user", text });
-        const ans = await metaChat(hist);
+        // activeGoals, not this turn's alone: on a follow-up ("มีอะไรแนะนำอีกไหม")
+        // the symptom lives in the profile from the previous turn, and using only
+        // the current text dropped the guard exactly when it mattered.
+        const ans = await metaChat(hist, undefined, undefined, activeGoals, extractCautions(text));
         if (ans) { push({ role: "ai", kind: "text", text: ans }); return true; }
       } catch { /* fall back to rule-based */ }
       return false;
@@ -231,30 +234,91 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
 
     const executePlan = async (plan: AIPlan, hist: { role: "user" | "ai"; text: string }[]): Promise<boolean> => {
       const intro = plan.reply?.trim();
-      const planGoals: HealthGoal[] = plan.goal ? ([plan.goal] as HealthGoal[]) : activeGoals;
+      // The UNION of what the planner inferred and what the raw text says. If
+      // Gemma mislabels an insomnia question as "energy", the sleep exclusions
+      // must still bite — a contraindication is only as good as the goal it is
+      // checked against.
+      const planGoals: HealthGoal[] = [
+        ...new Set<HealthGoal>([...(plan.goal ? [plan.goal as HealthGoal] : []), ...activeGoals]),
+      ];
       switch (plan.action) {
         case "search": {
+          const applyHardFilters = (p: P) =>
+            (plan.maxPrice == null || p.price <= plan.maxPrice) &&
+            (plan.minPrice == null || p.price >= plan.minPrice) &&
+            (plan.minRating == null || p.rating >= plan.minRating) &&
+            (!plan.promoOnly || p.isFlashSale || p.hasCoupon || (p.discountPercent ?? 0) > 0);
+
           let results: P[] = [];
-          // Prefer the exact products Gemma picked (semantic match), keeping any hard filters the user set.
-          if (!plan.sort && plan.productIds?.length) {
-            const byId = new Map(products.map((p) => [p.id, p]));
-            results = (plan.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[])
-              .filter((p) =>
-                (plan.maxPrice == null || p.price <= plan.maxPrice) &&
-                (plan.minPrice == null || p.price >= plan.minPrice) &&
-                (plan.minRating == null || p.rating >= plan.minRating) &&
-                (!plan.promoOnly || p.isFlashSale || p.hasCoupon || (p.discountPercent ?? 0) > 0))
-              .slice(0, 6);
+          let sources: ResearchSource[] = [];
+          let groundedReply = "";
+
+          // Agentic web-first recommend — for need/symptom queries (not plain
+          // sort/price browsing): fetch herb evidence (KB → live web), then let
+          // Gemma pick the products that TRULY fit from a candidate shortlist,
+          // instead of guessing off product names. Falls back silently to the
+          // name-based matcher on any failure so recommendations never break.
+          const isNeedQuery = !plan.sort && (Boolean(plan.query?.trim()) || Boolean(plan.goal));
+          if (isNeedQuery) {
+            try {
+              const byId = new Map(products.map((p) => [p.id, p]));
+              // Candidate pool: Gemma's picks ∪ the keyword/goal matcher — deduped,
+              // hard-filtered, capped. Gives the ranker real options to choose from.
+              const pool: P[] = [];
+              const seen = new Set<string>();
+              // Never hand a contraindicated product to the ranker: an LLM asked
+              // nicely not to suggest coffee for insomnia will sometimes do it anyway.
+              const addCand = (p?: P) => {
+                if (!p || seen.has(p.id) || !applyHardFilters(p)) return;
+                if (goalExcluded(p, planGoals)) return;
+                seen.add(p.id);
+                pool.push(p);
+              };
+              (plan.productIds ?? []).forEach((id) => addCand(byId.get(String(id))));
+              filterProducts(products, { query: plan.query, goals: planGoals, category: plan.category, maxPrice: plan.maxPrice, minPrice: plan.minPrice, minRating: plan.minRating, promoOnly: plan.promoOnly, limit: 10 }).forEach(addCand);
+              const candidates = pool.slice(0, 10);
+
+              if (candidates.length > 0) {
+                const r = await research(plan.query?.trim() || text, true);
+                sources = r.sources;
+                const ranked = await metaRecommend(
+                  plan.query?.trim() || text,
+                  candidates.map((p) => ({ id: p.id, name: p.name })),
+                  r.grounding,
+                  undefined,
+                  extractCautions(text),
+                );
+                groundedReply = ranked.reply;
+                results = (ranked.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[])
+                  // Belt and braces: the model can only pick from the pool, but a
+                  // hallucinated id must not slip a contraindicated product through.
+                  .filter((p) => !goalExcluded(p, planGoals));
+              }
+            } catch { /* fall through to the name-based matcher below */ }
           }
-          if (results.length === 0) {
+
+          // Fallback / non-need queries — original fast path.
+          if (results.length === 0 && !plan.productIds?.length) {
             results = filterProducts(products, {
               query: plan.query, goals: planGoals, category: plan.category,
               maxPrice: plan.maxPrice, minPrice: plan.minPrice, minRating: plan.minRating,
               promoOnly: plan.promoOnly, sort: plan.sort, limit: 6,
             });
+          } else if (results.length === 0 && plan.productIds?.length && !plan.sort) {
+            const byId = new Map(products.map((p) => [p.id, p]));
+            results = (plan.productIds.map((id) => byId.get(String(id))).filter(Boolean) as P[]).filter(applyHardFilters).slice(0, 6);
           }
-          if (results.length === 0) push({ role: "ai", kind: "text", text: intro ? `${intro}\n— แต่ยังไม่พบสินค้าที่ตรงเงื่อนไข ลองปรับราคา/คำค้นดูนะครับ` : "ยังไม่พบสินค้าที่ตรงเงื่อนไขครับ ลองปรับราคา/คำค้นดูนะครับ" });
-          else push({ role: "ai", kind: "products", text: intro || "นี่คือสินค้าที่ตรงกับที่หาครับ:", products: results, goals: planGoals });
+
+          const head = groundedReply || intro;
+          if (results.length === 0) {
+            push({ role: "ai", kind: "text", text: head ? `${head}\n— แต่ยังไม่พบสินค้าที่ตรงเงื่อนไข ลองปรับราคา/คำค้นดูนะครับ` : "ยังไม่พบสินค้าที่ตรงเงื่อนไขครับ ลองปรับราคา/คำค้นดูนะครับ", ...(sources.length && groundedReply ? { sources } : null) });
+          } else if (groundedReply) {
+            // Grounded path: reason (+ sources) as its own bubble, then the cards.
+            push({ role: "ai", kind: "text", text: groundedReply, ...(sources.length ? { sources } : null) });
+            push({ role: "ai", kind: "products", text: "สินค้าที่แนะนำครับ 👇", products: results, goals: planGoals });
+          } else {
+            push({ role: "ai", kind: "products", text: intro || "นี่คือสินค้าที่ตรงกับที่หาครับ:", products: results, goals: planGoals });
+          }
           return true;
         }
         case "compare": {
@@ -280,7 +344,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
             const match = products.find((p) => p.name.toLowerCase().includes(key)) || products.find((p) => toks.some((t) => p.name.toLowerCase().includes(t)));
             if (match && !seen.has(match.id)) {
               seen.add(match.id);
-              addToCart({ id: `c-${match.id}`, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id), quantity: qty });
+              addToCart({ id: `c-${match.id}`, productId: match.id, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id), quantity: qty });
               addedNames.push(match.name);
             }
           }
@@ -346,7 +410,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           } catch { /* answer without grounding */ }
           let answered = false;
           try {
-            const ans = await metaChat(hist, undefined, grounding);
+            const ans = await metaChat(hist, undefined, grounding, planGoals, extractCautions(text));
             push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
             answered = true;
           }
@@ -439,7 +503,7 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           push({ role: "ai", kind: "text", text: "ยังไม่แน่ใจว่าจะหยิบตัวไหน — ลองพิมพ์ชื่อสินค้าให้ชัดขึ้น หรือกดปุ่มตะกร้าใต้การ์ดสินค้าได้เลยครับ" });
           break;
         }
-        addToCart({ id: `c-${match.id}`, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id) });
+        addToCart({ id: `c-${match.id}`, productId: match.id, name: match.name, option: "ค่าเริ่มต้น", price: match.price, originalPrice: match.originalPrice, image: getRealProductImage(match.id) });
         push({ role: "ai", kind: "text", text: `เพิ่ม “${match.name}” ลงตะกร้าเรียบร้อย ✓\nยอดรวมโดยประมาณ ฿${(cTotal + match.price).toLocaleString()}` });
         const upsell = crossSell(products, match, 3);
         if (upsell.length > 0) { await think(400); push({ role: "ai", kind: "products", text: "ลูกค้าที่ซื้อสินค้านี้ มักซื้อพร้อมกับ:", products: upsell }); }
@@ -519,7 +583,8 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
           sources = r.sources;
         } catch { /* answer without grounding */ }
       }
-      const ans = await metaVision(imageDataUrl, cap, undefined, grounding);
+      // The caption's goal gates the vision prompt the same way it gates chat.
+      const ans = await metaVision(imageDataUrl, cap, undefined, grounding, extractGoals(cap), extractCautions(cap));
       push({ role: "ai", kind: "text", text: ans, ...(sources.length && grounding ? { sources } : null) });
       // Close the loop: attach related in-store products from caption/answer goals.
       const goals = extractGoals(`${cap} ${ans}`);

@@ -17,7 +17,9 @@ import {
   type SalesProduct, type Period,
 } from "./salesReport";
 import { SETTLEMENTS, FINANCE_TOTALS, type SettlementStatus } from "./financeTransactions";
-import { COUPONS, addCoupon, type CouponStatus } from "./coupons";
+import { addCoupon, allCoupons, effectiveStatus, nextCouponId, type Coupon, type CouponStatus } from "../store/coupons";
+import { ticketColor, ticketKind, ticketTitle } from "./couponView";
+import { METAHERB_SHOP } from "./shopOrders";
 import {
   MOCK_PRS, MOCK_POS, MOCK_QUOTES, PR_STATUS, PO_STATUS, QT_STATUS, DOC_TITLE,
   type DocKind,
@@ -124,34 +126,67 @@ function buildBriefing(complaints: Complaint[]): MetaReply {
 
 /* ── Real action: create a coupon ──────────────────────────────────────────── */
 
-export type CouponDraft = { code?: string; discount?: string; minSpend?: number | string; expiry?: string; couponType?: "MH" | "FREE" | "VIP" };
+/** `discount` may arrive as a bare number: the live model returns 15 for "ลด 15%"
+ * even when asked for a string, and `.trim()` on a number crashed the copilot. */
+export type CouponDraft = { code?: string; discount?: string | number; minSpend?: number | string; expiry?: string; couponType?: "MH" | "FREE" | "VIP" };
+
+/** Normalise the draft's discount to display text. A bare number ≤ 100 reads as
+ * a percent (the common "ลด 15%" case); larger reads as baht. */
+function draftDiscountText(d?: string | number | null): string {
+  if (d == null) return "";
+  if (typeof d === "number") return d <= 100 ? `ลด ${d}%` : `ลด ${d} บาท`;
+  return String(d).trim();
+}
 
 /** True when the LLM gave enough to actually mint a coupon (else we ask). */
 export function couponDraftReady(d?: CouponDraft | null): boolean {
-  return !!d && !!(d.discount?.trim() || d.code?.trim());
+  return !!d && !!(draftDiscountText(d.discount) || d.code?.trim());
 }
 
-/** Actually mint the coupon (mutates COUPONS) and return a confirmation card. */
+/** Mint the coupon in the shared table and return a confirmation card. */
 export function createCouponFromDraft(draft: CouponDraft): MetaReply {
   const type: "MH" | "FREE" | "VIP" =
     draft.couponType === "FREE" || draft.couponType === "VIP" ? draft.couponType : "MH";
   const color = type === "FREE" ? "#00bfa5" : type === "VIP" ? "#9c27b0" : "#319754";
   const code = (draft.code?.trim() || `MH${Math.floor(Math.random() * 9000 + 1000)}`).toUpperCase().replace(/\s+/g, "");
-  const minSpend =
-    typeof draft.minSpend === "number" ? `ขั้นต่ำ ฿${draft.minSpend.toLocaleString()}`
-      : draft.minSpend?.trim() || "ขั้นต่ำ ฿0";
-  const c = addCoupon({
-    type,
-    title: draft.discount?.trim() || (type === "FREE" ? "ส่งฟรี" : "ส่วนลดพิเศษ"),
+  const minOrder = typeof draft.minSpend === "number" ? draft.minSpend : Number(String(draft.minSpend ?? "").replace(/\D/g, "")) || 0;
+
+  // "ลด 20%" → percent 20; "ลด 50 บาท" / "฿50" → 50 baht off; "ส่งฟรี" → freeship.
+  const text = draftDiscountText(draft.discount);
+  const percent = /(\d+)\s*%/.exec(text);
+  const amount = /(\d[\d,]*)/.exec(text.replace(/%/g, ""));
+  const discountType: Coupon["discountType"] =
+    type === "FREE" ? "freeship" : percent ? "percent" : "baht";
+  const discountValue =
+    discountType === "freeship" ? 0 : Number((percent?.[1] ?? amount?.[1] ?? "50").replace(/,/g, ""));
+
+  const now = Date.now();
+  const c: Coupon = {
+    id: nextCouponId(now),
     code,
-    minSpend,
-    expiry: draft.expiry?.trim() || "ใช้ได้ 30 วัน",
-    bgColor: color,
-  });
+    name: text || (type === "FREE" ? "ส่งฟรี" : "ส่วนลดพิเศษ"),
+    discountType,
+    discountValue,
+    minOrder,
+    startsAt: new Date(now).toISOString(),
+    // The draft's expiry is free text ("ใช้ได้ 30 วัน"); default to 30 days out.
+    endsAt: new Date(now + 30 * 86_400_000).toISOString(),
+    membersOnly: type === "VIP",
+    used: 0,
+    status: "active",
+    shopName: METAHERB_SHOP,
+    color,
+  };
+  addCoupon(c);
   return {
     kind: "coupon_created",
     text: "สร้างคูปองให้เรียบร้อยแล้วครับ ใช้งานได้ทันที ✅",
-    code: c.code, title: c.title, minSpend: c.minSpend, expiry: c.expiry, type: c.type, color,
+    code: c.code,
+    title: ticketTitle(c),
+    minSpend: `ขั้นต่ำ ฿${minOrder.toLocaleString()}`,
+    expiry: draft.expiry?.trim() || "ใช้ได้ 30 วัน",
+    type,
+    color,
   };
 }
 
@@ -223,9 +258,15 @@ function buildComplaints(list: Complaint[]): MetaReply {
 }
 
 function buildCoupons(creating: boolean): MetaReply {
-  const active = COUPONS.filter((c) => c.status === "active");
+  const active = allCoupons().filter((c) => effectiveStatus(c) === "active");
   const items = active.slice(0, 6).map((c) => ({
-    code: c.code, title: c.title, minSpend: c.minSpend, expiry: c.expiry, type: c.type, color: c.bgColor, status: c.status,
+    code: c.code,
+    title: ticketTitle(c),
+    minSpend: `ขั้นต่ำ ฿${(c.minOrder ?? 0).toLocaleString()}`,
+    expiry: c.endsAt,
+    type: ticketKind(c),
+    color: ticketColor(c),
+    status: effectiveStatus(c) as CouponStatus,
   }));
   return {
     kind: "coupons",
@@ -634,7 +675,7 @@ export function shopSnapshot(complaints: Complaint[] = SHOP_COMPLAINTS): string 
   const rated = [...TOP_PRODUCTS].sort((a, b) => b.rating - a.rating)[0];
   const low = REGULAR_PRODUCTS.filter((p) => p.stock <= 15).map((p) => `${p.name} (เหลือ ${p.stock})`);
   const pending = complaints.filter((c) => c.status === "pending").length;
-  const activeCoupons = COUPONS.filter((c) => c.status === "active").length;
+  const activeCoupons = allCoupons().filter((c) => effectiveStatus(c) === "active").length;
   const atRisk = CUSTOMERS.filter((c) => c.daysAgo >= 60);
   const prPending = MOCK_PRS.filter((d) => d.status === "pending").length;
 

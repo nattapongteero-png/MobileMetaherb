@@ -29,6 +29,8 @@ import {
 } from "lucide-react-native";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import { useCart } from "../context/CartContext";
+import { createQuoteRequest } from "../store/quotes";
+import { currentUserId } from "../store/session";
 import { makeQuotePdf } from "../utils/quotePdf";
 
 // Route params are typed locally — `id` → single-material RFQ; `ids` → bulk RFQ
@@ -366,6 +368,65 @@ export function HerbalMarketQuoteScreen() {
   const [certPref, setCertPref] = useState("ทั่วไป");
   const [requiredBy, setRequiredBy] = useState("");
   const [note, setNote] = useState("");
+
+  /**
+   * Submit the RFQ. It used to only flip `submitted`, so the request the buyer
+   * spent a form filling in reached neither the shop nor their own B2BDocs page.
+   * One request per supplier — the shop console filters on `shopName`.
+   */
+  const submitRfq = () => {
+    const company = { name: companyName.trim() || "-", taxId: taxId.trim(), address: companyAddress.trim() };
+    const contact = {
+      name: contactName.trim() || "-",
+      position: position.trim() || undefined,
+      phone: phone.trim(),
+      email: email.trim(),
+      poRef: poReference.trim() || undefined,
+    };
+    const common = {
+      userId: currentUserId(),
+      company,
+      contact,
+      certificate: certPref,
+      neededBy: requiredBy.trim() || undefined,
+      note: note.trim() || undefined,
+    };
+
+    if (isBulk) {
+      for (const [supplier, items] of supplierGroups) {
+        createQuoteRequest({
+          ...common,
+          shopName: supplier,
+          items: items.map((it) => ({
+            materialId: it.id,
+            name: it.name,
+            supplier,
+            qty: it.quantity,
+            unit: "ชิ้น",
+            price: it.unitPrice,
+            image: it.image,
+          })),
+        });
+      }
+    } else {
+      createQuoteRequest({
+        ...common,
+        shopName: material.supplier,
+        items: [
+          {
+            materialId: material.id,
+            name: material.name,
+            supplier: material.supplier,
+            qty: qtyNum,
+            unit,
+            price: material.pricePerKg,
+            image: material.image as number,
+          },
+        ],
+      });
+    }
+    setSubmitted(true);
+  };
 
   const rfqNumber = `RFQ-${new Date().getFullYear() + 543}-${String(
     (Math.abs(((companyName || "x") + email).split("").reduce((s, c) => s + c.charCodeAt(0), 0)) % 9000) + 1000,
@@ -708,7 +769,7 @@ export function HerbalMarketQuoteScreen() {
               style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}
             >
               <Pressable
-                onPress={() => setSubmitted(true)}
+                onPress={submitRfq}
                 className="items-center justify-center active:opacity-80"
                 style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50 }}
               >

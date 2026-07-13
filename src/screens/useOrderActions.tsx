@@ -2,6 +2,8 @@ import { Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useOrders } from "../context/OrderContext";
+import { complaintForOrder } from "../store/complaints";
+import { requestCancellation } from "../store/orders";
 import type { Order } from "../data/orders";
 import type { OrderAction } from "../components/OrderActionButtons";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -21,12 +23,34 @@ export function useOrderActions() {
       case "pay":
         nav.navigate("PromptPayQR", { total: order.total, orderId: order.id });
         break;
-      case "cancel":
-        Alert.alert("ยกเลิกคำสั่งซื้อ", `ต้องการยกเลิก ${order.id}?`, [
-          { text: "ไม่", style: "cancel" },
-          { text: "ยกเลิกเลย", style: "destructive", onPress: () => setStatus(order.id, "cancelled") },
-        ]);
+      case "cancel": {
+        // An unpaid order the shop hasn't touched can be dropped outright. Once
+        // the shop has started on it, the buyer can only *request* a cancellation
+        // — the shop approves or denies it (and stock stays reserved meanwhile).
+        const needsApproval = order.status !== "pending_payment";
+        Alert.alert(
+          needsApproval ? "ขอยกเลิกคำสั่งซื้อ" : "ยกเลิกคำสั่งซื้อ",
+          needsApproval
+            ? `ร้านเริ่มดำเนินการแล้ว — ${order.id} จะถูกส่งให้ร้านพิจารณาก่อน`
+            : `ต้องการยกเลิก ${order.id}?`,
+          [
+            { text: "ไม่", style: "cancel" },
+            {
+              text: needsApproval ? "ส่งคำขอ" : "ยกเลิกเลย",
+              style: "destructive",
+              onPress: () => {
+                if (needsApproval) {
+                  requestCancellation(order.id, "ลูกค้าขอยกเลิก");
+                  Alert.alert("ส่งคำขอแล้ว", "รอร้านค้าพิจารณา คุณจะได้รับแจ้งเตือนเมื่อร้านตอบกลับ");
+                } else {
+                  setStatus(order.id, "cancelled");
+                }
+              },
+            },
+          ],
+        );
         break;
+      }
       case "received":
         Alert.alert("ยืนยันรับสินค้า", "ได้รับสินค้าครบถ้วนแล้วใช่ไหม?", [
           { text: "ยังไม่ได้รับ", style: "cancel" },
@@ -39,9 +63,14 @@ export function useOrderActions() {
       case "rebuy":
         nav.navigate("Products");
         break;
-      case "complaint":
-        nav.navigate("ComplaintSelect", { orderId: order.id });
+      case "complaint": {
+        // Already filed against this order? Show its live status instead of
+        // letting the buyer open a second case.
+        const existing = complaintForOrder(order.userId, order.id);
+        if (existing) nav.navigate("ComplaintStatus", { complaintId: existing.id });
+        else nav.navigate("ComplaintSelect", { orderId: order.id });
         break;
+      }
       case "contact":
         Alert.alert("กำลังพัฒนา", "ฟีเจอร์นี้อยู่ระหว่างพัฒนา");
         break;

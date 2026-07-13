@@ -15,6 +15,9 @@ import { GlassView } from "expo-glass-effect";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { usePayment } from "../context/PaymentContext";
+import { useTrials } from "../context/TrialContext";
+import { currentUserId } from "../store/session";
+import { METAHERB_SHOP } from "../data/shopOrders";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   MapPin,
@@ -184,6 +187,7 @@ export function TrialApplyScreen() {
 
   // Shared shipping address — same source as the checkout page (PaymentContext),
   // tapping the card opens the same AddressSelect picker.
+  const { apply } = useTrials();
   const { addresses, selectedAddressId } = usePayment();
   const selectedAddress =
     addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
@@ -217,6 +221,19 @@ export function TrialApplyScreen() {
       );
       return;
     }
+    // Persist the application. Before this the form validated, then navigated
+    // away — the shop's applicant registry never saw it.
+    apply({
+      trialId: product.id,
+      userId: currentUserId(),
+      shopName: METAHERB_SHOP,
+      applicantName: selectedAddress?.name ?? "ลูกค้า",
+      applicantPhone: selectedAddress?.phone ?? "-",
+      address: `${selectedAddress?.detail ?? ""} ${selectedAddress?.area ?? ""}`.trim(),
+      reason: reason.trim(),
+      objectives: ["efficacy", "sensory"],
+      productName: product.name,
+    });
     (nav as any).navigate("TrialSuccess", {
       productName: product.name,
       rewardPoints: product.rewardPoints,

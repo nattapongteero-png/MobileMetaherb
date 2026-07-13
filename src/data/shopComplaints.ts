@@ -1,5 +1,3 @@
-import type { ImageSourcePropType } from "react-native";
-import type { ComplaintType } from "./complaintTypes";
 import { RAW_PRODUCT_BY_ID } from "./realProducts";
 import { GALLERY_OVERRIDE } from "./productVariants";
 
@@ -10,15 +8,19 @@ import { GALLERY_OVERRIDE } from "./productVariants";
  * Every case carries เหลักฐานประกอบ (evidence) because the submit form requires it.
  */
 
-export type ComplaintStatus = "pending" | "acknowledged" | "refund_full" | "refund_partial" | "rejected";
+import {
+  COMPLAINT_STATUS_LABEL,
+  type Complaint,
+  type ComplaintItem,
+  type ComplaintStatus,
+  type Evidence,
+} from "../store/complaints";
+import type { ComplaintType } from "./complaintTypes";
+import { METAHERB_SHOP } from "./shopOrders";
+import { DEMO_USER } from "../store/session";
 
-export const STATUS_LABEL: Record<ComplaintStatus, string> = {
-  pending: "รอดำเนินการ",
-  acknowledged: "ยืนยันรับแจ้งปัญหา",
-  refund_full: "คืนเงินเต็มจำนวน",
-  refund_partial: "คืนเงินบางส่วน",
-  rejected: "ปฏิเสธ",
-};
+export type { Complaint, ComplaintItem, ComplaintStatus, Evidence };
+export const STATUS_LABEL = COMPLAINT_STATUS_LABEL;
 
 export const STATUS_COLOR: Record<ComplaintStatus, string> = {
   pending: "#f59e0b",
@@ -43,46 +45,24 @@ export const TYPE_COLOR: Record<ComplaintType, string> = {
   refund: "#0088ff",
 };
 
-export type ComplaintItem = { id?: string; name: string; option?: string; qty: number; price: number; image: ImageSourcePropType };
-/** A photo or video clip attached as supporting evidence (local asset or { uri }). */
-export type Evidence = { source: ImageSourcePropType; video?: boolean };
-
-export type Complaint = {
-  id: string;
-  orderId: string;
-  customer: string;
-  customerEmail: string;
-  customerPhone: string;
-  type: ComplaintType;
-  status: ComplaintStatus;
-  product: string;
-  description: string;
-  amount: number;
-  refundAmount?: number;
-  refundChannel: string;
-  createdAt: string;
-  note?: string;
-  items: ComplaintItem[];
-  evidence: Evidence[];
-};
 
 /** Item built from a real shop product id (name/price/photo come from the catalog). */
-function ci(id: string, qty: number, option?: string): ComplaintItem {
+function ci(id: string, qty: number, option = ""): ComplaintItem {
   const p = RAW_PRODUCT_BY_ID[id];
-  return { id, name: p.name, option, qty, price: p.price, image: p.image };
+  return { productId: id, name: p.name, option, qty, price: p.price, image: p.image as number };
 }
 
 // Evidence = real photos of the complaint's own product (its gallery if it has
 // extra shots, otherwise its single catalog photo) so the proof relates to the item.
 function evidenceFor(items: ComplaintItem[]): Evidence[] {
   return items.flatMap((it) => {
-    const g = it.id ? GALLERY_OVERRIDE[it.id] : undefined;
+    const g = it.productId ? GALLERY_OVERRIDE[it.productId] : undefined;
     const shots = g && g.length ? g : [it.image];
-    return shots.map((source) => ({ source }));
+    return shots.map((source) => ({ source: source as number }));
   });
 }
 
-type SeedRow = Omit<Complaint, "amount" | "product" | "evidence">;
+type SeedRow = Omit<Complaint, "amount" | "product" | "evidence" | "userId" | "shopName" | "history">;
 
 const BASE: SeedRow[] = [
   { id: "DSP-20260313-001", orderId: "ORD-20260318-4421", customer: "มาลี สวยงาม", customerEmail: "malee@email.com", customerPhone: "091-555-6666", type: "damaged", status: "pending", description: "ซองชาฉีกขาดหลายซอง ใบชาหกเลอะทั้งกล่อง สภาพไม่สมบูรณ์ ใช้ไม่ได้", refundChannel: "ธนาคารไทยพาณิชย์ (SCB) [*4321]", createdAt: "13 มี.ค. 2569", items: [ci("44", 1, "ชาอูหลงผสมดอกหอมหมื่นลี้")] },
@@ -107,13 +87,19 @@ const BASE: SeedRow[] = [
   { id: "DSP-20260313-020", orderId: "ORD-20260326-4440", customer: "ศิริรัตน์ ทองดี", customerEmail: "siriwat@email.com", customerPhone: "081-665-9090", type: "wrong_item", status: "rejected", description: "อ้างว่าได้สินค้าไม่ตรง แต่ตรวจสอบใบสั่งซื้อพบว่าตรงตามที่สั่ง", refundChannel: "ธนาคารกสิกรไทย [*3344]", createdAt: "26 มี.ค. 2569", items: [ci("34", 1, "ถุง 50 g")] },
 ];
 
-export const SHOP_COMPLAINTS: Complaint[] = BASE.map((c) => {
+export const SHOP_COMPLAINTS: Complaint[] = BASE.map((c, i) => {
   const amount = c.items.reduce((s, it) => s + it.price * it.qty, 0);
   return {
     ...c,
+    // The demo buyer owns the second case ("สมชาย ใจดี" shares their phone) so
+    // the customer status screen has something real to open. The rest belong to
+    // other buyers and only show up in the console.
+    userId: i === 1 ? DEMO_USER.id : `u-c${i}`,
+    shopName: METAHERB_SHOP,
     product: c.items[0]?.name ?? "-",
     amount,
     refundAmount: c.status === "refund_full" ? amount : c.refundAmount,
     evidence: evidenceFor(c.items),
+    history: [{ status: c.status, at: Date.now() }],
   };
 });

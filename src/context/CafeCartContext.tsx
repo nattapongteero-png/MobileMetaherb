@@ -1,13 +1,30 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import type { CafeCartLine } from "../data/cafeCart";
-import { INITIAL_CAFE_HISTORY, type CafePayMethodId, type CafeOrder, type CafeHistoryOrder, type CafeFavorite } from "../data/cafePayment";
+import type { CafePayMethodId, CafeFavorite } from "../data/cafePayment";
 import { startOrderLiveActivity, endOrderLiveActivity, reconcileOrderLiveActivities } from "../services/cafeLiveActivity";
+import { scheduleCafeReadyNotification, cancelCafeReadyNotification } from "../services/cafeNotify";
+import { useStore } from "../store/db";
+import {
+  activeCafeOrders,
+  cafeHistory,
+  cafeStore,
+  completeCafeOrder,
+  placeCafeOrder,
+  rateCafeOrder,
+  type CafeOrder,
+  type PlaceCafeOrderInput,
+} from "../store/cafe";
+import { currentUserId } from "../store/session";
 
 /**
  * META Caffe cart — shared across the café landing, item-detail and cart screens.
  * Lines are keyed by item + chosen options (identical lines merge). Item-level
  * helpers (qtyOfItem / decItem) power the quick +/- on the menu cards.
+ *
+ * The CART stays local to the session. ORDERS live in the shared café table
+ * (src/store/cafe.ts), which the barista queue on the shop side also reads —
+ * before this, a placed café order never left the customer's device.
  */
 type Ctx = {
   lines: CafeCartLine[];
@@ -23,22 +40,21 @@ type Ctx = {
   /** Café checkout payment method (PromptPay or cash only). */
   payMethod: CafePayMethodId;
   setPayMethod: (id: CafePayMethodId) => void;
-  /** Orders currently being prepared (drive the success screen + queue banners). */
+  /** Orders being prepared or waiting at the counter. */
   activeOrders: CafeOrder[];
   /** Past (picked-up) orders, newest first — with service/taste ratings. */
-  orderHistory: CafeHistoryOrder[];
-  /** Place an order: append it to the active list and empty the cart. */
-  placeOrder: (order: CafeOrder) => void;
-  /** Mark an active order picked up: move it into history (unrated). */
+  orderHistory: CafeOrder[];
+  /** Place an order: append it to the shared queue and empty the cart. */
+  placeOrder: (order: PlaceCafeOrderInput) => void;
+  /** Mark an active order picked up: move it into history. */
   completeOrder: (orderId: string) => void;
-  /** Save the review (service + taste ratings 1–5 and a comment) on a history order. */
+  /** Save the review (service + taste ratings 1–5 and a comment). */
   rateOrder: (orderId: string, service: number, taste: number, comment: string) => void;
   /** Favourite menu items (with saved options), newest first. */
   favorites: CafeFavorite[];
-  /** Add the item to favourites (with its options) or remove it if already saved. */
   toggleFavorite: (fav: CafeFavorite) => void;
   isFavorite: (itemId: string) => boolean;
-  /** Counter that bumps to fire the falling-stars celebration overlay (e.g. after a review). */
+  /** Counter that bumps to fire the falling-stars celebration overlay. */
   celebrate: number;
   fireCelebration: () => void;
 };
@@ -48,11 +64,14 @@ const CafeCartCtx = createContext<Ctx | null>(null);
 export function CafeCartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CafeCartLine[]>([]);
   const [payMethod, setPayMethod] = useState<CafePayMethodId>("promptpay");
-  const [activeOrders, setActiveOrders] = useState<CafeOrder[]>([]);
-  const [orderHistory, setOrderHistory] = useState<CafeHistoryOrder[]>(INITIAL_CAFE_HISTORY);
   const [favorites, setFavorites] = useState<CafeFavorite[]>([]);
   const [celebrate, setCelebrate] = useState(0);
   const fireCelebration = () => setCelebrate((c) => c + 1);
+
+  useStore(cafeStore); // re-render when the barista moves an order
+  const userId = currentUserId();
+  const activeOrders = activeCafeOrders(userId);
+  const orderHistory = cafeHistory(userId);
 
   // Reliable no-push "ready" flip for the reopened-app case: whenever the app
   // returns to the foreground, ask native to flip any order whose readyAt has
@@ -86,13 +105,14 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
       return next;
     });
   const clear = () => setLines([]);
+
   const placeOrder: Ctx["placeOrder"] = (order) => {
-    // Idempotent per orderId — a double-submit with the same id won't duplicate.
-    setActiveOrders((prev) => (prev.some((o) => o.orderId === order.orderId) ? prev : [...prev, order]));
+    // Idempotent per orderId, enforced by the store.
+    placeCafeOrder(order);
     setLines([]);
-    // Kick off the iOS Live Activity (Dynamic Island) countdown (no-op elsewhere).
     const first = order.items[0];
     const itemsLabel = first ? (order.items.length > 1 ? `${first.name} +${order.items.length - 1}` : first.name) : "ออเดอร์กาแฟ";
+    // iOS Live Activity (Dynamic Island) countdown — no-op elsewhere.
     startOrderLiveActivity({
       orderId: order.orderId,
       queueNo: order.queueNo,
@@ -101,16 +121,20 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
       startedAt: order.readyAt - order.waitMinutes * 60000,
       readyAt: order.readyAt,
     });
+    // Local "ready" push at readyAt (fires even if the app is closed).
+    void scheduleCafeReadyNotification({ orderId: order.orderId, readyAt: order.readyAt, queueNo: order.queueNo, itemsLabel });
   };
+
   const completeOrder: Ctx["completeOrder"] = (orderId) => {
-    const done = activeOrders.find((o) => o.orderId === orderId);
-    if (!done) return;
+    if (!completeCafeOrder(orderId)) return;
     endOrderLiveActivity(orderId);
-    setActiveOrders((prev) => prev.filter((o) => o.orderId !== orderId));
-    setOrderHistory((prev) => (prev.some((o) => o.orderId === orderId) ? prev : [{ ...done, ratingService: 0, ratingTaste: 0, comment: "" }, ...prev]));
+    // Picked up — cancel the pending "ready" push if it hasn't fired yet.
+    void cancelCafeReadyNotification(orderId);
   };
+
   const rateOrder: Ctx["rateOrder"] = (orderId, service, taste, comment) =>
-    setOrderHistory((prev) => prev.map((o) => (o.orderId === orderId ? { ...o, ratingService: service, ratingTaste: taste, comment } : o)));
+    void rateCafeOrder(orderId, service, taste, comment);
+
   const toggleFavorite: Ctx["toggleFavorite"] = (fav) =>
     setFavorites((prev) => (prev.some((f) => f.itemId === fav.itemId) ? prev.filter((f) => f.itemId !== fav.itemId) : [fav, ...prev]));
   const isFavorite: Ctx["isFavorite"] = (itemId) => favorites.some((f) => f.itemId === itemId);

@@ -47,6 +47,8 @@ import { AddBankAccountScreen } from "../screens/AddBankAccountScreen";
 import { PaymentAccountsScreen } from "../screens/PaymentAccountsScreen";
 import { SecuritySettingsScreen } from "../screens/SecuritySettingsScreen";
 import { ComplaintStatusScreen } from "../screens/ComplaintStatusScreen";
+import { CafeQueueScreen } from "../screens/CafeQueueScreen";
+import { ShopChatListScreen } from "../screens/ShopChatListScreen";
 import { CouponCollectScreen } from "../screens/CouponCollectScreen";
 import { HerbalMarketScreen } from "../screens/HerbalMarketScreen";
 import { HerbalMarketDetailScreen } from "../screens/HerbalMarketDetailScreen";
@@ -184,7 +186,9 @@ export type RootStackParamList = {
   ComplaintTypeSelect: { orderId?: string; current?: "damaged" | "wrong_item" | "return" | "refund" } | undefined;
   RefundChannelSelect: undefined;
   AddBankAccount: { selectForPayment?: boolean } | undefined;
-  ComplaintStatus: undefined;
+  ComplaintStatus: { complaintId: string };
+  CafeQueue: undefined;
+  ShopChatList: undefined;
   CouponCollect: undefined;
   // Pushed from Home "ดูทั้งหมด" (no longer bottom-tab screens).
   Products: undefined;
@@ -230,7 +234,7 @@ export type RootStackParamList = {
   Language: undefined;
   MyTrials: undefined;
   TrialRegister: undefined;
-  Chat: { shopId?: string; shopName?: string } | undefined;
+  Chat: { shopId?: string; shopName?: string; role?: "user" | "shop" } | undefined;
   ChatList: undefined;
   AIAssistant: { context?: string } | undefined;
   AIHistory: undefined;
@@ -251,7 +255,8 @@ export type RootStackParamList = {
   ShopOrderSearch: undefined;
   ShopOrderDetail: { orderId: string };
   CancelOrder: { orderId: string; onConfirm?: (reason: string, note: string) => void };
-  ConfirmShip: { orderId: string; onConfirm?: (tracking: string) => void };
+  /** `kind` picks which table the tracking number lands on. */
+  ConfirmShip: { orderId: string; kind?: "order" | "trial"; onConfirm?: (tracking: string) => void };
   ShopOrderReview: { orderId: string };
   ShopQuoteSearch: undefined;
   ShopDocSearch: { kind: DocKind };
@@ -311,7 +316,7 @@ export type RootStackParamList = {
   BrandInfo: undefined;
   Cart: undefined;
   Payment: undefined;
-  PromptPayQR: { total: number; orderId: string; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[] };
+  PromptPayQR: { total: number; orderId: string; orderIds?: string[]; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[] };
   PaymentSuccess: { orderId: string; total: number; methodLabel: string; methodDesc?: string };
   PaymentMethod: undefined;
   ShippingMethod: undefined;
@@ -464,6 +469,8 @@ export function RootStack() {
       <Stack.Screen name="ComplaintTypeSelect" component={ComplaintTypeSelectScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="RefundChannelSelect" component={RefundChannelSelectScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
       <Stack.Screen name="AddBankAccount" component={AddBankAccountScreen} options={{ presentation: "modal", animation: "slide_from_bottom", headerShown: false }} />
+      <Stack.Screen name="CafeQueue" component={CafeQueueScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="ShopChatList" component={ShopChatListScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="ComplaintStatus" component={ComplaintStatusScreen} options={{ headerShown: true, title: "สถานะการร้องเรียน", animation: "slide_from_right" }} />
       <Stack.Screen name="CouponCollect" component={CouponCollectScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="HerbalMarketDetail" component={HerbalMarketDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />

@@ -36,7 +36,7 @@ import { BottomFade } from "../components/BottomFade";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { CountBadge } from "../components/CountBadge";
 import { ARTICLES, VIDEOS, type Article, type VideoItem } from "../data/articles";
-import { REAL_FLASH_SALE, REAL_RECOMMENDED, REAL_PROMO } from "../data/realProducts";
+import { useFlashSaleProducts, useRecommendedProducts, usePromoProducts } from "../data/liveCatalog";
 import { MATERIALS, type HerbalMaterial } from "./HerbalMarketScreen";
 import { TRIAL_PRODUCTS, type TrialProduct } from "./TrialProductsScreen";
 import { useCart } from "../context/CartContext";
@@ -78,9 +78,8 @@ const SIDE_BANNERS = [
 // Home rails now draw from the real METAHERB product samples (real names,
 // prices, photos) ported from the web app — see src/data/realProducts.ts.
 // Each rail is paged 2-per-page, so we cap at 6 items (3 pages).
-const FLASH_SALE: Product[] = REAL_FLASH_SALE.slice(0, 6);
-const RECOMMENDED: Product[] = REAL_RECOMMENDED.slice(0, 6);
-const PROMO: Product[] = REAL_PROMO.slice(0, 6);
+// The three storefront rails now derive from the live catalog, so an owner
+// toggling "แนะนำ" or running a discount changes what the customer sees.
 
 function FlashSaleCountdown() {
   const [time, setTime] = useState({ h: 12, m: 13, s: 8 });
@@ -628,6 +627,9 @@ export function HomeScreen() {
   const nav = useNavigation<Nav>();
   const { count: cartCount } = useCart();
   const filter = useProductFilter();
+  const FLASH_SALE: Product[] = useFlashSaleProducts().slice(0, 6);
+  const RECOMMENDED: Product[] = useRecommendedProducts().slice(0, 6);
+  const PROMO: Product[] = usePromoProducts().slice(0, 6);
   // Products & Knowledge are no longer bottom tabs — push them as stack screens
   // from a section's "ดูทั้งหมด". Knowledge takes a tab param (articles/videos).
   // Open Products pre-filtered to the section's kind (all/flash/promo/recommended).

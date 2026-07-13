@@ -21,6 +21,20 @@ import { showToast } from "../components/Toast";
 import { SHOP_PRODUCTS } from "./ShopScreen";
 import { useAllPromotions, computedStatus } from "../data/promotions";
 import type { FlashProduct } from "./MyShopScreen";
+import { upsertFlash } from "../store/promotions";
+
+const TH_MONTH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+/** "01 ก.ค. 69 - 00:00" → epoch ms. Falls back when the field is empty. */
+function parseFlashDate(text: string, fallback: number): string {
+  const m = text.match(/(\d{1,2})\s+(\S+)\s+(\d{2,4})(?:[^\d]+(\d{1,2}):(\d{2}))?/);
+  if (!m) return new Date(fallback).toISOString();
+  const month = TH_MONTH.indexOf(m[2]);
+  if (month < 0) return new Date(fallback).toISOString();
+  const yy = Number(m[3]);
+  const year = (yy < 100 ? 2500 + yy : yy) - 543; // Buddhist → Gregorian
+  return new Date(year, month, Number(m[1]), Number(m[4] ?? 0), Number(m[5] ?? 0)).toISOString();
+}
 import type { RootStackParamList } from "../navigation/RootStack";
 import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, DIVIDER_GRAY, SURFACE_GRAY } from "../theme/tokens";
 
@@ -160,6 +174,17 @@ export function FlashAddProductScreen() {
       startText: startDate,
       endText: endDate,
     };
+    // Write the round to the shared store, so the product's price drops on the
+    // customer's storefront and it joins the Home flash rail. (This used to hand
+    // the product to a navigation callback and die in the caller's useState.)
+    upsertFlash({
+      productId: picked.id,
+      flashPrice,
+      total: qty,
+      sold,
+      startsAt: parseFlashDate(startDate, Date.now()),
+      endsAt: parseFlashDate(endDate, Date.now() + 7 * 86_400_000),
+    });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     params?.onDone?.(product);
     showToast(edit ? `แก้ไข "${picked.name}" เรียบร้อย` : `เพิ่ม "${picked.name}" เข้า Flash Sale เรียบร้อย`);

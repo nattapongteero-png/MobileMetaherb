@@ -7,6 +7,7 @@ import {
   TextInput,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { PAYMENT_METHODS, BANK_APPS } from "../data/paymentMethods";
 import { SAVED_CARDS } from "../data/savedCards";
@@ -17,8 +18,12 @@ import { usePayment } from "../context/PaymentContext";
 import { useRefund } from "../context/RefundContext";
 import { useSecurity } from "../context/SecurityContext";
 import { SHIPPING_METHODS } from "../data/shippingMethods";
-import { CHECKOUT_COUPONS as COUPONS, couponDiscount } from "../data/checkoutCoupons";
-import { CHECKOUT_ITEMS as ITEMS } from "../data/checkoutItems";
+import { useCheckoutCoupons, couponDiscount } from "../data/checkoutCoupons";
+import { useCart, type CartItem } from "../context/CartContext";
+import { createOrder, markPaid } from "../store/orders";
+import { splitByShop } from "../data/checkoutSplit";
+import { currentUserId } from "../store/session";
+import { redeemCoupon } from "../store/coupons";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
@@ -66,7 +71,7 @@ export function PaymentScreen() {
     selectedPayment,
     trueMoneyPhone,
     selectedShipping,
-    selectedCouponIdx,
+    selectedCouponId,
     coinsUsed,
     setCoinsUsed,
     addresses,
@@ -75,13 +80,19 @@ export function PaymentScreen() {
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? addresses[0];
   const { accounts } = useRefund();
 
+  // The lines the buyer ticked in the cart. Falls back to the whole in-stock
+  // cart when Payment is opened directly (deep link / back-navigation).
+  const { items: cartItems, checkoutItems, finishCheckout } = useCart();
+  const ITEMS: CartItem[] = checkoutItems.length ? checkoutItems : cartItems.filter((i) => i.inStock);
+
   const selectedShippingMethod =
     SHIPPING_METHODS.find((s) => s.id === selectedShipping) ?? SHIPPING_METHODS[0];
 
   // Pricing math
-  const selectedCoupon = selectedCouponIdx !== null ? COUPONS[selectedCouponIdx] : null;
+  const walletCoupons = useCheckoutCoupons();
+  const selectedCoupon = walletCoupons.find((c) => c.id === selectedCouponId) ?? null;
   const subtotal = ITEMS.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const discount = selectedCoupon ? couponDiscount(selectedCoupon, subtotal) : 0;
+  const discount = couponDiscount(selectedCoupon, subtotal);
   const vat = Math.round((subtotal - discount) * 0.07);
   // A free-shipping coupon waives the carrier fee.
   const freeShip = selectedCoupon?.type === "freeship";
@@ -118,15 +129,63 @@ export function PaymentScreen() {
     !!selectedCard || !!selectedBankAcc || !!BANK_APPS.find((a) => a.id === selectedPayment);
 
   const placeOrder = async () => {
+    if (ITEMS.length === 0) {
+      Alert.alert("ตะกร้าว่าง", "กรุณาเลือกสินค้าก่อนชำระเงิน");
+      return;
+    }
     if (needsPin) {
       const ok = await requirePin("ยืนยันรหัส PIN เพื่อชำระเงิน");
       if (!ok) return;
     }
-    const orderId = `MH${Date.now().toString().slice(-9)}`;
-    // PromptPay → show a QR for the amount; other methods → straight to success.
+
+    // One order per shop — the cart is supplier-grouped, and each seller sees
+    // only their own order. The proportional split (and its rounding rules)
+    // lives in data/checkoutSplit.ts where the tests can reach it.
+    const created: string[] = [];
+    for (const { shopName, lines, share } of splitByShop(ITEMS, grandTotal, subtotal)) {
+      const res = createOrder({
+        userId: currentUserId(),
+        shopName,
+        items: lines.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          option: i.option,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.image,
+        })),
+        recipient: {
+          name: selectedAddress.name,
+          phone: selectedAddress.phone,
+          address: `${selectedAddress.detail} ${selectedAddress.area}`.trim(),
+        },
+        total: share,
+        shippingMethod: selectedShippingMethod.name,
+        paymentMethod: selLabel ?? "",
+      });
+
+      if (!res.ok) {
+        const names = res.shortfall
+          .map((sf) => lines.find((l) => l.productId === sf.productId)?.name ?? sf.productId)
+          .join(", ");
+        Alert.alert("สินค้าไม่พอ", `${names} มีไม่พอในสต็อก กรุณาลดจำนวนแล้วลองใหม่`);
+        return;
+      }
+      created.push(res.order.id);
+    }
+
+    // Spend the coupon: bumps its usage counter (visible in the shop console)
+    // and marks it used in the buyer's wallet.
+    if (selectedCoupon) redeemCoupon(currentUserId(), selectedCoupon.id);
+    finishCheckout(); // the ordered lines leave the cart
+    const orderId = created[0];
+
+    // PromptPay → show a QR; the order stays "รอชำระเงิน" until the buyer confirms.
     if (selectedPayment === "promptpay") {
-      nav.navigate("PromptPayQR", { total: grandTotal, orderId });
+      nav.navigate("PromptPayQR", { total: grandTotal, orderId, orderIds: created });
     } else {
+      // Card / wallet / bank-app: the charge went through, so the shop must verify.
+      created.forEach((id) => markPaid(id));
       nav.navigate("PaymentSuccess", {
         orderId,
         total: grandTotal,
@@ -495,7 +554,7 @@ export function PaymentScreen() {
               </View>
             ) : (
               <Text style={{ flex: 1, fontSize: 14, color: "#525252", lineHeight: 18 }}>
-                เลือกคูปองส่วนลด / ส่งฟรี ({COUPONS.length} คูปองพร้อมใช้)
+                เลือกคูปองส่วนลด / ส่งฟรี ({walletCoupons.length} คูปองพร้อมใช้)
               </Text>
             )}
           </Pressable>

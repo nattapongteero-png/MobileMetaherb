@@ -9,6 +9,7 @@ import { Eye, EyeOff, Check, Store, ArrowRight, User, Lock, Mail, Phone } from "
 import { SubPageHeader } from "../components/SubPageHeader";
 import { SocialRow } from "./LoginScreen";
 import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { signUp } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -50,6 +51,8 @@ export function RegisterScreen() {
       setError("กรุณายอมรับเงื่อนไขการใช้งาน");
       return;
     }
+    // Creates the session the whole buyer side reads — it used to only Alert.
+    signUp({ name: username.trim(), email: email.trim(), phone: phone.trim() });
     Alert.alert("สมัครสมาชิกสำเร็จ", "ยินดีต้อนรับสู่ METAHERB", [{ text: "ตกลง", onPress: () => nav.navigate("Main") }]);
   };
 

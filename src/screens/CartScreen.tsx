@@ -173,7 +173,7 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
 export function CartScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { items, updateQty, removeItem, removeMany } = useCart();
+  const { items, updateQty, removeItem, removeMany, beginCheckout } = useCart();
 
   // Search — filters the displayed rows by product name or shop. Selection and
   // pricing keep operating on the full cart so the checkout total stays stable
@@ -552,7 +552,11 @@ export function CartScreen() {
             discount={discount}
             grandTotal={grandTotal}
             payDisabled={selectedCount === 0}
-            onPay={() => nav.navigate("Payment")}
+            onPay={() => {
+              // Carry the ticked lines into checkout — Payment reads these, not a mock array.
+              beginCheckout(selectedItems);
+              nav.navigate("Payment");
+            }}
             onPR={() => {
               if (selectedItems.length === 0) {
                 Alert.alert("เลือกสินค้าก่อน", "กรุณาเลือกสินค้าอย่างน้อย 1 รายการก่อนออกใบ PR");

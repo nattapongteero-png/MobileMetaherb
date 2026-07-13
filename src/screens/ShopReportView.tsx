@@ -24,14 +24,17 @@ import { SalesDatePicker, salesDateLabel, type DateRange } from "../components/S
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
   REPORT_DATA, sumField, fmtBaht,
-  sortCustomers, customerStats, rankColor, rankTextColor, customersForPeriod, focusCustomers,
+  sortCustomers, customerStats, rankColor, rankTextColor, focusCustomers,
   CUSTOMER_SORT_OPTIONS,
-  sortTopProducts, sortRatingProducts, productsForPeriod, focusProducts, avgPerUnit, productDiscount,
+  sortTopProducts, sortRatingProducts, focusProducts, avgPerUnit,
   sortChannels, channelsForPeriod, focusChannels, channelStats, channelColor, channelGradient, CHANNEL_SORT_OPTIONS,
   PRODUCT_SORT_OPTIONS, RATING_SORT_OPTIONS,
-  TOP_PRODUCTS, CHANNELS, CHANNEL_TYPE_COLOR,
+  CHANNEL_TYPE_COLOR,
   type Period, type SeriesKey, type Customer, type CustomerSort, type TopProduct, type TopProductSort, type RatingSort, type Channel, type ChannelSort,
 } from "../data/salesReport";
+// Real order-derived rows (teammate's "Reports read the orders table") feeding
+// the card UI — see reportSources.ts for what is real and what stays mock.
+import { useReportCustomers, useReportProducts, useReportKpis } from "../data/reportSources";
 import { CHANNEL_LOGO, CHANNEL_LOGO_VIEWBOX } from "../data/channelLogos";
 import { exportCustomerReportPDF, exportCustomerReportExcel, type CustomerExportData } from "../utils/reportExport";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
@@ -416,7 +419,6 @@ function ProductCard({ p, rank, mode }: { p: TopProduct; rank: number; mode: Pro
   const tint = rank < 3 ? medal : "#94a3b8";
   const rating = mode === "rating";
   const avg = avgPerUnit(p);
-  const discount = productDiscount(p);
   // No tinted peek strip: everything it could carry (หมวดหมู่, รีวิว) already
   // sits in the card body, so it was pure repetition.
   return (
@@ -466,14 +468,16 @@ function ProductCard({ p, rank, mode }: { p: TopProduct; rank: number; mode: Pro
                     </View>
                   </View>
                 </View>
-                {/* unit left blank: "รีวิว (รีวิว)" would just repeat the label */}
-                <CStat compact width={RATING_COL} label="รีวิว" value={p.reviews.toLocaleString()} unit="" />
+                {/* ยังไม่มีที่เก็บรีวิว — แสดงจำนวนคำสั่งซื้อ ซึ่งเป็นค่าจริง */}
+                <CStat compact width={RATING_COL} label="คำสั่งซื้อ" value={p.reviews.toLocaleString()} unit="" />
               </View>
             ) : (
               <>
                 <CStat compact flex label="ยอดขาย" value={p.sold.toLocaleString()} unit="ชิ้น" />
                 <CStat compact flex label="รายได้" value={p.revenue.toLocaleString()} unit="฿" />
-                <CStat compact flex label="ส่วนลด" value={discount > 0 ? `−${discount.toLocaleString()}` : "–"} unit="฿" />
+                {/* ส่วนลดต่อสินค้าอนุมานจากออเดอร์ไม่ได้ (คูปองอยู่ระดับออเดอร์) — ใช้จำนวน
+                    คำสั่งซื้อของสินค้านั้นแทน ซึ่งเป็นค่าจริง */}
+                <CStat compact flex label="คำสั่งซื้อ" value={p.reviews.toLocaleString()} unit="" />
                 <CStat compact flex label="เฉลี่ย/ชิ้น" value={avg.toLocaleString()} unit="" />
               </>
             )}
@@ -652,12 +656,12 @@ function ProductTotals({ list, all, scope, mode, onMode }: {
   const sold = list.reduce((s, p) => s + p.sold, 0);
   const revenue = list.reduce((s, p) => s + p.revenue, 0);
   const reviews = list.reduce((s, p) => s + p.reviews, 0);
-  const discount = list.reduce((s, p) => s + productDiscount(p), 0);
   const avg = sold > 0 ? Math.round(revenue / sold) : 0;
   const rating = list.length > 0 ? list.reduce((s, p) => s + p.rating, 0) / list.length : 0;
   // Top ring = ส่วนลด ÷ รายได้ — the one real 0–100% ratio in this table, and both
   // its numerator and denominator are already on the card. Rating ring = ★ ÷ 5.
-  const discountPct = revenue > 0 ? Math.round((discount / revenue) * 100) : 0;
+  const allRevenue = all.reduce((s, p) => s + p.revenue, 0);
+  const sharePct = allRevenue > 0 ? Math.round((revenue / allRevenue) * 100) : 0;
 
 
   // Peek geometry — the next card's edge stays visible so the swipe advertises
@@ -724,7 +728,7 @@ function ProductTotals({ list, all, scope, mode, onMode }: {
                   {isRating ? (
                     <RatingBandDonut items={list} />
                   ) : (
-                    <SplitDonut total={revenue} part={discount} partColor={DISCOUNT_TONE} restColor={BRAND_GREEN} />
+                    <SplitDonut total={allRevenue} part={allRevenue - revenue} partColor={RING_TRACK} restColor={BRAND_GREEN} />
                   )}
                   <View className="flex-row items-center" style={{ flex: 1, flexWrap: "wrap", rowGap: 8, columnGap: 16 }}>
                     {isRating ? (
@@ -733,13 +737,12 @@ function ProductTotals({ list, all, scope, mode, onMode }: {
                             (คะแนนเฉลี่ยไม่ซ้ำที่นี่ — มันคือพาดหัวข้างบนแล้ว). */}
                         <CStat dot="#16a34a" label="4.5 ขึ้นไป" value={`${list.filter((p) => p.rating >= 4.5).length}`} unit="รายการ" />
                         <CStat dot="#dc2626" label="ต่ำกว่า 4.0" value={`${list.filter((p) => p.rating < 4).length}`} unit="รายการ" />
-                        <CStat label="รีวิวรวม" value={reviews.toLocaleString()} unit="รีวิว" />
+                        <CStat label="คำสั่งซื้อรวม" value={reviews.toLocaleString()} unit="ครั้ง" />
                       </>
                     ) : (
                       <>
-                        {/* รายได้สุทธิ isn't repeated here — it IS the ฿ headline above;
-                            the donut's green arc already stands for it. */}
-                        <CStat dot={DISCOUNT_TONE} label={`ส่วนลด (${discountPct}%)`} value={discount > 0 ? `−${discount.toLocaleString()}` : "–"} unit={discount > 0 ? "฿" : ""} />
+                        {/* วงเขียว = รายได้ของสินค้าที่แสดง เทียบรายได้ทั้งหมดของร้าน (ทั้งคู่เป็นค่าจริง) */}
+                        <CStat dot={BRAND_GREEN} label={`ส่วนแบ่งรายได้ (${sharePct}%)`} value={revenue.toLocaleString()} unit="฿" />
                         <CStat label="ยอดขาย" value={sold.toLocaleString()} unit="ชิ้น" />
                         <CStat label="เฉลี่ย/ชิ้น" value={avg.toLocaleString()} unit="฿" />
                       </>
@@ -763,28 +766,34 @@ export function ShopReportView({ kind, period, setPeriod, dateSel, exportRef }: 
   const [chartType, setChartType] = useState<"line" | "bar" | "pie">("line");
   const hasPie = true; // all three reports have the web's 3 chart tabs
   const data = REPORT_DATA[period];
+
+  // ลูกค้า/สินค้า มาจากตารางออเดอร์จริง; การตลาด (ผู้เข้าชม/Conv./ROAS) ยังเป็น mock
+  // เพราะออเดอร์บอกไม่ได้ว่ามีคนเข้าดูหน้าร้านกี่คน — see reportSources.ts.
+  const realCustomers = useReportCustomers();
+  const realProducts = useReportProducts();
+  const k = useReportKpis();
   const scope = salesDateLabel(period, dateSel);
   const days = Math.max(1, data.filter((d) => d.visits > 0).length);
 
   const kpis: Kpi[] = useMemo(() => {
     if (kind === "customers") {
-      const nc = sumField(data, "newCust"), rp = sumField(data, "repeat"), tot = nc + rp;
+      // "ใหม่" = ซื้อครั้งเดียว, "ซื้อซ้ำ" = มากกว่าหนึ่งครั้ง — นับจากประวัติทั้งหมดของร้าน.
       return [
-        { label: `ลูกค้าใหม่ ${scope}`, value: `${nc.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(nc / days)} คน/วัน`, accent: "#3b82f6", SubIcon: TrendingUp, art: ART.newCustomer },
-        { label: `ลูกค้าซื้อซ้ำ ${scope}`, value: `${rp.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(rp / days)} คน/วัน`, accent: "#319754", SubIcon: TrendingUp, art: ART.repeatCustomers },
-        { label: `ลูกค้าทั้งหมด ${scope}`, value: `${tot.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(tot / days)} คน/วัน`, accent: "#0ea5e9", SubIcon: TrendingUp, art: ART.groupCustomer },
-        { label: "ลูกค้าทั้งหมดในร้าน", value: "1,247 คน", sub: `+${nc} คนใหม่`, accent: "#10b981", SubIcon: UserPlus, art: ART.member },
+        { label: "ลูกค้าใหม่", value: `${k.newCust.toLocaleString()} คน`, sub: "สั่งซื้อครั้งแรก", accent: "#3b82f6", SubIcon: TrendingUp, art: ART.newCustomer },
+        { label: "ลูกค้าซื้อซ้ำ", value: `${k.repeat.toLocaleString()} คน`, sub: "สั่งซื้อมากกว่า 1 ครั้ง", accent: "#319754", SubIcon: TrendingUp, art: ART.repeatCustomers },
+        { label: "ลูกค้าทั้งหมด", value: `${k.buyers.toLocaleString()} คน`, sub: `${k.orders} คำสั่งซื้อรวม`, accent: "#0ea5e9", SubIcon: TrendingUp, art: ART.groupCustomer },
+        { label: "ยอดซื้อเฉลี่ย/คน", value: fmtBaht(k.lifetimeAvg), sub: "ตลอดอายุลูกค้า", accent: "#10b981", SubIcon: UserPlus, art: ART.member },
       ];
     }
     if (kind === "products") {
-      const u = sumField(data, "units");
       return [
-        { label: `จำนวนขาย ${scope}`, value: `${u.toLocaleString()} ชิ้น`, sub: `เฉลี่ย ${Math.round(u / days)} ชิ้น/วัน`, accent: "#319754", SubIcon: TrendingUp, art: ART.productsSold },
-        { label: "สินค้าทั้งหมดในร้าน", value: "247 รายการ", sub: "9 หมวดหมู่", accent: "#0ea5e9", SubIcon: Boxes, art: ART.productsStore },
-        { label: "สต็อกต่ำ / หมด", value: "4 รายการ", sub: "1 รายการสินค้าหมด", accent: "#dc2626", SubIcon: AlertTriangle, art: ART.stock },
-        { label: "รีวิวเฉลี่ยร้าน", value: "4.6 ★", sub: "1,247 รีวิวรวม", accent: "#f59e0b", SubIcon: Star, art: ART.rating },
+        { label: "จำนวนขายรวม", value: `${k.units.toLocaleString()} ชิ้น`, sub: `จาก ${k.orders} คำสั่งซื้อ`, accent: "#319754", SubIcon: TrendingUp, art: ART.productsSold },
+        { label: "สินค้าที่ขายได้", value: `${k.distinctProducts} รายการ`, sub: "มีอย่างน้อย 1 ออเดอร์", accent: "#0ea5e9", SubIcon: Boxes, art: ART.productsStore },
+        { label: "รายได้รวม", value: fmtBaht(k.sales), sub: `ยกเลิก ${fmtBaht(k.cancelled)}`, accent: "#dc2626", SubIcon: AlertTriangle, art: ART.stock },
+        { label: "คะแนนเฉลี่ยสินค้า", value: `${k.avgRating.toFixed(1)} ★`, sub: `มูลค่าเฉลี่ย/ออเดอร์ ${fmtBaht(k.aov)}`, accent: "#f59e0b", SubIcon: Star, art: ART.rating },
       ];
     }
+    // การตลาด — ยังเป็น mock ทั้งบล็อก (ไม่มี pipeline เก็บผู้เข้าชม/คูปอง).
     const v = sumField(data, "visits"), o = sumField(data, "orders"), conv = v > 0 ? (o / v) * 100 : 0;
     return [
       { label: `ผู้เข้าชม ${scope}`, value: `${v.toLocaleString()} คน`, sub: `เฉลี่ย ${Math.round(v / days)} คน/วัน`, accent: "#7c3aed", SubIcon: TrendingUp, art: ART.visitors },
@@ -792,7 +801,7 @@ export function ShopReportView({ kind, period, setPeriod, dateSel, exportRef }: 
       { label: `อัตราคอนเวิร์ต ${scope}`, value: `${conv.toFixed(2)}%`, sub: `${o} จาก ${v.toLocaleString()} ครั้ง`, accent: "#10b981", SubIcon: TrendingUp, art: ART.convert },
       { label: "คูปองที่ใช้", value: "32 ครั้ง", sub: "8 คูปองล่าสุด", accent: "#ec4899", SubIcon: Ticket, art: ART.coupon },
     ];
-  }, [kind, data, scope, days]);
+  }, [kind, data, scope, days, k]);
 
   /* ---- Customer table — flat ranked list (web parity), sort + export like ยอดขาย ----
    * Web has five filters stacked on this table: ช่วงเวลา (period tabs) → วันที่
@@ -818,19 +827,19 @@ export function ShopReportView({ kind, period, setPeriod, dateSel, exportRef }: 
 
   // period + date → scaled list; then narrow to the focused chart bucket.
   const scoped = useMemo(() => {
-    const base = customersForPeriod(period, dateSel.start.month);
+    const base = realCustomers;
     if (!focused) return base;
     const row = data.find((d) => d.label === focused);
     return focusCustomers(base, focused, row ? row.newCust + row.repeat : 0);
-  }, [period, dateSel, focused, data]);
+  }, [realCustomers, focused, data]);
   const ranked = useMemo(() => sortCustomers(scoped, sort as CustomerSort), [scoped, sort]);
 
   const pScoped = useMemo(() => {
-    const base = productsForPeriod(period, dateSel.start.month);
+    const base = realProducts;
     if (!focused) return base;
     const row = data.find((d) => d.label === focused);
     return focusProducts(base, focused, row ? row.units : 0);
-  }, [period, dateSel, focused, data]);
+  }, [realProducts, focused, data]);
   const chScoped = useMemo(() => {
     const base = channelsForPeriod(period, dateSel.start.month);
     if (!focused) return base;

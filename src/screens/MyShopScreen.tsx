@@ -43,6 +43,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   AlertCircle,
   AlertTriangle,
+  Coffee,
+  MessageSquare,
   ArrowRightCircle,
   BarChart3,
   Beaker,
@@ -120,6 +122,24 @@ import { useSeller } from "../context/SellerContext";
 import { BottomFade } from "../components/BottomFade";
 import { MATERIALS, MaterialCard } from "./HerbalMarketScreen";
 import { SHOP, SHOP_PRODUCTS, REVIEWS, ProductsGrid, ReviewsSection } from "./ShopScreen";
+import {
+  ORDER_STATUS_CFG,
+  matchesShopTab,
+  useShopOrders,
+  type OrderStatus,
+  type ShopOrder,
+} from "../data/shopOrderView";
+import { METAHERB_SHOP } from "../data/shopOrders";
+import { useShopQuotes } from "../data/quoteView";
+import { useShopOrderRows } from "../data/shopOrderView";
+import { dailySales, heatLevels, monthlyLineRevenue, monthlyOrders, pctDelta } from "../store/analytics";
+import { verifyPayment } from "../store/orders";
+import type { Order } from "../store/types";
+import { useStore } from "../store/db";
+import { catalogStore, deleteProduct, setProductClosed, setProductRecommended } from "../store/catalog";
+import { useOwnerProducts, type OwnerProduct } from "../data/liveCatalog";
+// Re-exported so the shop sub-screens keep their existing import site.
+export { ORDER_STATUS_CFG, useShopOrders, type ShopOrder };
 import { webCategoryLabel, SHOP_STOCK } from "../data/catalog";
 import { GROUP_BY_ID } from "../data/productVariants";
 import { RAW_PRODUCT_BY_ID } from "../data/realProducts";
@@ -165,6 +185,8 @@ const SHOP_TABS = [
 // sub-menus render as accordion sections inside the sheet).
 export type SectionId =
   | "dashboard"
+  | "cafe_queue"
+  | "shop_chat"
   | "orders"
   | "hm_quotations"
   | "hm_pr"
@@ -255,6 +277,8 @@ const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[]
   { id: "report_products", label: "รายงานสินค้า", Icon: Package },
   { id: "report_market", label: "รายงานตลาด", Icon: Beaker },
   { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
+  { id: "cafe_queue", label: "คิวคาเฟ่", Icon: Coffee },
+  { id: "shop_chat", label: "ข้อความลูกค้า", Icon: MessageSquare },
 ];
 
 type MenuItem = (typeof SHOP_MENU_GRID)[number];
@@ -501,6 +525,8 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
 // Flat label lookup for the section selector button.
 export const SECTION_LABEL: Record<SectionId, string> = {
   dashboard: "Dashboard",
+  cafe_queue: "คิวคาเฟ่",
+  shop_chat: "ข้อความลูกค้า",
   orders: "จัดการคำสั่งซื้อ",
   hm_quotations: "ใบเสนอราคา",
   hm_pr: "ใบ PR",
@@ -544,9 +570,9 @@ const WALLET = {
 
 // Per-month figures (index 0 = Jan) — same arrays as the web OverviewTab.
 // Selecting a month/day re-scopes everything off these.
+// Page visits have no source in the app — no analytics pipeline exists — so this
+// stays mock. Sales and orders now come from the shop's real orders.
 const MONTHLY_VISITS = [3200, 2800, 4100, 3600, 2900, 3500, 4500, 3100, 2600, 3800, 4200, 2700];
-const MONTHLY_ORDERS = [480, 390, 620, 510, 430, 560, 710, 450, 370, 580, 640, 400];
-const MONTHLY_SALES_DATA = [96000, 78000, 124000, 102000, 86000, 112000, 142000, 90000, 74000, 116000, 128000, 80000];
 
 // Order status grid — exact same 6 buckets as the web Order tracking card.
 const ORDER_STATUS = [
@@ -612,9 +638,13 @@ export const PM_STATUS_COLOR: Record<PMStatus, string> = {
 // always match what the storefront cards actually display. Products whose
 // detail page offers variant options (VARIANT_GROUPS) show "มีตัวเลือก" with
 // the min–max price across their SKUs instead of "ราคาเดียว".
-export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
-  const m = SHOP_STOCK[p.id] ?? { stock: 200 };
-  const status: PMStatus = m.closed ? "ปิดขาย" : m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
+/**
+ * The shop's own products, as management cards. Derived from the LIVE catalog
+ * (seed + the owner's edits + owner-created products) and the LIVE stock table,
+ * so a sale that drains stock is visible here immediately.
+ */
+function pmFromOwner(p: OwnerProduct): PMProduct {
+  const status: PMStatus = p.closed ? "ปิดขาย" : p.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
   const group = GROUP_BY_ID[p.id];
   let priceText = `฿ ${p.price.toFixed(2)}`;
   if (group) {
@@ -631,75 +661,61 @@ export const PM_REGULAR: PMProduct[] = SHOP_PRODUCTS.map((p) => {
     type: group ? "มีตัวเลือก" : "ราคาเดียว",
     typeColor: group ? "#0088ff" : "#ff9500",
     priceText,
-    stockText: `${m.stock.toLocaleString()} ชิ้น`,
+    stockText: `${p.stock.toLocaleString()} ชิ้น`,
     status,
     statusColor: PM_STATUS_COLOR[status],
     flash: !!p.isFlashSale,
     recommended: !!p.isRecommended,
   };
-});
+}
 
-export const PM_MATERIAL: PMProduct[] = MATERIALS.map((m) => {
-  const status: PMStatus = m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
-  return {
-    id: m.id,
-    name: m.name,
-    category: m.category,
-    image: m.image as number,
-    type: "วัตถุดิบ",
-    typeColor: "#475569",
-    priceText: `฿ ${m.pricePerKg.toLocaleString()} / กก.`,
-    stockText: `${m.stock.toLocaleString()} กก.`,
-    status,
-    statusColor: PM_STATUS_COLOR[status],
-    flash: false,
-    recommended: false,
-  };
-});
-
-/* ── PM store — status overrides + deletions shared by the list, search, and
-   detail pages (same in-memory pattern as the coupons/promotions stores).
-   Base data stays the derived PM_REGULAR / PM_MATERIAL arrays; overrides
-   layer on top so every surface re-renders together. ── */
-type PMOverrides = Record<string, { status?: PMStatus; recommended?: boolean; deleted?: boolean }>;
-let pmOverrides: PMOverrides = {};
-const pmListeners = new Set<() => void>();
-const pmEmit = () => pmListeners.forEach((l) => l());
-const pmSubscribe = (l: () => void) => {
-  pmListeners.add(l);
-  return () => {
-    pmListeners.delete(l);
-  };
-};
+/* ── Product management writes go to the shared catalog overlay
+   (src/store/catalog.ts), so hiding, renaming, recommending or deleting a
+   product changes what the CUSTOMER sees. They used to land in a private
+   `pmOverrides` map that no storefront surface ever read. ── */
 export function setPMStatus(id: string, status: PMStatus) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], status } };
-  pmEmit();
+  setProductClosed(id, status === "ปิดขาย");
 }
 export function deletePMProduct(id: string) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], deleted: true } };
-  pmEmit();
+  deleteProduct(id);
 }
 export function setPMRecommended(id: string, recommended: boolean) {
-  pmOverrides = { ...pmOverrides, [id]: { ...pmOverrides[id], recommended } };
-  pmEmit();
+  setProductRecommended(id, recommended);
 }
-function applyPMOverrides(base: PMProduct[], o: PMOverrides): PMProduct[] {
-  return base
-    .filter((p) => !o[p.id]?.deleted)
-    .map((p) => {
-      const ov = o[p.id];
-      if (!ov) return p;
-      return {
-        ...p,
-        ...(ov.status ? { status: ov.status, statusColor: PM_STATUS_COLOR[ov.status] } : null),
-        ...(ov.recommended != null ? { recommended: ov.recommended } : null),
-      };
-    });
+
+/** Herbal-Market materials aren't catalog products, but share the overlay for status/deletion. */
+function useMaterialPM(): PMProduct[] {
+  const overlay = useStore(catalogStore);
+  return useMemo(
+    () =>
+      MATERIALS.filter((m) => !overlay.patches[m.id]?.deleted).map((m) => {
+        const closed = Boolean(overlay.patches[m.id]?.closed);
+        const status: PMStatus = closed ? "ปิดขาย" : m.stock === 0 ? "สินค้าหมด" : "เปิดขาย";
+        return {
+          id: m.id,
+          name: m.name,
+          category: m.category,
+          image: m.image as number,
+          type: "วัตถุดิบ",
+          typeColor: "#475569",
+          priceText: `฿ ${m.pricePerKg.toLocaleString()} / กก.`,
+          stockText: `${m.stock.toLocaleString()} กก.`,
+          status,
+          statusColor: PM_STATUS_COLOR[status],
+          flash: false,
+          recommended: false,
+        };
+      }),
+    [overlay],
+  );
 }
-/** Live product list (overrides applied) — re-renders on toggle / delete. */
+
+/** Live product list — re-renders on toggle / delete / new product / stock change. */
 export function usePMProducts(type: "regular" | "material"): PMProduct[] {
-  const o = useSyncExternalStore(pmSubscribe, () => pmOverrides, () => pmOverrides);
-  return useMemo(() => applyPMOverrides(type === "regular" ? PM_REGULAR : PM_MATERIAL, o), [type, o]);
+  const owned = useOwnerProducts(METAHERB_SHOP);
+  const materials = useMaterialPM();
+  const regular = useMemo(() => owned.map(pmFromOwner), [owned]);
+  return type === "regular" ? regular : materials;
 }
 
 // ===================== FLASH SALE (sidebar → Flash Sale) ====================
@@ -838,171 +854,30 @@ const TOP_CUSTOMERS = [
 ];
 
 // ===================== ORDERS (sidebar → คำสั่งซื้อ) =====================
-// Ported from the web OwnerDashboard OrdersTab. Same 6 statuses, status pill +
-// note colors, filter tabs, and order-card layout — adapted for a phone width.
-type OrderStatus =
-  | "pending_payment"
-  | "pending_verify"
-  | "ready_ship"
-  | "shipping"
-  | "shipped"
-  | "cancelled";
-
-// Status pill bg + footer note tag (exact web values from statusConfig).
-export const ORDER_STATUS_CFG: Record<
-  OrderStatus,
-  { label: string; pillBg: string; note: string; noteColor: string }
-> = {
-  pending_payment: { label: "รอชำระเงิน", pillBg: "#ff8d28", note: "ยังไม่ชำระเงิน", noteColor: "#ff9500" },
-  pending_verify: { label: "รอตรวจสอบ", pillBg: "#ff9500", note: "รอร้านตรวจสอบ", noteColor: "#ff9500" },
-  ready_ship: { label: "พร้อมจัดส่ง", pillBg: "#007aff", note: "พร้อมส่งให้ลูกค้า", noteColor: "#007aff" },
-  shipping: { label: "กำลังจัดส่ง", pillBg: "#319754", note: "ระหว่างจัดส่ง", noteColor: "#319754" },
-  shipped: { label: "ส่งสำเร็จ", pillBg: "#10b981", note: "ส่งสำเร็จแล้ว", noteColor: "#10b981" },
-  cancelled: { label: "ยกเลิก", pillBg: "#ff3b30", note: "ยกเลิกแล้ว", noteColor: "#ff3b30" },
-};
+// Ported from the web OwnerDashboard OrdersTab. Status pill + note colors,
+// filter tabs, and order-card layout — adapted for a phone width.
+//
+// The rows come from the SHARED orders table (src/store/orders.ts) via the
+// `useShopOrders` projection, so a purchase made in the customer app lands here.
+// The old module-level `ORDERS` const — a private array with its own id
+// namespace that no buyer could ever reach — is gone.
 
 // Filter tabs — "all" + each status, with the same icons as the web.
+// "ส่งสำเร็จ" also collects reviewed (completed) orders; see `matchesShopTab`.
+/**
+ * The orders table holds 19 months of history and StickyFilterList is a plain
+ * ScrollView, so the console renders a window. Search still reaches everything.
+ */
+const ORDER_PAGE_SIZE = 40;
+
 const ORDER_TABS: { id: "all" | OrderStatus; label: string; Icon: typeof BarChart3 }[] = [
   { id: "all", label: "ทั้งหมด", Icon: ClipboardList },
   { id: "pending_payment", label: "รอชำระเงิน", Icon: Wallet },
   { id: "pending_verify", label: "รอตรวจสอบ", Icon: ScanSearch },
-  { id: "ready_ship", label: "พร้อมจัดส่ง", Icon: Package },
+  { id: "preparing", label: "พร้อมจัดส่ง", Icon: Package },
   { id: "shipping", label: "กำลังจัดส่ง", Icon: Truck },
-  { id: "shipped", label: "ส่งสำเร็จ", Icon: PackageCheck },
+  { id: "delivered", label: "ส่งสำเร็จ", Icon: PackageCheck },
   { id: "cancelled", label: "ยกเลิก", Icon: PackageX },
-];
-
-type OrderItem = { name: string; option: string; qty: number; price: number; image: number };
-export type ShopOrder = {
-  id: string;
-  status: OrderStatus;
-  date: string;
-  customer: string;
-  phone: string;
-  address: string;
-  shippingMethod: "รับที่ร้าน" | "จัดส่งปกติ" | "จัดส่งด่วน";
-  trackingNumber?: string;
-  reviewScore?: number;
-  // Detail-page fields (same shape as the web OwnerDashboard order).
-  paymentMethod?: string;
-  note?: string;
-  cancelReason?: string;
-  cancelNote?: string;
-  cancelledBy?: "shop" | "customer";
-  // Customer-requested cancellations await the shop's decision ("pending");
-  // deny reverts the order to previousStatus (web flow).
-  cancellationStatus?: "pending" | "approved" | "denied";
-  previousStatus?: OrderStatus;
-  // Customer review (web ReviewModal data) — per-item ratings reference items[].
-  review?: {
-    reviewerName: string;
-    reviewedAt: string;
-    shopRating: number;
-    items: { itemIndex: number; rating: number; comment: string }[];
-  };
-  items: OrderItem[];
-};
-
-// Order line built from the matching shop product — name/image/price always come
-// from the live catalog (SHOP_PRODUCTS), so orders match the web shop. Index wraps.
-const oi = (i: number, option: string, qty: number): OrderItem => {
-  const p = TOP_PRODUCTS[i % TOP_PRODUCTS.length];
-  return { name: p.name, option, qty, price: p.unit * qty, image: p.image };
-};
-
-export const ORDERS: ShopOrder[] = [
-  {
-    id: "ORD-20260204-03521", status: "pending_payment", date: "4 ก.พ. 2569 - 08:12 น.",
-    customer: "คุณสมชาย ใจดี", phone: "081-234-5678",
-    address: "88/12 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "พร้อมเพย์ PromptPay",
-    items: [oi(0, "150 g", 2)],
-  },
-  {
-    id: "ORD-20260204-03520", status: "pending_verify", date: "4 ก.พ. 2569 - 11:08 น.",
-    customer: "คุณสมหญิง รักสุขภาพ", phone: "089-876-5432",
-    address: "120 หมู่ 5 ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งด่วน", paymentMethod: "บัญชีธนาคาร",
-    note: "ฝากแพ็คกันกระแทกด้วยนะคะ สั่งไปเป็นของฝากค่ะ",
-    items: [oi(1, "1 หลอด", 1), oi(2, "20 ซอง", 2)],
-  },
-  {
-    id: "ORD-20260203-03517", status: "ready_ship", date: "3 ก.พ. 2569 - 16:45 น.",
-    customer: "คุณทานตะวัน งามดี", phone: "086-111-2233",
-    address: "55/3 ถ.นิมมานเหมินท์ ต.สุเทพ อ.เมือง จ.เชียงใหม่ 50200",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
-    items: [oi(3, "200 g", 1)],
-  },
-  {
-    id: "ORD-20260202-03512", status: "shipping", date: "2 ก.พ. 2569 - 09:20 น.",
-    customer: "คุณสายฝน พรหมมา", phone: "082-555-7788",
-    address: "9 ซ.ลาดพร้าว 71 แขวงลาดพร้าว เขตลาดพร้าว กรุงเทพฯ 10230",
-    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH6829-4471-220K", paymentMethod: "พร้อมเพย์ PromptPay",
-    items: [oi(4, "30 แคปซูล", 1), oi(5, "1 ชุด", 1)],
-  },
-  {
-    id: "ORD-20260131-03505", status: "shipped", date: "31 ม.ค. 2569 - 13:05 น.",
-    customer: "คุณฟ้าใส แจ่มจันทร์", phone: "087-222-9090",
-    address: "203/7 ถ.เพชรเกษม ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
-    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH1180-5523-901P", reviewScore: 5, paymentMethod: "ชำระเงินปลายทาง",
-    review: {
-      reviewerName: "คุณฟ้าใส แจ่มจันทร์",
-      reviewedAt: "2 ก.พ. 2569",
-      shopRating: 5,
-      items: [{ itemIndex: 0, rating: 5, comment: "หอมอร่อยมากค่ะ ชงง่าย แพ็คมาดีมาก ส่งไวกว่าที่คิด จะกลับมาซื้อซ้ำแน่นอนค่ะ" }],
-    },
-    items: [oi(6, "150 g", 3)],
-  },
-  {
-    // Shipped-but-not-yet-reviewed example — no reviewScore/review, so the
-    // detail page shows no review section and no "ดูคะแนน" button.
-    id: "ORD-20260130-03501", status: "shipped", date: "30 ม.ค. 2569 - 09:18 น.",
-    customer: "คุณพิมพ์ใจ บุญมา", phone: "085-666-2211",
-    address: "99/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
-    shippingMethod: "จัดส่งด่วน", trackingNumber: "TH2244-8810-455M", paymentMethod: "บัตรเครดิต/บัตรเดบิต",
-    items: [oi(9, "1 ชุด", 1), oi(10, "1 ขวด", 2)],
-  },
-  {
-    id: "ORD-20260129-03498", status: "cancelled", date: "29 ม.ค. 2569 - 10:41 น.",
-    customer: "คุณมานพ ตั้งใจ", phone: "081-444-1212",
-    address: "17 หมู่ 2 ต.บางพระ อ.ศรีราชา จ.ชลบุรี 20110",
-    shippingMethod: "รับที่ร้าน", paymentMethod: "พร้อมเพย์ PromptPay",
-    cancelledBy: "customer", cancelReason: "ลูกค้าเปลี่ยนใจ", cancelNote: "เปลี่ยนใจ ขอยกเลิกค่ะ",
-    cancellationStatus: "pending", previousStatus: "pending_verify",
-    items: [oi(7, "1 หลอด", 1)],
-  },
-  {
-    // Reviewed multi-item example — 3 products in one order, per-item ratings
-    // (exercises the card's "ดูอีก N รายการ" collapse + the multi-item review page).
-    id: "ORD-20260128-03495", status: "shipped", date: "28 ม.ค. 2569 - 14:02 น.",
-    customer: "คุณชลธิชา แก้วใส", phone: "089-333-8877",
-    address: "8/15 ถ.ศรีจันทร์ ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000",
-    shippingMethod: "จัดส่งปกติ", trackingNumber: "TH7731-0092-114D", paymentMethod: "พร้อมเพย์ PromptPay",
-    reviewScore: 4,
-    review: {
-      reviewerName: "คุณชลธิชา แก้วใส",
-      reviewedAt: "31 ม.ค. 2569",
-      shopRating: 4,
-      items: [
-        { itemIndex: 0, rating: 5, comment: "กลิ่นหอมมาก ใช้แล้วผ่อนคลายสุด ๆ ซื้อซ้ำแน่นอนค่ะ" },
-        { itemIndex: 1, rating: 4, comment: "คุณภาพดี รสชาติเข้มข้น แต่ซองเล็กกว่าที่คิดนิดหน่อย" },
-        { itemIndex: 2, rating: 3, comment: "สินค้าโอเคค่ะ แต่กล่องมาถึงบุบมุมนึง อยากให้แพ็คแน่นกว่านี้" },
-      ],
-    },
-    items: [oi(11, "1 กล่อง", 1), oi(12, "2 ซอง", 2), oi(13, "1 ชุด", 1)],
-  },
-  {
-    // Shop-cancelled example — shows the red "ยกเลิกแล้ว" variant with full
-    // details (ยกเลิกโดย: ร้านค้า + เหตุผล + หมายเหตุ) on the detail page.
-    id: "ORD-20260126-03484", status: "cancelled", date: "26 ม.ค. 2569 - 15:22 น.",
-    customer: "คุณวรรณา สายทอง", phone: "084-777-3344",
-    address: "42/8 ถ.รัถการ ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา 90110",
-    shippingMethod: "จัดส่งปกติ", paymentMethod: "บัญชีธนาคาร",
-    cancelledBy: "shop", cancelReason: "สินค้าหมดสต็อก",
-    cancelNote: "วัตถุดิบล็อตล่าสุดหมด ทางร้านคืนเงินเต็มจำนวนให้แล้ว ขออภัยในความไม่สะดวกค่ะ",
-    cancellationStatus: "approved",
-    items: [oi(8, "250 g", 1)],
-  },
 ];
 
 export const orderTotal = (o: ShopOrder) => o.items.reduce((s, it) => s + it.price, 0);
@@ -1141,6 +1016,8 @@ function OverviewScreen() {
   const [pmType, setPmType] = useState<"regular" | "material">("regular");
   // เรื่องร้องเรียน opens as its own subpage; everything else swaps in-console.
   const selectSection = (id: SectionId) => {
+    if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
+    if (id === "shop_chat") { nav.navigate("ShopChatList"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }
@@ -1210,6 +1087,8 @@ function FinanceScreen() {
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [sub, setSub] = useState<SectionId>("finance_overview");
   const selectSection = (id: SectionId) => {
+    if (id === "cafe_queue") { nav.navigate("CafeQueue"); return; }
+    if (id === "shop_chat") { nav.navigate("ShopChatList"); return; }
     if (id === "complaints") { nav.navigate("ShopComplaints"); return; }
     if (id === "products_manage") { nav.navigate("ShopProducts"); return; }
     if (id === "orders") { nav.navigate("ShopOrders"); return; }
@@ -1874,18 +1753,6 @@ const MONTH_SHORT = [
 ];
 const DAY_NAMES = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
 
-// Per-day sales intensity (1 low → 5 high). Same seed values as the web.
-const HEAT_DATA: Record<number, number> = {
-  1: 5, 2: 5, 3: 5, 4: 4, 5: 2, 6: 3, 7: 4,
-  8: 1, 9: 2, 10: 2, 11: 3, 12: 1, 13: 2, 14: 2,
-  15: 1, 16: 5, 17: 3, 18: 4, 19: 2, 20: 1, 21: 1,
-  22: 2, 23: 4, 24: 4, 25: 4, 26: 1, 27: 1, 28: 1,
-  29: 2, 30: 5, 31: 5,
-};
-const MONTH_HEAT: Record<number, number> = {
-  0: 5, 1: 4, 2: 3, 3: 4, 4: 2, 5: 3, 6: 2, 7: 3, 8: 1, 9: 1, 10: 2, 11: 1,
-};
-
 function heatColor(level: number): string {
   switch (level) {
     case 5: return "#ea6549";
@@ -1897,14 +1764,13 @@ function heatColor(level: number): string {
   }
 }
 
-// Deterministic mock figures (same seed formula as the web OverviewTab).
+// Page visits have no source in the app — no analytics pipeline exists.
 const seed = (a: number, b: number) => (a * 137 + b * 293 + 7) % 100;
 const dailyVisits = (month: number, day: number) => 50 + seed(month, day) * 3;
-const dailyOrders = (month: number, day: number) => 5 + Math.round(seed(month + 3, day) * 0.5);
-const dailySales = (month: number, day: number) => 1000 + seed(month + 7, day) * 120;
 
-// ---- Per-day sales line items (the "ดูรายละเอียด" breakdown). Deterministic so
-// the same day always shows the same basket; total drives the contextual card.
+// ---- Sales line items (the "ดูรายละเอียด" breakdown), aggregated from the
+// shop's real order lines. They used to be generated from a seed formula, so the
+// big sales card showed an invented number next to a REAL month-on-month delta.
 export type SalesLine = {
   name: string;
   cat: string;
@@ -1915,42 +1781,50 @@ export type SalesLine = {
   image: number;
 };
 
-function dayLines(month: number, day: number): SalesLine[] {
-  const s0 = seed(month + 5, day);
-  const count = 3 + (s0 % 4); // 3–6 distinct products
-  const start = s0 % TOP_PRODUCTS.length;
-  const lines: SalesLine[] = [];
-  for (let i = 0; i < count; i++) {
-    const p = TOP_PRODUCTS[(start + i) % TOP_PRODUCTS.length];
-    const s = seed(month + i + 1, day + i * 3);
-    const qty = 1 + (s % 4); // 1–4 pcs
-    const sales = p.unit * qty;
-    // Cost ≈ 45% (margin 55%); a rare day sells one item at a loss → red row.
-    const lossy = s % 11 === 0;
-    const cost = lossy ? Math.round(sales * 1.54) : Math.round(sales * 0.45);
-    lines.push({ name: p.name, cat: p.cat, unit: p.unit, qty, sales, cost, image: p.image });
-  }
-  return lines.sort((a, b) => b.sales - a.sales);
-}
+/** No cost of goods exists anywhere in the app; 45% is a stated assumption. */
+const COST_RATIO = 0.45;
 
-// Aggregate a whole month's lines by product (for the monthly/“ดูรายละเอียด” scope).
-function monthLines(month: number, year: number): SalesLine[] {
-  const dim = new Date(year, month + 1, 0).getDate();
+function linesFrom(orders: Order[]): SalesLine[] {
   const byName = new Map<string, SalesLine>();
-  for (let d = 1; d <= dim; d++) {
-    for (const l of dayLines(month, d)) {
-      const cur = byName.get(l.name);
+  for (const o of orders) {
+    if (o.status === "cancelled") continue;
+    for (const it of o.items) {
+      const sales = it.price * it.quantity;
+      const cur = byName.get(it.name);
       if (cur) {
-        cur.qty += l.qty;
-        cur.sales += l.sales;
-        cur.cost += l.cost;
+        cur.qty += it.quantity;
+        cur.sales += sales;
+        cur.cost += Math.round(sales * COST_RATIO);
       } else {
-        byName.set(l.name, { ...l });
+        byName.set(it.name, {
+          name: it.name,
+          cat: webCategoryLabel(RAW_PRODUCT_BY_ID[it.productId]?.category ?? ""),
+          unit: it.price,
+          qty: it.quantity,
+          sales,
+          cost: Math.round(sales * COST_RATIO),
+          image: it.image as number,
+        });
       }
     }
   }
   return [...byName.values()].sort((a, b) => b.sales - a.sales);
 }
+
+const onDay = (orders: Order[], year: number, month: number, day: number) =>
+  orders.filter((o) => {
+    const d = new Date(o.createdAt);
+    return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+  });
+
+const inMonth = (orders: Order[], year: number, month: number) =>
+  orders.filter((o) => {
+    const d = new Date(o.createdAt);
+    return d.getFullYear() === year && d.getMonth() === month;
+  });
+
+const inYear = (orders: Order[], year: number) =>
+  orders.filter((o) => new Date(o.createdAt).getFullYear() === year);
 
 const linesTotal = (ls: SalesLine[]) => ls.reduce((s, l) => s + l.sales, 0);
 const linesQty = (ls: SalesLine[]) => ls.reduce((s, l) => s + l.qty, 0);
@@ -2043,6 +1917,10 @@ function DashboardCalendar({
   onChange: (next: CalSel) => void;
 }) {
   const { month, year, day: selectedDate } = sel;
+  // Real per-day intensity, scaled against this month's own best day.
+  const orderRows = useShopOrderRows(METAHERB_SHOP);
+  const dayHeat = useMemo(() => heatLevels(dailySales(orderRows, year, month)), [orderRows, year, month]);
+  const monthHeat = useMemo(() => heatLevels(monthlyLineRevenue(orderRows, year)), [orderRows, year]);
   const setMonth = (fn: (m: number) => number) => onChange({ ...sel, month: fn(month) });
   const setYear = (fn: (y: number) => number) => onChange({ ...sel, year: fn(year) });
   const setSelectedDate = (d: number) => onChange({ ...sel, day: d });
@@ -2058,7 +1936,7 @@ function DashboardCalendar({
     cells.push({ day: prevMonthDays - startOffset + 1 + i, inMonth: false, heat: 0 });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ day: d, inMonth: true, heat: HEAT_DATA[d] || 0 });
+    cells.push({ day: d, inMonth: true, heat: dayHeat[d] ?? 0 });
   }
   // Trailing days belong to next month → count from 1, not from cells.length.
   let nextDay = 1;
@@ -2212,7 +2090,7 @@ function DashboardCalendar({
                     borderRadius: 10,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: selected ? "#f1340c" : heatColor(MONTH_HEAT[mi] || 0),
+                    backgroundColor: selected ? "#f1340c" : heatColor(monthHeat[mi] ?? 0),
                   }}
                 >
                   <Text
@@ -2635,8 +2513,13 @@ function OverviewTab({
 }) {
   const nav = useNavigation<Nav>();
   const periodLabel = period === "yearly" ? "ปีก่อน" : "เดือนก่อน";
-  // Controlled calendar selection — drives every scoped figure below.
-  const [cal, setCal] = useState<CalSel>({ month: 0, year: 2026, day: 16 });
+  // Controlled calendar selection — drives every scoped figure below. Opens on
+  // today: the seeded orders are anchored to the current date (data/seedClock.ts),
+  // so this month always has sales to show.
+  const [cal, setCal] = useState<CalSel>(() => {
+    const d = new Date();
+    return { month: d.getMonth(), year: d.getFullYear(), day: d.getDate() };
+  });
   const { month, year, day } = cal;
   // Sales-report scope — lifted so its date picker can ride on the page title row.
   const [salesPeriod, setSalesPeriod] = useState<Period>("daily");
@@ -2646,42 +2529,37 @@ function OverviewTab({
     return { start: today, end: today }; // start === end → single-point scope
   });
 
-  // ----- Top-level KPI: depend on the selected month (monthly) or whole year.
-  const yearlySales = MONTHLY_SALES_DATA.reduce((a, b) => a + b, 0);
+  // ----- Top-level KPI — sales and orders are REAL, derived from the shop's
+  // orders (they used to be twelve hardcoded numbers). Visits has no source in
+  // the app: there is no analytics pipeline, so it stays mock and is the only
+  // number here that a purchase does not move.
+  const shopOrderRows = useShopOrderRows(METAHERB_SHOP);
+  // Goods-only, so the sales card equals the breakdown sheet it opens.
+  const salesByMonth = useMemo(() => monthlyLineRevenue(shopOrderRows, year), [shopOrderRows, year]);
+  const ordersByMonth = useMemo(() => monthlyOrders(shopOrderRows, year), [shopOrderRows, year]);
+
+  const yearlySales = salesByMonth.reduce((a, b) => a + b, 0);
+  const yearlyOrders = ordersByMonth.reduce((a, b) => a + b, 0);
   const yearlyVisits = MONTHLY_VISITS.reduce((a, b) => a + b, 0);
-  const yearlyOrders = MONTHLY_ORDERS.reduce((a, b) => a + b, 0);
   const kpi = period === "yearly"
     ? { sales: yearlySales, visits: yearlyVisits, orders: yearlyOrders }
-    : { sales: MONTHLY_SALES_DATA[month], visits: MONTHLY_VISITS[month], orders: MONTHLY_ORDERS[month] };
+    : { sales: salesByMonth[month], visits: MONTHLY_VISITS[month], orders: ordersByMonth[month] };
 
-  // % change vs previous month (monthly) — simple deterministic mock.
   const prevMonth = month > 0 ? month - 1 : 11;
-  const pct = (cur: number, prev: number) =>
-    prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
   const delta = period === "yearly"
     ? { sales: 15, visits: 12, orders: 9 }
     : {
-        sales: pct(MONTHLY_SALES_DATA[month], MONTHLY_SALES_DATA[prevMonth]),
-        visits: pct(MONTHLY_VISITS[month], MONTHLY_VISITS[prevMonth]),
-        orders: pct(MONTHLY_ORDERS[month], MONTHLY_ORDERS[prevMonth]),
+        sales: pctDelta(salesByMonth[month], salesByMonth[prevMonth]),
+        orders: pctDelta(ordersByMonth[month], ordersByMonth[prevMonth]),
+        visits: pctDelta(MONTHLY_VISITS[month], MONTHLY_VISITS[prevMonth]),
       };
 
   // ----- Line-item breakdowns (memoised) — every sales total below is the sum
   // of these, so each card matches its "ดูรายละเอียด" sheet exactly.
-  const monthBd = useMemo(() => monthLines(month, year), [month, year]);
-  const yearBd = useMemo(() => {
-    const byName = new Map<string, SalesLine>();
-    for (let m = 0; m < 12; m++)
-      for (const l of monthLines(m, year)) {
-        const cur = byName.get(l.name);
-        if (cur) { cur.qty += l.qty; cur.sales += l.sales; cur.cost += l.cost; }
-        else byName.set(l.name, { ...l });
-      }
-    return [...byName.values()].sort((a, b) => b.sales - a.sales);
-  }, [year]);
-
+  const monthBd = useMemo(() => linesFrom(inMonth(shopOrderRows, year, month)), [shopOrderRows, year, month]);
+  const yearBd = useMemo(() => linesFrom(inYear(shopOrderRows, year)), [shopOrderRows, year]);
   // Contextual (small) card: day in monthly view, month in yearly view.
-  const ctxLines = period === "yearly" ? monthBd : dayLines(month, day);
+  const ctxLines = period === "yearly" ? monthBd : linesFrom(onDay(shopOrderRows, year, month, day));
   const ctxSales = linesTotal(ctxLines);
   const ctxLabel = period === "yearly"
     ? `${MONTH_NAMES[month]} ${year + 543}`
@@ -2827,7 +2705,7 @@ function OverviewTab({
       />
       <KpiCard
         label={period === "yearly" ? "คำสั่งซื้อรายเดือน" : "คำสั่งซื้อรายวัน"}
-        value={fmtNum(period === "yearly" ? MONTHLY_ORDERS[month] : dailyOrders(month, day))}
+        value={fmtNum(period === "yearly" ? ordersByMonth[month] : onDay(shopOrderRows, year, month, day).filter((o) => o.status !== "cancelled").length)}
         unit="รายการ"
         delta={delta.orders}
         deltaLabel={period === "yearly" ? "เดือนก่อน" : "วันก่อน"}
@@ -3711,6 +3589,8 @@ export type MarketDoc = {
 // Status pill colors per document kind (ported from the web *_STATUS_CFG).
 export const DOC_STATUS: Record<DocKind, Record<string, { label: string; color: string }>> = {
   qt: {
+    // A customer RFQ the shop has not priced yet.
+    requested: { label: "รอเสนอราคา", color: "#0088ff" },
     sent: { label: "รอตอบกลับ", color: "#f59e0b" },
     accepted: { label: "ตอบรับแล้ว", color: "#10b981" },
     expired: { label: "หมดอายุ", color: "#9ca3af" },
@@ -3843,6 +3723,7 @@ export const docSubtotal = (d: MarketDoc) => d.items.reduce((s, it) => s + docLi
 // Quotation filter chips — web QT_STATUS_STYLE statuses + "ทั้งหมด".
 const QT_TABS = [
   { id: "all", label: "ทั้งหมด", Icon: FileText },
+  { id: "requested", label: "รอเสนอราคา", Icon: ScanSearch },
   { id: "sent", label: "รอตอบกลับ", Icon: Clock },
   { id: "accepted", label: "ตอบรับแล้ว", Icon: Check },
   { id: "expired", label: "หมดอายุ", Icon: AlertCircle },
@@ -3858,11 +3739,15 @@ export function QuotationSection({ showSearch = true, initialFilter, insetsBotto
     (initialFilter as (typeof QT_TABS)[number]["id"]) ?? "all",
   );
 
+  // Real RFQs from customers first, then the demo rows.
+  const liveQuotes = useShopQuotes(METAHERB_SHOP) as unknown as MarketDoc[];
+  const quotations = [...liveQuotes, ...QUOTATIONS];
+
   const count = (id: string) =>
-    id === "all" ? QUOTATIONS.length : QUOTATIONS.filter((d) => d.status === id).length;
+    id === "all" ? quotations.length : quotations.filter((d) => d.status === id).length;
 
   const q = query.trim().toLowerCase();
-  const visible = QUOTATIONS.filter((d) => {
+  const visible = quotations.filter((d) => {
     if (filter !== "all" && d.status !== filter) return false;
     if (!q) return true;
     return (
@@ -5887,13 +5772,13 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
 export function OrdersSection({ showSearch = true, initialFilter, insetsBottom = 24 }: { showSearch?: boolean; initialFilter?: string; insetsBottom?: number }) {
   const [filter, setFilter] = useState<"all" | OrderStatus>((initialFilter as OrderStatus) ?? "all");
   const [query, setQuery] = useState("");
+  const orders = useShopOrders(METAHERB_SHOP);
 
-  const count = (id: "all" | OrderStatus) =>
-    id === "all" ? ORDERS.length : ORDERS.filter((o) => o.status === id).length;
+  const count = (id: "all" | OrderStatus) => orders.filter((o) => matchesShopTab(o.status, id)).length;
 
   const q = query.trim().toLowerCase();
-  const visible = ORDERS.filter((o) => {
-    if (filter !== "all" && o.status !== filter) return false;
+  const matched = orders.filter((o) => {
+    if (!matchesShopTab(o.status, filter)) return false;
     if (!q) return true;
     return (
       o.id.toLowerCase().includes(q) ||
@@ -5901,6 +5786,10 @@ export function OrdersSection({ showSearch = true, initialFilter, insetsBottom =
       o.items.some((it) => it.name.toLowerCase().includes(q))
     );
   });
+  // The table holds 19 months of history and this list is a plain ScrollView, so
+  // render a window rather than ~230 cards. The count below says what was cut.
+  const visible = matched.slice(0, ORDER_PAGE_SIZE);
+  const hidden = matched.length - visible.length;
 
   return (
     <StickyFilterList
@@ -5996,7 +5885,14 @@ export function OrdersSection({ showSearch = true, initialFilter, insetsBottom =
           <Text style={{ fontSize: 14, color: TEXT_DISABLED }}>ไม่พบคำสั่งซื้อ</Text>
         </View>
       ) : (
-        visible.map((o) => <OrderCard key={o.id} order={o} />)
+        <>
+          {visible.map((o) => <OrderCard key={o.id} order={o} />)}
+          {hidden > 0 ? (
+            <Text style={{ textAlign: "center", fontSize: 12.5, color: TEXT_MUTED, paddingVertical: 12 }}>
+              แสดง {visible.length} รายการล่าสุด · ซ่อนอีก {hidden.toLocaleString()} รายการ — ใช้ช่องค้นหาเพื่อดูออเดอร์เก่า
+            </Text>
+          ) : null}
+        </>
       )}
     </StickyFilterList>
   );
@@ -6139,12 +6035,13 @@ export function OrderCard({ order }: { order: ShopOrder }) {
             <Btn label="ยกเลิก" variant="danger" onPress={() => nav.navigate("CancelOrder", { orderId: order.id })} />
           ) : null}
           {order.status === "pending_verify" ? (
-            <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} />
+            // Confirms the payment and moves the order into "พร้อมจัดส่ง".
+            <Btn label="เตรียมจัดส่ง" variant="primary" Icon={ArrowRightCircle} onPress={() => verifyPayment(order.id)} />
           ) : null}
-          {order.status === "ready_ship" ? (
+          {order.status === "preparing" ? (
             <Btn label="ยืนยันจัดส่ง" variant="primary" Icon={Truck} onPress={() => nav.navigate("ConfirmShip", { orderId: order.id })} />
           ) : null}
-          {order.status === "shipped" && order.reviewScore ? (
+          {(order.status === "delivered" || order.status === "completed") && order.reviewScore ? (
             <Btn
               label={`รีวิว ${order.reviewScore}/5`}
               variant="amber"

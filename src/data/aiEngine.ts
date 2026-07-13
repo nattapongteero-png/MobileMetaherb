@@ -5,6 +5,7 @@
  */
 import type { CatalogProduct } from "./catalog";
 import { CATEGORIES } from "./catalog";
+import { goalMatchCount, isContraindicated } from "./productGoals";
 
 type P = CatalogProduct;
 
@@ -35,13 +36,18 @@ export function categoryLabel(key: string): string { return CAT_LABEL[key] ?? ke
 
 /** ===== Keyword → canonical mappings (Thai-leaning) ===== */
 const GOAL_KEYWORDS: Record<HealthGoal, string[]> = {
-  sleep:        ["นอน", "หลับ", "อินซอม", "พักผ่อน", "sleep", "insomnia"],
+  // NOT bare "นอน"/"หลับ": "ง่วงนอน" (sleepy) is an ENERGY problem, and the old
+  // keywords read it as insomnia — which then banned coffee for the one person
+  // who actually wanted it.
+  sleep:        ["นอนไม่หลับ", "ไม่หลับ", "หลับยาก", "หลับไม่สนิท", "ตื่นกลางดึก", "นอนหลับ", "นอนน้อย", "อยากหลับ", "ให้หลับ", "หลับสบาย", "อินซอม", "sleep", "insomnia"],
   weight_loss:  ["ลดน้ำหนัก", "ลดความอ้วน", "ผอม", "ดีท็อกซ์", "diet", "burn"],
   weight_gain:  ["เพิ่มน้ำหนัก", "อ้วน", "บำรุงร่างกาย"],
   skin:         ["ผิว", "หน้าใส", "สิว", "ฝ้า", "skin", "คอลลาเจน", "ขาว"],
-  hair:         ["ผม", "หัวล้าน", "ผมร่วง", "hair"],
+  // NOT bare "ผม": in Thai that is also the male pronoun "I", so every man who
+  // began a sentence with it was read as asking about his hair.
+  hair:         ["เส้นผม", "ผมร่วง", "ผมบาง", "หัวล้าน", "บำรุงผม", "hair"],
   brain:        ["สมอง", "ความจำ", "บำรุงสมอง", "memory", "focus"],
-  energy:       ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "energy", "บำรุงกำลัง"],
+  energy:       ["พลังงาน", "อ่อนเพลีย", "เหนื่อย", "ง่วง", "ตื่นตัว", "ไม่มีแรง", "energy", "บำรุงกำลัง"],
   immune:       ["ภูมิคุ้มกัน", "ป้องกัน", "หวัด", "ไข้หวัด", "immune"],
   digestion:    ["ย่อย", "ท้อง", "ขับถ่าย", "ลำไส้", "stomach"],
   joint:        ["ข้อ", "เข่า", "ปวดข้อ", "joint", "กระดูก"],
@@ -61,23 +67,6 @@ const GOAL_LABEL: Record<HealthGoal, string> = {
 };
 
 /** Words that hint each goal might fit certain product names/categories. */
-const GOAL_PRODUCT_HINTS: Record<HealthGoal, string[]> = {
-  sleep:       ["คาโมมายล์", "ดอกคำฝอย", "ลาเวนเดอร์", "อัญชัน", "ชา", "พิมเสน"],
-  weight_loss: ["ดีท็อกซ์", "ดีทอกซ์", "ชา", "น้ำผัก", "มะนาว", "ส้มแขก", "การ์ซิเนีย", "บุก", "ไฟเบอร์"],
-  weight_gain: ["บำรุง", "โสม", "ถั่งเช่า", "กาแฟ"],
-  skin:        ["คอลลาเจน", "วิตามินซี", "ผิว", "อโรม่า", "น้ำผึ้ง", "มะนาว"],
-  hair:        ["บำรุงผม", "งา", "ใบบัวบก"],
-  brain:       ["บัวบก", "ใบบัวบก", "สมอง", "กาแฟ"],
-  energy:      ["โสม", "ถั่งเช่า", "กาแฟ", "น้ำผึ้ง"],
-  immune:      ["ฟ้าทะลาย", "ขมิ้น", "น้ำผึ้ง", "มะนาว", "อบเชย"],
-  digestion:   ["ขิง", "อบเชย", "ตะไคร้", "กระวาน", "มะตูม"],
-  joint:       ["ขมิ้น", "ไพล", "อบเชย"],
-  pressure:    ["รางจืด", "ใบบัวบก", "อัญชัน"],
-  diabetes:    ["มะระ", "ฟ้าทะลาย", "อบเชย"],
-  senior:      ["น้ำผึ้ง", "อบเชย", "สมุนไพร"],
-  kids:        ["น้ำผึ้ง", "มะนาว", "วุ้น"],
-  stress:      ["คาโมมายล์", "ลาเวนเดอร์", "อโรม่า", "พิมเสน", "หอม"],
-};
 
 /** ===== Intent parser ===== */
 export function detectIntent(text: string): Intent {
@@ -116,6 +105,28 @@ export function extractGoals(text: string): HealthGoal[] {
   return hits;
 }
 
+/**
+ * Contexts where "which herb helps X" is the wrong question — pregnancy, small
+ * children, chronic medication, or symptoms that belong in an ER. Each returns
+ * a rule the prompt must carry; the model is not asked to notice these itself.
+ */
+const CAUTION_RULES: [RegExp, string][] = [
+  [/ตั้งครรภ์|มีครรภ์|คนท้อง|ให้นมบุตร|ให้นมลูก|pregnan/i,
+   "ลูกค้าตั้งครรภ์หรือให้นมบุตร — ห้ามยืนยันว่าสมุนไพรหรือสินค้าใดปลอดภัยสำหรับคนท้อง/แม่ให้นม ให้แนะนำปรึกษาแพทย์ก่อนใช้ทุกชนิด และอย่าเชียร์ขายสินค้าในคำตอบนี้"],
+  [/(ลูก|เด็ก|หลาน)\s*\d+\s*(ขวบ|เดือน|ปี)|ทารก|เด็กเล็ก|ลูกน้อย/,
+   "คำถามเกี่ยวกับเด็กเล็ก — ห้ามแนะนำให้เด็กใช้หรือกินสมุนไพร/ยาดม/น้ำมันหอมระเหยเองโดยไม่ผ่านแพทย์ ให้แนะนำปรึกษากุมารแพทย์หรือเภสัชกร"],
+  [/ยาประจำ|ยาละลายลิ่มเลือด|วาร์ฟาริน|warfarin|ยาเบาหวาน|ยาลดน้ำตาล|ยาความดัน|ยาหัวใจ|โรคไต|โรคตับ|เคมีบำบัด/,
+   "ลูกค้าใช้ยาประจำหรือมีโรคเรื้อรัง — สมุนไพรอาจตีกับยาได้ (เช่น อบเชยกับยาเบาหวาน) ห้ามบอกว่ากินร่วมกันได้อย่างปลอดภัย ให้แนะนำปรึกษาแพทย์หรือเภสัชกรก่อนเสมอ"],
+  [/เจ็บหน้าอก|แน่นหน้าอก|หายใจไม่ออก|หายใจไม่สะดวก|หมดสติ|เลือดออกมาก|ชักเกร็ง/,
+   "อาการที่เล่ามาอาจเป็นภาวะฉุกเฉิน — สิ่งแรกและสิ่งเดียวที่ควรทำคือแนะนำให้พบแพทย์หรือโทร 1669 ทันที ห้ามเสนอขายสินค้าใด ๆ มาบรรเทาอาการนี้"],
+];
+
+/** The safety rules this message activates, as prompt text. Empty = none. */
+export function extractCautions(text: string): string[] {
+  const t = text.toLowerCase();
+  return CAUTION_RULES.filter(([re]) => re.test(t)).map(([, rule]) => rule);
+}
+
 export function extractBudget(text: string): number | undefined {
   const m = text.match(/(\d{2,5})\s*(บาท|baht|฿|thb)?/i);
   if (m) {
@@ -137,7 +148,21 @@ export function extractCategory(text: string): string | undefined {
 export function goalLabel(g: HealthGoal): string { return GOAL_LABEL[g]; }
 
 /** ===== Search / recommendation ===== */
+
+/**
+ * Does this product genuinely serve one of the goals? Answered by the curated
+ * table (data/productGoals.ts), not by looking for herb names inside the product
+ * title — no product is called "นอนไม่หลับ", so name matching scored every item
+ * ≈ 0 and let the generic rating boost decide. That is how coffee ended up being
+ * recommended for insomnia.
+ */
+export const goalHits = (p: P, goals: HealthGoal[]): number => goalMatchCount(p.id, goals);
+
+/** Hard exclusion: caffeine for sleep, sugar for diabetes. Never overridable. */
+export const goalExcluded = (p: P, goals: HealthGoal[]): boolean => isContraindicated(p.id, goals);
+
 export function scoreProduct(p: P, goals: HealthGoal[], q: string): number {
+  if (goalExcluded(p, goals)) return -1;
   let score = 0;
   const text = `${p.name} ${categoryLabel(p.category)}`.toLowerCase();
 
@@ -146,11 +171,8 @@ export function scoreProduct(p: P, goals: HealthGoal[], q: string): number {
     if (text.includes(tok)) score += 3;
   });
 
-  goals.forEach((g) => {
-    GOAL_PRODUCT_HINTS[g].forEach((hint) => {
-      if (text.includes(hint.toLowerCase())) score += 5;
-    });
-  });
+  // A curated goal hit outweighs anything a name match or a rating can add.
+  score += goalHits(p, goals) * 10;
 
   if (p.isRecommended) score += 1.5;
   if (p.isFlashSale) score += 1;
@@ -189,24 +211,16 @@ export function recommendForGoals(products: P[], goals: HealthGoal[], limit = 5)
   // Only products that genuinely match a goal hint — never pad a themed set
   // with unrelated items (e.g. a ยาดม in a weight-loss set). Generic boosts
   // (isRecommended / rating) must not sneak an off-theme product in.
-  const goalHitScore = (p: P): number => {
-    const text = `${p.name} ${categoryLabel(p.category)}`.toLowerCase();
-    let s = 0;
-    goals.forEach((g) => GOAL_PRODUCT_HINTS[g].forEach((hint) => { if (text.includes(hint.toLowerCase())) s += 1; }));
-    return s;
-  };
   const matched = products
-    .map((p) => ({ p, hit: goalHitScore(p), s: scoreProduct(p, goals, "") }))
+    .filter((p) => !goalExcluded(p, goals))
+    .map((p) => ({ p, hit: goalHits(p, goals), s: scoreProduct(p, goals, "") }))
     .filter(({ hit }) => hit > 0)
     .sort((a, b) => b.s - a.s || b.p.rating - a.p.rating)
     .slice(0, limit)
     .map(({ p }) => p);
-  // Fallback: catalog has nothing for this goal → top picks rather than empty.
-  if (matched.length === 0) {
-    return [...products]
-      .sort((a, b) => (b.isRecommended ? 1 : 0) - (a.isRecommended ? 1 : 0) || b.rating - a.rating)
-      .slice(0, limit);
-  }
+  // Nothing in the catalog serves this goal → say so. This used to fall back to
+  // "top picks", which is how an unrelated product got recommended for a symptom
+  // it does nothing about. Every caller handles an empty list.
   return matched;
 }
 
@@ -240,8 +254,13 @@ export function filterProducts(products: P[], f: ProductFilter): P[] {
   const scored = q.trim().length > 0 || goals.length > 0;
   if (scored) {
     list = list
+      // Contraindicated products are dropped outright, whatever else matches.
+      .filter((p) => !goalExcluded(p, goals))
       .map((p) => ({ p, s: scoreProduct(p, goals, q) }))
-      .filter(({ s }) => s > 0 || goals.length > 0)
+      // With a goal, only products that genuinely serve it survive. `s > 0` used
+      // to be waived whenever a goal was present, which let every product
+      // through on its rating boost alone.
+      .filter(({ p, s }) => (goals.length > 0 ? goalHits(p, goals) > 0 : s > 0))
       .sort((a, b) => b.s - a.s || b.p.rating - a.p.rating)
       .map(({ p }) => p);
   }

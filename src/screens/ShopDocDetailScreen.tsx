@@ -9,6 +9,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BottomFade } from "../components/BottomFade";
 import { showToast } from "../components/Toast";
+import { sendQuote } from "../store/quotes";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
@@ -211,8 +212,24 @@ export function ShopDocDetailScreen() {
             ) : null}
           </Section>
 
-          {/* Actions — contact the requester (same pattern as the order detail) */}
-          <View style={{ backgroundColor: "#fff", marginTop: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
+          {/* Actions — price the RFQ, then contact the requester */}
+          <View style={{ backgroundColor: "#fff", marginTop: 8, paddingHorizontal: 16, paddingVertical: 16, gap: 10 }}>
+            {kind === "qt" && doc.status === "requested" ? (
+              <Pressable
+                onPress={() => {
+                  // Prices stand as requested; validity 14 days. The buyer's
+                  // B2BDocs page flips from "รอร้านเสนอราคา" to "ได้รับใบเสนอราคา".
+                  if (sendQuote(doc.id, { validDays: 14 })) {
+                    showToast("ส่งใบเสนอราคาให้ลูกค้าแล้ว");
+                    nav.goBack();
+                  }
+                }}
+                className="flex-row items-center justify-center active:opacity-80"
+                style={{ height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 6 }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>ส่งใบเสนอราคา (มีผล 14 วัน)</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => showToast(`เปิดแชทกับ ${doc.contact} (${doc.phone})`)}
               className="flex-row items-center justify-center active:opacity-80"
