@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Platform, Pressable } from "react-native";
+import { Pressable } from "react-native";
 import { GlassView } from "expo-glass-effect";
 
 /**
@@ -32,20 +32,16 @@ export function GlassIconButton({
         glassEffectStyle="regular"
         colorScheme="light"
         isInteractive
-        // Android: opaque white — the elevation shadow bleeds through any
-        // translucent fill and reads as a second layer inside the button.
-        tintColor={tintColor ?? (Platform.OS === "android" ? "#ffffff" : undefined)}
+        tintColor={tintColor}
         style={{
           width: size,
           height: size,
           borderRadius: size / 2,
           alignItems: "center",
           justifyContent: "center",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 4,
-          elevation: 3,
+          // boxShadow (RN 0.76+) draws outside the shape and never bleeds
+          // through a translucent fill the way Android elevation does.
+          boxShadow: "0 2 6 rgba(0,0,0,0.18)",
         }}
       >
         {children}
