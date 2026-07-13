@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { View, Text, Image, Pressable, Dimensions, Alert, Switch } from "react-native";
+import { View, Text, Image, Pressable, Dimensions, Alert, Platform, Switch } from "react-native";
 import Reanimated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -228,14 +228,16 @@ function CafeFeatureCard({ onPress }: { onPress: () => void }) {
             </View>
             <Text numberOfLines={1} style={{ fontSize: 12, color: "rgba(255,255,255,0.88)", lineHeight: 16 }}>สั่งอาหาร ขนม เครื่องดื่ม จากคาเฟ่ของเรา</Text>
           </View>
+          {/* Android's glass shim is a white fill — white children would vanish,
+              so flip to the sibling-card CTA style (solid white pill, brand text). */}
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
             isInteractive
-            style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingLeft: 14, paddingRight: 10, paddingVertical: 8 }}
+            style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingLeft: 14, paddingRight: 10, paddingVertical: 8, ...(Platform.OS === "android" && { backgroundColor: "#fff" }) }}
           >
-            <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>สั่งเลย</Text>
-            <ChevronRight size={15} color="#fff" strokeWidth={2.6} />
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Platform.OS === "android" ? "#0b3d2e" : "#fff" }}>สั่งเลย</Text>
+            <ChevronRight size={15} color={Platform.OS === "android" ? "#0b3d2e" : "#fff"} strokeWidth={2.6} />
           </GlassView>
         </LinearGradient>
       </Pressable>

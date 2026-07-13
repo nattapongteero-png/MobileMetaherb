@@ -325,14 +325,16 @@ function MetaManagerCard({ onPress }: { onPress: () => void }) {
           <Text numberOfLines={2} style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 5, lineHeight: 16 }}>
             ช่วยจัดการข้อมูลร้านค้า · ถามยอดขาย สรุปออเดอร์ จัดการสินค้า
           </Text>
+          {/* Android's glass shim is a white fill — white children would vanish,
+              so flip to the sibling-card CTA style (solid white pill, brand text). */}
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
             isInteractive
-            style={{ alignSelf: "flex-start", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingLeft: 16, paddingRight: 13, paddingVertical: 9 }}
+            style={{ alignSelf: "flex-start", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingLeft: 16, paddingRight: 13, paddingVertical: 9, ...(Platform.OS === "android" && { backgroundColor: "#fff" }) }}
           >
-            <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#fff" }}>เริ่มแชท</Text>
-            <ArrowRightCircle size={16} color="#fff" strokeWidth={2.4} />
+            <Text style={{ fontSize: 13.5, fontWeight: "700", color: Platform.OS === "android" ? "#c2410c" : "#fff" }}>เริ่มแชท</Text>
+            <ArrowRightCircle size={16} color={Platform.OS === "android" ? "#c2410c" : "#fff"} strokeWidth={2.4} />
           </GlassView>
         </View>
         <Image key={playKey} source={META_CHAR} style={{ width: 110, height: 116 }} resizeMode="contain" />

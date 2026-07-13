@@ -1345,7 +1345,8 @@ export function ProductDetailScreen({ route }: Props) {
           {/* Close button — Liquid Glass (iOS 26), top-right */}
           <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
             <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
-              <X size={20} color="#ffffff" strokeWidth={2.6} />
+              {/* Android glass shim = white circle → X must be dark there. */}
+              <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
             </GlassIconButton>
           </View>
         </View>

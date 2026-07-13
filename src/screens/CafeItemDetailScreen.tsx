@@ -7,7 +7,7 @@ import { GLASS_BAR_TINT } from "../theme/tokens";
  * café cart via the onAdd route callback.
  */
 import { useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, Image, TextInput, Dimensions, Animated, Modal, Share } from "react-native";
+import { View, Text, Pressable, Image, TextInput, Dimensions, Animated, Modal, Platform, Share } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
@@ -226,7 +226,8 @@ export function CafeItemDetailScreen() {
         </Pressable>
         <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
           <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
-            <X size={20} color="#ffffff" strokeWidth={2.6} />
+            {/* Android glass shim = white circle → X must be dark there. */}
+            <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
           </GlassIconButton>
         </View>
       </Modal>
