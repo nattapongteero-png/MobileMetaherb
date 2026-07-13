@@ -69,7 +69,7 @@ function cleanOptions(options: any) {
 function FrostedGlass() {
   return (
     <BlurView
-      intensity={50}
+      intensity={60}
       tint="light"
       // Real blur on Android needs the experimental renderer; without it the
       // rgba overlay below still gives the translucent-milk fallback.
@@ -77,7 +77,7 @@ function FrostedGlass() {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.82)",
+          backgroundColor: "rgba(255,255,255,0.90)",
           borderRadius: BAR_RADIUS,
           borderWidth: 1,
           borderColor: "rgba(0,0,0,0.10)",
