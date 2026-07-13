@@ -57,7 +57,9 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 // The profile row collapses to 0 on scroll, but the green safe-area strip + the
 // utility bar (title + bell/settings) stay pinned; the FIXED white sheet sits
 // right below and grows up to fill the rest — only the cards inside it scroll.
-const PROFILE_BLOCK = 204;
+// Android's Thai text metrics render taller than iOS — the same card content
+// needs a taller collapse block or its bottom padding gets clipped flush.
+const PROFILE_BLOCK = Platform.OS === "android" ? 218 : 204;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 const LEAF_B = require("../../assets/herb-leaf-b.png");
@@ -433,7 +435,7 @@ export function AccountScreen() {
                   <Ticket size={17} color="#ffd27a" strokeWidth={2.2} />
                   <View>
                     <Text style={{ fontSize: 15, fontWeight: "800", color: "#ffffff", lineHeight: 18 }}>{ACTIVE_COUPONS}</Text>
-                    <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>คูปองพร้อมใช้</Text>
+                    <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>{/* trailing space: Android drops the last tall Thai cluster at paint */}{Platform.OS === "android" ? "คูปองพร้อมใช้ " : "คูปองพร้อมใช้"}</Text>
                   </View>
                 </Pressable>
               </View>
