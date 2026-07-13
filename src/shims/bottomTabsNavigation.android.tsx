@@ -77,7 +77,7 @@ function FrostedGlass() {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.70)",
+          backgroundColor: "rgba(251,251,252,0.96)",
           borderRadius: BAR_RADIUS,
           // Liquid-glass rim: iOS shows a bright specular edge, not a dark line.
           borderWidth: 1,
