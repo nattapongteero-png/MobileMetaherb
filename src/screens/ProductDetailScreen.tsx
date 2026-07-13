@@ -1128,6 +1128,9 @@ export function ProductDetailScreen({ route }: Props) {
         <GlassView
           glassEffectStyle="regular"
           colorScheme="light"
+          // Android: 95% white so the floating bar reads bright with a hint of
+          // see-through; iOS keeps the real Liquid Glass material untinted.
+          tintColor={Platform.OS === "android" ? "rgba(255,255,255,0.95)" : undefined}
           style={{
             height: 68,
             borderRadius: 34,
