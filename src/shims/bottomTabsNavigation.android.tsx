@@ -77,7 +77,7 @@ function FrostedGlass() {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.90)",
+          backgroundColor: "rgba(255,255,255,0.60)",
           borderRadius: BAR_RADIUS,
           borderWidth: 1,
           borderColor: "rgba(0,0,0,0.10)",
@@ -105,17 +105,19 @@ function FloatingPillTabBar({
 
   const [rowWidth, setRowWidth] = React.useState(0);
   const itemWidth = rowWidth > 0 ? rowWidth / state.routes.length : 0;
+  // Compact lens like the iPhone's — hugs the icon+label, centered in the tab.
+  const lensWidth = Math.min(itemWidth - 10, 92);
   const lensX = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (itemWidth > 0) {
       Animated.spring(lensX, {
-        toValue: state.index * itemWidth,
+        toValue: state.index * itemWidth + (itemWidth - lensWidth) / 2,
         useNativeDriver: true,
         friction: 10,
         tension: 120,
       }).start();
     }
-  }, [state.index, itemWidth, lensX]);
+  }, [state.index, itemWidth, lensWidth, lensX]);
 
   return (
     // Full-width overlay anchored to the bottom; the pill sits INSIDE it with
@@ -161,10 +163,10 @@ function FloatingPillTabBar({
               position: "absolute",
               top: 5,
               bottom: 5,
-              left: 5,
-              width: itemWidth - 10,
+              left: 0,
+              width: lensWidth,
               borderRadius: 23,
-              backgroundColor: "rgba(0,0,0,0.06)",
+              backgroundColor: "#ffffff",
               transform: [{ translateX: lensX }],
             }}
           />
