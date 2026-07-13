@@ -121,13 +121,16 @@ export const MARKET_PRODUCTS: SalesProduct[] = [
   { name: "เก๊กฮวยอบแห้ง", sku: "MKT-023", initial: "กฮ", bg: "#fef3c7", fg: "#b45309", category: "ดอกไม้แห้ง", qty: 95, sales: 28500, cost: 17100, stock: 420, unit: "กก." },
 ];
 
-export type ProductSort = "sales_desc" | "sales_asc" | "qty_desc" | "margin_desc";
+export type ProductSort = "sales_desc" | "sales_asc" | "qty_desc" | "margin_desc" | "latest";
 
 export const SORT_OPTIONS: { id: ProductSort; label: string }[] = [
   { id: "sales_desc", label: "ยอดขายสูงสุด" },
   { id: "sales_asc", label: "ยอดขายต่ำสุด" },
   { id: "qty_desc", label: "จำนวนขายสูงสุด" },
   { id: "margin_desc", label: "มาร์จิ้นสูงสุด" },
+  // Orders the GROUP cards newest → oldest by their period date (handled in the
+  // view); lines within a group have no date, so they keep the sales default.
+  { id: "latest", label: "ล่าสุด" },
 ];
 
 export function sortProducts(list: SalesProduct[], sort: ProductSort): SalesProduct[] {
@@ -250,6 +253,66 @@ export const CUSTOMER_GROUP_COLOR: Record<string, { bg: string; fg: string }> = 
   หายไป: { bg: "#f3f4f6", fg: "#525252" },
 };
 
+/* ---------- Customer table (web parity) ----------
+ * The web's "ลูกค้าที่มียอดซื้อสูงสุด" table is a FLAT ranked list — no grouping.
+ * Columns: # · ลูกค้า(ชื่อ+อีเมล) · ออเดอร์ · ยอดรวม · AOV · อัตราซื้อซ้ำ · ซื้อล่าสุด · สินค้าที่ชอบ,
+ * with a รวม summary row. Same five sort keys as the web <select>. */
+
+export type CustomerSort = "total_desc" | "total_asc" | "orders_desc" | "recent" | "oldest";
+
+export const CUSTOMER_SORT_OPTIONS: { id: CustomerSort; label: string }[] = [
+  { id: "total_desc", label: "ยอดซื้อรวม" },
+  { id: "total_asc", label: "ยอดซื้อต่ำสุด" },
+  { id: "orders_desc", label: "ออเดอร์มากสุด" },
+  { id: "recent", label: "ซื้อล่าสุด" },
+  { id: "oldest", label: "ห่างจากซื้อ" },
+];
+
+export function sortCustomers(list: Customer[], sort: CustomerSort): Customer[] {
+  const arr = [...list];
+  switch (sort) {
+    case "total_asc": return arr.sort((a, b) => a.total - b.total);
+    case "orders_desc": return arr.sort((a, b) => b.orders - a.orders);
+    case "recent": return arr.sort((a, b) => a.daysAgo - b.daysAgo);
+    case "oldest": return arr.sort((a, b) => b.daysAgo - a.daysAgo);
+    default: return arr.sort((a, b) => b.total - a.total);
+  }
+}
+
+/** AOV + อัตราซื้อซ้ำ + สีของ badge — web's per-row derived values. */
+export function customerStats(c: Customer) {
+  const aov = c.orders > 0 ? Math.round(c.total / c.orders) : 0;
+  const repeatRate = c.orders > 1 ? Math.round(((c.orders - 1) / c.orders) * 100) : 0;
+  const rr =
+    repeatRate >= 70 ? { fg: "#15803d", bg: "#dcfce7" }
+    : repeatRate >= 40 ? { fg: "#319754", bg: "#d6eadd" }
+    : repeatRate > 0 ? { fg: "#0ea5e9", bg: "#dbeafe" }
+    : { fg: "#9ca3af", bg: "#f3f4f6" };
+  return { aov, repeatRate, rr, stale: c.daysAgo > 30 };
+}
+
+/** อันดับ 1–3 ได้เหรียญ ทอง/เงิน/ทองแดง (web rankBg). */
+export const rankColor = (rank: number) =>
+  rank === 0 ? "#eab308" : rank === 1 ? "#94a3b8" : rank === 2 ? "#f97316" : "#e5e7eb";
+
+/** เลขบนเหรียญ — 1–3 ขาว, ที่เหลือเทา. */
+export const rankTextColor = (rank: number) => (rank < 3 ? "#ffffff" : "#9ca3af");
+
+/** กรองเฉพาะจุดที่เลือกบนกราฟ — web's focusedLabel: the table narrows to the
+ *  customers that make up that bucket (rotated + scaled deterministically). */
+export function focusCustomers(list: Customer[], label: string, bucketCustomers: number): Customer[] {
+  if (bucketCustomers <= 0 || list.length === 0) return [];
+  const hash = Array.from(label).reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  const rotateBy = hash % list.length;
+  return [...list.slice(rotateBy), ...list.slice(0, rotateBy)]
+    .slice(0, Math.min(bucketCustomers, list.length))
+    .map((c, i) => ({
+      ...c,
+      orders: Math.max(1, Math.round(c.orders * (1 - i * 0.08))),
+      total: Math.max(1, Math.round(c.total * (0.4 + (((hash + i) % 60) / 100)))),
+    }));
+}
+
 /* ---------- Product report ---------- */
 export type TopProduct = { name: string; category: string; sold: number; revenue: number; rating: number; reviews: number };
 
@@ -272,6 +335,64 @@ export const TOP_PRODUCTS: TopProduct[] = [
 ];
 
 /* ---------- Market report ---------- */
+/* ---------- Product table (web parity) ----------
+ * The web's "Top Product" table is a FLAT ranked list:
+ *   # · สินค้า · ยอดขาย(ชิ้น) · รายได้ · เฉลี่ย/ชิ้น   (+ rating/reviews on its own table)
+ * Same three sort keys as the web <select>. */
+
+export type TopProductSort = "sold_desc" | "sold_asc" | "revenue_desc";
+
+export const PRODUCT_SORT_OPTIONS: { id: TopProductSort; label: string }[] = [
+  { id: "sold_desc", label: "ขายดีที่สุด" },
+  { id: "sold_asc", label: "ขายน้อยที่สุด" },
+  { id: "revenue_desc", label: "รายได้สูงสุด" },
+];
+
+/** ตาราง Rating Product ของเว็บ — คนละ sort set กับ Top Product. */
+export type RatingSort = "rating_desc" | "rating_asc" | "reviews_desc";
+
+export const RATING_SORT_OPTIONS: { id: RatingSort; label: string }[] = [
+  { id: "rating_desc", label: "คะแนนสูงสุด" },
+  { id: "rating_asc", label: "คะแนนต่ำสุด" },
+  { id: "reviews_desc", label: "รีวิวมากสุด" },
+];
+
+export function sortRatingProducts(list: TopProduct[], sort: RatingSort): TopProduct[] {
+  const arr = [...list];
+  switch (sort) {
+    case "rating_asc": return arr.sort((a, b) => a.rating - b.rating);
+    case "reviews_desc": return arr.sort((a, b) => b.reviews - a.reviews);
+    default: return arr.sort((a, b) => b.rating - a.rating);
+  }
+}
+
+export function sortTopProducts(list: TopProduct[], sort: TopProductSort): TopProduct[] {
+  const arr = [...list];
+  switch (sort) {
+    case "sold_asc": return arr.sort((a, b) => a.sold - b.sold);
+    case "revenue_desc": return arr.sort((a, b) => b.revenue - a.revenue);
+    default: return arr.sort((a, b) => b.sold - a.sold);
+  }
+}
+
+/** รายได้เฉลี่ยต่อชิ้น = รายได้ ÷ ยอดขาย (web's เฉลี่ย/ชิ้น column). */
+export const avgPerUnit = (p: TopProduct) => (p.sold > 0 ? Math.round(p.revenue / p.sold) : 0);
+
+/** กรองเฉพาะจุดที่เลือกบนกราฟ (web focusedLabel). */
+export function focusProducts(list: TopProduct[], label: string, bucketUnits: number): TopProduct[] {
+  if (bucketUnits <= 0 || list.length === 0) return [];
+  const hash = Array.from(label).reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  const rotateBy = hash % list.length;
+  const take = Math.max(1, Math.min(list.length, Math.round(bucketUnits / 8)));
+  return [...list.slice(rotateBy), ...list.slice(0, rotateBy)]
+    .slice(0, take)
+    .map((p, i) => ({
+      ...p,
+      sold: Math.max(1, Math.round(p.sold * (1 - i * 0.08))),
+      revenue: Math.max(1, Math.round(p.revenue * (0.4 + (((hash + i) % 60) / 100)))),
+    }));
+}
+
 export type Channel = { name: string; type: string; visits: number; orders: number; revenue: number; cost: number; initial: string; bg: string; fg: string };
 
 export const CHANNELS: Channel[] = [
@@ -294,3 +415,92 @@ export const CHANNEL_TYPE_COLOR: Record<string, { bg: string; fg: string }> = {
   Direct: { bg: "#dbeafe", fg: "#1e40af" },
   Partner: { bg: "#e0e7ff", fg: "#4338ca" },
 };
+
+
+/* ---------- Market table (ประสิทธิภาพช่องทาง) ---------- */
+
+export type ChannelSort = "revenue_desc" | "conv_desc" | "visits_desc" | "roas_desc";
+
+export const CHANNEL_SORT_OPTIONS: { id: ChannelSort; label: string }[] = [
+  { id: "revenue_desc", label: "รายได้สูงสุด" },
+  { id: "visits_desc", label: "ผู้เข้าชมมากสุด" },
+  { id: "conv_desc", label: "Conv. Rate สูงสุด" },
+  { id: "roas_desc", label: "ROAS สูงสุด" },
+];
+
+/** อัตราคอนเวิร์ต + ROAS ของช่องทาง (organic = ไม่มีต้นทุน → ROAS = null). */
+export function channelStats(ch: Channel) {
+  const conv = ch.visits > 0 ? (ch.orders / ch.visits) * 100 : 0;
+  const roas = ch.cost > 0 ? ch.revenue / ch.cost : null;
+  return { conv, roas };
+}
+
+/** สีแบรนด์จริงของแต่ละแพลตฟอร์ม (ไล่เฉดหัวการ์ด: เข้ม → อ่อน). */
+export const CHANNEL_BRAND: Record<string, [string, string]> = {
+  "Google Search": ["#1a73e8", "#4285f4"], // Google blue
+  TikTok: ["#2b2b2b", "#4a4a4a"],          // เทาเข้ม → เทา (พื้นให้โลโก้สีจริงเด่น)
+  Facebook: ["#1877F2", "#42A5F5"],
+  "Google Ads": ["#3C8BD9", "#FBBC04"],    // ฟ้า → เหลือง Ads
+  Instagram: ["#833AB4", "#FD1D1D"],       // ม่วง → แดง (ไล่เฉด IG)
+  "Line OA": ["#06C755", "#33D375"],
+  "Email Marketing": ["#C5221F", "#EA4335"],
+  "Direct (URL)": ["#475569", "#94A3B8"],
+  Affiliate: ["#4338CA", "#818CF8"],
+  YouTube: ["#CC0000", "#FF0000"],
+};
+
+/** สีเดี่ยวของช่องทาง (ring/จุด) — เฉดเข้มของแบรนด์นั้น. */
+export const channelColor = (ch: Channel) =>
+  CHANNEL_BRAND[ch.name]?.[0] ?? (ch.fg.toLowerCase().startsWith("#fff") ? ch.bg : ch.fg);
+
+/** ไล่เฉดสำหรับหัวการ์ด. */
+export const channelGradient = (ch: Channel): [string, string] => {
+  const brand = CHANNEL_BRAND[ch.name];
+  if (brand) return brand;
+  const c = channelColor(ch);
+  return [c, c + "cc"];
+};
+
+export function sortChannels(list: Channel[], sort: ChannelSort): Channel[] {
+  const arr = [...list];
+  switch (sort) {
+    case "conv_desc": return arr.sort((a, b) => channelStats(b).conv - channelStats(a).conv);
+    case "visits_desc": return arr.sort((a, b) => b.visits - a.visits);
+    case "roas_desc": return arr.sort((a, b) => (channelStats(b).roas ?? 0) - (channelStats(a).roas ?? 0));
+    default: return arr.sort((a, b) => b.revenue - a.revenue);
+  }
+}
+
+/** กรองตามช่วงเวลา — same scaling rule the customer/product tables use. */
+export function channelsForPeriod(period: Period, monthIdx: number): Channel[] {
+  const hash = period.length * 17 + monthIdx * 3;
+  const scale = period === "daily" ? 0.35 : period === "weekly" ? 0.7 : period === "yearly" ? 12 : 1;
+  // No dropping here (unlike customers/products): a marketing channel doesn't
+  // vanish on a slow day — it just gets fewer visits. Dropping it hid TikTok /
+  // YouTube from the list entirely.
+  return CHANNELS.map((ch, i) => {
+    return {
+      ...ch,
+      visits: Math.max(1, Math.round(ch.visits * scale)),
+      orders: Math.max(1, Math.round(ch.orders * scale)),
+      revenue: Math.max(1, Math.round(ch.revenue * scale)),
+      cost: Math.round(ch.cost * scale),
+    };
+  });
+}
+
+/** กรองเฉพาะจุดที่เลือกบนกราฟ (web focusedLabel). */
+export function focusChannels(list: Channel[], label: string, bucketVisits: number): Channel[] {
+  if (bucketVisits <= 0 || list.length === 0) return [];
+  const hash = Array.from(label).reduce((s, ch) => s + ch.charCodeAt(0), 0);
+  const rotateBy = hash % list.length;
+  const take = Math.max(1, Math.min(list.length, Math.round(bucketVisits / 120)));
+  return [...list.slice(rotateBy), ...list.slice(0, rotateBy)]
+    .slice(0, take)
+    .map((ch, i) => ({
+      ...ch,
+      visits: Math.max(1, Math.round(ch.visits * (1 - i * 0.08))),
+      orders: Math.max(1, Math.round(ch.orders * (0.5 + (((hash + i) % 50) / 100)))),
+      revenue: Math.max(1, Math.round(ch.revenue * (0.4 + (((hash + i) % 60) / 100)))),
+    }));
+}

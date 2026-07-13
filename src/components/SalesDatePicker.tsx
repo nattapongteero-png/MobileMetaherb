@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { View, Text, Pressable, Modal } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Calendar, X } from "lucide-react-native";
+import { Calendar, ChevronDown, X } from "lucide-react-native";
+import { GlassView } from "expo-glass-effect";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
+import { isTablet } from "../theme/layout";
 import { Wheel, WheelHighlight, WheelFades } from "./WheelPicker";
 import type { Period } from "../data/salesReport";
 
@@ -129,14 +131,26 @@ export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel
 
   return (
     <>
-      <Pressable onPress={openModal} className="flex-row items-center active:opacity-60" style={{ gap: 5, paddingHorizontal: 6, height: 34 }}>
-        <Calendar size={15} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
-        <Text style={{ fontSize: 12.5, fontWeight: "700", color: BRAND_GREEN_DARK }}>{salesDateLabel(period, sel)}</Text>
+      {/* Trigger — Liquid Glass capsule, same look as the Flash Sale month
+          picker (Calendar + label + chevron); tablet-sized to match. */}
+      <Pressable onPress={openModal} hitSlop={8}>
+        <GlassView
+          glassEffectStyle="regular"
+          colorScheme="light"
+          isInteractive
+          style={{ height: isTablet() ? 50 : 44, borderRadius: 999, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 6 }}
+        >
+          <Calendar size={isTablet() ? 17 : 16} color="#1a1a1a" strokeWidth={2.2} />
+          <Text numberOfLines={1} style={{ maxWidth: 190, fontSize: isTablet() ? 14.5 : 13, fontWeight: "700", color: "#1a1a1a" }}>{salesDateLabel(period, sel)}</Text>
+          <ChevronDown size={isTablet() ? 16 : 15} color="#1a1a1a" strokeWidth={2.4} />
+        </GlassView>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
-        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
+        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
+          {/* Fixed dialog width — on iPad the card would otherwise stretch the
+              full screen; clamp to a phone-sized, centered sheet. */}
+          <Pressable onPress={() => {}} style={{ width: "100%", maxWidth: 400, backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — step-aware title, X top-right */}
             <View style={{ marginBottom: 12 }}>
               <Text style={{ textAlign: "center", fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>

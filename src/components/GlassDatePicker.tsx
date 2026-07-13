@@ -97,8 +97,9 @@ export function GlassDatePicker({
       </PressableScale>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
-        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
+        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
+          {/* Fixed dialog width so the sheet doesn't stretch full-screen on iPad */}
+          <Pressable onPress={() => {}} style={{ width: "100%", maxWidth: 400, backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — centered title, X top-right */}
             <View style={{ marginBottom: 12 }}>
               <Text style={{ textAlign: "center", fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>{placeholder}</Text>
@@ -295,8 +296,9 @@ export function GlassDateRangePicker({
       <FieldPill field="end" label={endLabel} val={end} />
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
-        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
+        <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
+          {/* Fixed dialog width so the sheet doesn't stretch full-screen on iPad */}
+          <Pressable onPress={() => {}} style={{ width: "100%", maxWidth: 400, backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — step-aware title, X top-right */}
             <View style={{ marginBottom: 12 }}>
               <Text style={{ textAlign: "center", fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>

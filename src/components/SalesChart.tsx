@@ -63,7 +63,7 @@ function smoothPath(pts: { x: number; y: number }[]) {
 /** Primary series (left scale) + secondary series (right scale) — web parity:
  *  smooth dual lines / grouped 3D bars, and a press-and-drag tooltip that
  *  scrubs across points (mobile version of the web hover tooltip). */
-export function SalesChart({ data, type, series = DEFAULT_SERIES }: { data: Point[]; type: "bar" | "line"; series?: [Series, Series] }) {
+export function SalesChart({ data, type, series = DEFAULT_SERIES, onSelect }: { data: Point[]; type: "bar" | "line"; series?: [Series, Series]; onSelect?: (label: string) => void }) {
   const [p, sec] = series;
   const [w, setW] = useState(0);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
@@ -107,6 +107,17 @@ export function SalesChart({ data, type, series = DEFAULT_SERIES }: { data: Poin
     .onUpdate((e) => scrub(e.x))
     .onEnd(clear)
     .onFinalize(clear);
+  // Tap a bucket to drill into it (mobile stand-in for the web's chart click).
+  // Only armed when the host passes onSelect, so other charts keep their old
+  // scrub-only behaviour.
+  const tapGesture = Gesture.Tap()
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (!onSelect || n === 0) return;
+      Haptics.selectionAsync();
+      onSelect(data[idxFromX(e.x)].label);
+    });
+  const gesture = onSelect ? Gesture.Race(scrubGesture, tapGesture) : scrubGesture;
 
   const active = activeIdx != null ? data[activeIdx] : null;
 
@@ -118,7 +129,7 @@ export function SalesChart({ data, type, series = DEFAULT_SERIES }: { data: Poin
     // Fixed block height (shared with SalesDonut) so switching chart tabs
     // never shifts the layout below the card.
     <View style={{ height: CHART_BLOCK_H }}>
-      <GestureDetector gesture={scrubGesture}>
+      <GestureDetector gesture={gesture}>
       <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
         {w > 0 ? (
           <Svg width={w} height={H}>

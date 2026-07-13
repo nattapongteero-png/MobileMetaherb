@@ -369,10 +369,12 @@ function MainTabs() {
       // Don't let the iOS 26 tab bar minimize on scroll — it leaves labels
       // half-collapsed (sunk to the bottom) when navigating between screens.
       minimizeBehavior="never"
-      // iPad renders tab labels big/bold by default — pin them to the compact
-      // phone look (small + medium weight). Phones keep the system default.
+      // iPad's default tab labels are big+bold; the compact 11pt pin overshot
+      // the other way (looked tiny on the large canvas). 14pt medium reads as
+      // a proper iPad tab bar without the heavy system default. Phones keep the
+      // system default.
       {...(isTablet()
-        ? { tabLabelStyle: { fontSize: 11, fontFamily: "IBMPlexSansThaiLooped_500Medium" } }
+        ? { tabLabelStyle: { fontSize: 14, fontFamily: "IBMPlexSansThaiLooped_500Medium" } }
         : null)}
       // Eagerly mount every tab (default lazy:true leaves non-focused tabs blank
       // under iOS 26 + New Arch).
