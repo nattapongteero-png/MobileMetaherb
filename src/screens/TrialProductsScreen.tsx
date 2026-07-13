@@ -78,7 +78,7 @@ export const TRIAL_PRODUCTS: TrialProduct[] = [
     tagline: "ชาดอกคาเมลเลียคัดดอกทั้งดอก กลิ่นหอมละมุน — ทดลองชิมก่อนวางขาย",
     category: "อาหาร / เครื่องดื่ม",
     image: "",
-    imageSrc: require("../../assets/products/trial/trial-camellia-tea.jpg"),
+    imageSrc: require("../../assets/products/trial/trial-camellia-tea.png"),
     spotsTotal: 60,
     spotsTaken: 21,
     endsInDays: 16,
@@ -94,7 +94,7 @@ export const TRIAL_PRODUCTS: TrialProduct[] = [
     tagline: "ครีมเติมน้ำให้ผิว เนื้อบางเบา ซึมไว ชุ่มชื้นยาวนาน — หาผู้ทดสอบผิวแห้ง",
     category: "เครื่องสำอาง",
     image: "",
-    imageSrc: require("../../assets/products/trial/trial-dew-cream.jpg"),
+    imageSrc: require("../../assets/products/trial/trial-dew-cream.png"),
     spotsTotal: 80,
     spotsTaken: 44,
     endsInDays: 11,
@@ -110,7 +110,7 @@ export const TRIAL_PRODUCTS: TrialProduct[] = [
     tagline: "ผงมัทฉะอุจิเกรดพรีเมียม บดละเอียด สีเขียวสด — ทดลองชงก่อนเปิดจำหน่าย",
     category: "อาหาร / เครื่องดื่ม",
     image: "",
-    imageSrc: require("../../assets/products/trial/trial-matcha.jpg"),
+    imageSrc: require("../../assets/products/trial/trial-matcha.png"),
     spotsTotal: 50,
     spotsTaken: 33,
     endsInDays: 8,
@@ -126,7 +126,7 @@ export const TRIAL_PRODUCTS: TrialProduct[] = [
     tagline: "โฟมล้างหน้าสูตรชาเขียว + แตงกวา + ว่านหางจระเข้ อ่อนโยน — หาผู้ทดสอบผิวบอบบาง",
     category: "เครื่องสำอาง",
     image: "",
-    imageSrc: require("../../assets/products/trial/trial-facewash.jpg"),
+    imageSrc: require("../../assets/products/trial/trial-facewash.png"),
     spotsTotal: 90,
     spotsTaken: 38,
     endsInDays: 20,
@@ -526,7 +526,11 @@ function TrialCard({ p, onOpen, width }: { p: TrialProduct; onOpen: () => void; 
       >
         <Image
           source={p.imageSrc ?? { uri: p.image }}
-          style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }}
+          // No borderRadius on the Image itself: under Android + Fabric an
+          // <Image resizeMode="cover"> with per-corner radii renders BLANK. The
+          // parent View already clips the top corners (overflow:hidden + radii),
+          // so the image needs none of its own.
+          style={{ width: "100%", height: "100%" }}
           resizeMode="cover"
         />
 
