@@ -77,7 +77,7 @@ function FrostedGlass() {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.60)",
+          backgroundColor: "rgba(255,255,255,0.78)",
           borderRadius: BAR_RADIUS,
           borderWidth: 1,
           borderColor: "rgba(0,0,0,0.10)",
@@ -166,7 +166,7 @@ function FloatingPillTabBar({
               left: 0,
               width: lensWidth,
               borderRadius: 999,
-              backgroundColor: "rgba(244,244,246,0.78)",
+              backgroundColor: "rgba(0,0,0,0.08)",
               transform: [{ translateX: lensX }],
             }}
           />
