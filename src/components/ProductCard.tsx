@@ -123,7 +123,9 @@ export function ProductCard({ product, width, preview, onPress }: {
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 10,
-        elevation: 3,
+        // iOS's 8% shadow is nearly invisible; Android's elevation draws a much
+        // harder one — skip it there so both read as flat bordered cards.
+        elevation: 0,
       }}
       className="bg-white rounded-2xl border border-[#d4d4d4] overflow-hidden active:opacity-80"
     >
