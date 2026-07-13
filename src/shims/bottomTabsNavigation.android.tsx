@@ -40,7 +40,7 @@ const BAR_RADIUS = 30;
 const SIDE_MARGIN = 16;
 /** How high the pill floats above the very bottom — always a clear gap above
  *  the gesture area, so it reads as floating on every device (iOS-26 feel). */
-export const floatBottomFor = (insetBottom: number) => Math.max(insetBottom, 10) + 14;
+export const floatBottomFor = (insetBottom: number) => Math.max(insetBottom, 12);
 
 /** `tabBarIcon: () => ({ sfSymbol })` → a filled Ionicons glyph in the tab's tint. */
 function toJsIcon(original: unknown) {
