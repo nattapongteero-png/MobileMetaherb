@@ -33,7 +33,18 @@ export function GlassIconButton({
         colorScheme="light"
         isInteractive
         tintColor={tintColor}
-        style={{ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center" }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 4,
+          elevation: 3,
+        }}
       >
         {children}
       </GlassView>
