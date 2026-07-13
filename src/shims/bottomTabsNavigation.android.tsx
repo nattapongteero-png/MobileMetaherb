@@ -164,14 +164,7 @@ function FloatingPillTabBar({
               left: 5,
               width: itemWidth - 10,
               borderRadius: 23,
-              backgroundColor: "rgba(255,255,255,0.95)",
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: "rgba(0,0,0,0.06)",
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.14,
-              shadowRadius: 7,
+              backgroundColor: "rgba(0,0,0,0.06)",
               transform: [{ translateX: lensX }],
             }}
           />
