@@ -35,3 +35,7 @@ export const DIVIDER_GRAY = "#f0f0f0";
 // glass material, so they render opaque white there; iOS keeps the native glass.
 import { Platform } from "react-native";
 export const GLASS_BAR_TINT = Platform.OS === "android" ? "#ffffff" : undefined;
+// Circular glass chip buttons inside floating bars: opaque pastels on Android
+// (translucent tints let scrolled content bleed through); real tints on iOS.
+export const GLASS_CHIP_GREEN = Platform.OS === "android" ? "#eaf4ee" : "rgba(49,151,84,0.1)";
+export const GLASS_CHIP_AMBER = Platform.OS === "android" ? "#fbf1e2" : "rgba(219,139,10,0.1)";

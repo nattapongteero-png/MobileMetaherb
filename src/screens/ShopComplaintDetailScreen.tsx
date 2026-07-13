@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState, type ReactNode } from "react";
 import { View, Text, Pressable, Image, ScrollView, Linking, Modal, Dimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -232,6 +233,7 @@ export function ShopComplaintDetailScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
           >
             <Pressable

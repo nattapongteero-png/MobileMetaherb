@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT, GLASS_CHIP_GREEN, GLASS_CHIP_AMBER } from "../theme/tokens";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   View,
@@ -957,6 +958,7 @@ export function HerbalMarketDetailScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{
               height: 68,
               borderRadius: 34,
@@ -972,7 +974,7 @@ export function HerbalMarketDetailScreen() {
               <GlassView
                 glassEffectStyle="regular"
                 colorScheme="light"
-                tintColor="rgba(49,151,84,0.1)"
+                tintColor={GLASS_CHIP_GREEN}
                 isInteractive
                 style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
               >
@@ -990,7 +992,7 @@ export function HerbalMarketDetailScreen() {
                 <GlassView
                   glassEffectStyle="regular"
                   colorScheme="light"
-                  tintColor="rgba(219,139,10,0.1)"
+                  tintColor={GLASS_CHIP_AMBER}
                   isInteractive
                   style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
                 >

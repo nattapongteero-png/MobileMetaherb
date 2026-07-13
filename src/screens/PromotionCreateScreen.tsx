@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 /* ============================================================================
  *  สร้างโปรโมชั่น / แก้ไขโปรโมชั่น — full-screen port of the web CreatePromotionView
  *  (OwnerDashboard.tsx L14490-14991).
@@ -530,6 +531,7 @@ export function PromotionCreateScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
           >
             <Pressable

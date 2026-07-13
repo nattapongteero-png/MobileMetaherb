@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 /* ============================================================================
  *  สร้างคูปอง / แก้ไขคูปอง — full-screen port of the web CreateCouponModal
  *  (OwnerDashboard.tsx L13745-14000).
@@ -431,6 +432,7 @@ export function CouponCreateScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", height: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}
           >
             <Pressable

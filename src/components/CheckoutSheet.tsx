@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { View, Text, Pressable, Animated, PanResponder } from "react-native";
 import { GlassView } from "expo-glass-effect";
@@ -183,6 +184,7 @@ export const CheckoutSheet = forwardRef<CheckoutSheetHandle, Props>(function Che
         <AnimatedGlass
           glassEffectStyle="regular"
           colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
           style={{
             borderTopLeftRadius: rTop,
             borderTopRightRadius: rTop,

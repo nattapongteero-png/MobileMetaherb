@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT, GLASS_CHIP_GREEN } from "../theme/tokens";
 import { useMemo, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, Animated, Dimensions, Modal, Platform, Alert } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1094,10 +1095,11 @@ export function TrialDetailScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}
           >
             <Pressable hitSlop={6} className="active:opacity-70" onPress={() => (nav.navigate as (route: string, params?: object) => void)("Chat", { shopName: "เมต้าเฮิร์บ" })}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor="rgba(49,151,84,0.1)" isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_CHIP_GREEN} isInteractive style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}>
                 <MessageCircle size={22} color="#319754" />
               </GlassView>
             </Pressable>

@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import {
   View,
   Text,
@@ -692,6 +693,7 @@ export function PaymentScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+            tintColor={GLASS_BAR_TINT}
             style={{
               height: 68,
               borderRadius: 34,
