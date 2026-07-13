@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 /**
  * น้องเมต้า — ผู้จัดการร้านค้า AI chat (owner-facing).
@@ -472,7 +473,8 @@ export function ShopManagerChatScreen() {
                 <Animated.View pointerEvents="none" style={[glowRect, glowA]} />
                 <Animated.View pointerEvents="none" style={[glowRect, glowB]} />
                 <View style={{ borderRadius: 34, shadowColor: "#7c2d12", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.16, shadowRadius: 16, elevation: 14 }}>
-                  <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
+                  <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
                     <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "#f5f5f5", borderRadius: 22, minHeight: 44, paddingLeft: 2 }}>
                       <Pressable onPress={onCamera} hitSlop={6} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }} accessibilityLabel="ส่งรูปภาพ">
                         <Camera size={22} color={ORANGE} strokeWidth={2.2} />
@@ -839,7 +841,8 @@ function MetaContent({ m, onChip }: { m: MetaMsg; onChip: (s: string) => void })
         <View style={{ gap: 8 }}>
           {m.items.map((p, i) => (
             <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <Image source={p.image} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
+              <Image source={p.image} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: "#f5f5f5" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 12.5, fontWeight: "600", color: "#1a1a1a" }}>{p.name}</Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>

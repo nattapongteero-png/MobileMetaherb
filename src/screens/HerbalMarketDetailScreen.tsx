@@ -468,6 +468,7 @@ export function HerbalMarketDetailScreen() {
                   source={imgSource(item)}
                   style={{ width: SCREEN_WIDTH, height: HERO_H }}
                   resizeMode="cover"
+          resizeMethod="resize"
                 />
               </Pressable>
             )}
@@ -1068,7 +1069,8 @@ export function HerbalMarketDetailScreen() {
             opacity: flyAnim.interpolate({ inputRange: [0, 0.85, 1], outputRange: [1, 1, 0] }),
           }}
         >
-          <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+          <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
         </Animated.View>
       ) : null}
 

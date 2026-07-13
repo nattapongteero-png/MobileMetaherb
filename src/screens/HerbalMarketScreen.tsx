@@ -223,6 +223,7 @@ export function MaterialCard({
           source={m.image}
           style={{ width: "100%", height: "100%" }}
           resizeMode="cover"
+          resizeMethod="resize"
         />
         {/* Verified */}
         {m.supplierVerified && (

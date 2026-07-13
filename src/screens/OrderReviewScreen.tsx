@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState } from "react";
 import { View, Text, Image, ScrollView, Pressable, TextInput, Switch, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -159,7 +160,8 @@ export function OrderReviewScreen() {
           <Section key={i}>
             {/* Product header */}
             <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-              <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+              <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>
                 <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>{item.option}</Text>
@@ -186,7 +188,8 @@ export function OrderReviewScreen() {
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
               {items[i].photos.map((p) => (
                 <View key={p}>
-                  <Image source={{ uri: p }} style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                  <Image source={{ uri: p }} style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                   <Pressable
                     onPress={() => removePhoto(i, p)}
                     hitSlop={6}
@@ -281,6 +284,7 @@ export function OrderReviewScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}
           >
             <Pressable

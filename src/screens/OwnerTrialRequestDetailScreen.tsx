@@ -152,7 +152,8 @@ export function OwnerTrialRequestDetailScreen() {
               className="flex-row items-center active:opacity-80"
               style={{ gap: 12 }}
             >
-              <Image source={productImg} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover" />
+              <Image source={productImg} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "600", color: "#0a0a0a" }}>{product.name}</Text>
                 <Text numberOfLines={1} style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{product.category || "—"}</Text>

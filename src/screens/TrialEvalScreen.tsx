@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useMemo, useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, TextInput as RNTextInput, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -154,7 +155,8 @@ export function TrialEvalScreen() {
         {/* Floating submit */}
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, gap: 6 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, gap: 6 }}>
               <Text style={{ fontSize: 11.5, color: "#737373", textAlign: "center" }}>
                 ตอบแล้ว {answeredCount} / {questions.length} ข้อ
               </Text>

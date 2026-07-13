@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState, useRef } from "react";
 import { View, Text, ScrollView, Pressable, TextInput, Alert, Modal, StyleSheet, Dimensions, type View as RNView } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -628,6 +629,7 @@ export function HerbalMarketPRScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}
           >
             <Pressable

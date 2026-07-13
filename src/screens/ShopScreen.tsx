@@ -367,7 +367,8 @@ export function ShopScreen() {
         {/* Shop cover image (natural herb banner) — stretches on pull-down */}
         <View style={{ height: bannerHeight, backgroundColor: "#319754" }}>
           <Animated.View style={{ width: "100%", height: "100%", transform: [{ translateY: bannerTranslateY }, { scale: bannerScale }] }}>
-            <Image source={displayBanner} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <Image source={displayBanner} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
             <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(13,49,29,0.28)" }} />
           </Animated.View>
         </View>
@@ -400,7 +401,8 @@ export function ShopScreen() {
                 overflow: "hidden",
               }}
             >
-              <Image source={displayLogo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              <Image source={displayLogo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>

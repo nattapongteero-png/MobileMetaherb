@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -147,6 +148,7 @@ function Bubble({ msg, shopName, role }: { msg: ChatMessage; shopName: string; r
             borderBottomLeftRadius: isUser ? 18 : 4,
           }}
           resizeMode="cover"
+          resizeMethod="resize"
         />
       ) : (
         <View
@@ -415,6 +417,7 @@ export function ChatScreen() {
                 <GlassView
                   glassEffectStyle="regular"
                   colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
                   style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "flex-end", gap: 6 }}
                 >
                   {/* Gray field — wraps the camera button and the text input together */}

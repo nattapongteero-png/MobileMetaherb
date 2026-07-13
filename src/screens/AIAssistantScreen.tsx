@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -402,6 +403,7 @@ export function AIAssistantScreen() {
                   <GlassView
                     glassEffectStyle="regular"
                     colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
                     style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "flex-end", gap: 6 }}
                   >
                     {/* Gray field — wraps the camera button + text input */}
@@ -654,7 +656,8 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
     return (
       <View style={{ alignItems: "flex-end", marginBottom: 16 }}>
         <View style={{ maxWidth: "72%", borderRadius: 18, overflow: "hidden", backgroundColor: "#eceef1" }}>
-          <Image source={{ uri: m.image }} style={{ width: 200, height: 200, backgroundColor: "#e5e7eb" }} resizeMode="cover" />
+          <Image source={{ uri: m.image }} style={{ width: 200, height: 200, backgroundColor: "#e5e7eb" }} resizeMode="cover"
+          resizeMethod="resize" />
           {m.text ? (
             <Text style={{ fontSize: 14.5, color: "#1a1a1a", lineHeight: 21, paddingHorizontal: 14, paddingVertical: 9 }}>{m.text}</Text>
           ) : null}

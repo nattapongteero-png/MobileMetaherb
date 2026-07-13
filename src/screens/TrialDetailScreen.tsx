@@ -309,7 +309,8 @@ function RelatedTrialCard({ p, onPress, width }: { p: TrialCard; onPress: () => 
       style={{ width: width ?? 188, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#d4d4d4", overflow: "hidden", opacity: isClosed ? 0.7 : 1 }}
     >
       <View style={{ width: "100%", height: 130, backgroundColor: palette.bg, borderTopLeftRadius: 15, borderTopRightRadius: 15, overflow: "hidden" }}>
-        <Image source={imgSource(p.imageSrc ?? p.image)} style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }} resizeMode="cover" />
+        <Image source={imgSource(p.imageSrc ?? p.image)} style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }} resizeMode="cover"
+          resizeMethod="resize" />
         {(isClosed || isUrgent) && (
           <View style={{ position: "absolute", left: 10, top: 10, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: isClosed ? "rgba(31,41,55,0.85)" : palette.bar, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
             {isUrgent && <Sparkles size={12} color="#fff" strokeWidth={2.4} />}
@@ -538,7 +539,8 @@ export function TrialDetailScreen() {
                   setViewerOpen(true);
                 }}
               >
-                <Image source={imgSource(item)} style={{ width: SCREEN_WIDTH, height: HERO_H }} resizeMode="cover" />
+                <Image source={imgSource(item)} style={{ width: SCREEN_WIDTH, height: HERO_H }} resizeMode="cover"
+          resizeMethod="resize" />
               </Pressable>
             )}
           />

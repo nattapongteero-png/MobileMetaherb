@@ -55,7 +55,8 @@ export function CafeFavoritesScreen() {
                 className="active:opacity-90"
                 style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececed", padding: 12 }}
               >
-                <Image source={item.image} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
+                <Image source={item.image} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover"
+          resizeMethod="resize" />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: TEXT_PRIMARY }}>{item.name}</Text>
                   {fav.summary ? <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>{fav.summary}</Text> : null}

@@ -766,6 +766,7 @@ export function HerbalMarketQuoteScreen() {
             <GlassView
               glassEffectStyle="regular"
               colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
               style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}
             >
               <Pressable
@@ -801,7 +802,8 @@ export function HerbalMarketQuoteScreen() {
         {!isBulk ? (
           <View style={{ ...SECTION, flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ width: MATERIAL_IMG, height: MATERIAL_IMG, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-              <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }} numberOfLines={1}>
@@ -828,7 +830,8 @@ export function HerbalMarketQuoteScreen() {
               {quoteItems.map((q) => (
                 <View key={q.id} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View style={{ width: LINE_IMG, height: LINE_IMG, borderRadius: 12, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-                    <Image source={q.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image source={q.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }} numberOfLines={1}>

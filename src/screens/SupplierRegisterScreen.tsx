@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState, type ReactNode } from "react";
 import { View, Text, TextInput, Pressable, ScrollView, Alert, Image, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -194,7 +195,8 @@ export function SupplierRegisterScreen() {
           <View style={{ alignItems: "center", paddingTop: 18, paddingBottom: 6 }}>
             <Pressable onPress={() => pickImage(setLogoUri)} className="active:opacity-80" style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               {logoUri ? (
-                <Image source={{ uri: logoUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={{ uri: logoUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               ) : (
                 <View style={{ alignItems: "center", gap: 5 }}>
                   <Camera size={24} color={BRAND_GREEN} strokeWidth={2} />
@@ -349,7 +351,8 @@ export function SupplierRegisterScreen() {
         {/* Floating submit bar */}
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}>
               <Pressable onPress={submit} disabled={!isValid} className="active:opacity-90" style={{ height: 50, borderRadius: 999, backgroundColor: isValid ? BRAND_GREEN : "#cfd4d1", alignItems: "center", justifyContent: "center" }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>ส่งใบสมัคร Supplier</Text>
               </Pressable>

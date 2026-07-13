@@ -386,6 +386,7 @@ export function AccountScreen() {
                     source={AVATAR}
                     style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#ffffff", borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" }}
                     resizeMode="cover"
+          resizeMethod="resize"
                   />
                   <View
                     style={{

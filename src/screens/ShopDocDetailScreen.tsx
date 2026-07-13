@@ -134,7 +134,8 @@ export function ShopDocDetailScreen() {
               {doc.items.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
-                    <Image source={matImg(item.name)} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image source={matImg(item.name)} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>

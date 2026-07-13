@@ -466,7 +466,8 @@ export function PromotionCreateScreen() {
                       <View key={sp.productId} style={{ gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 10 }}>
                         {/* Top: image + info + remove */}
                         <View className="flex-row items-start" style={{ gap: 10 }}>
-                          <Image source={p.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover" />
+                          <Image source={p.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6" }} resizeMode="cover"
+          resizeMethod="resize" />
                           <View style={{ flex: 1, minWidth: 0 }}>
                             <Text numberOfLines={2} style={{ fontSize: 13, fontWeight: "500", color: "#000", lineHeight: 18 }}>{p.name}</Text>
                             <Text style={{ fontSize: 12, fontWeight: "500", color: BRAND_GREEN, marginTop: 2 }}>{p.price}</Text>

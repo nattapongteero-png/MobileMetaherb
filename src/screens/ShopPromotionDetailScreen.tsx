@@ -192,7 +192,8 @@ export function ShopPromotionDetailScreen() {
                   if (!item) return null;
                   return (
                     <View key={pl.productId} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                      <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }}>{item.name}</Text>
                         {/* Promo price + struck-through normal price */}

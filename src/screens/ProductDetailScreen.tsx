@@ -515,6 +515,7 @@ export function ProductDetailScreen({ route }: Props) {
                   source={item as number}
                   style={{ width: SCREEN_WIDTH, height: HERO_H }}
                   resizeMode="cover"
+          resizeMethod="resize"
                 />
               </Pressable>
             )}
@@ -1270,6 +1271,7 @@ export function ProductDetailScreen({ route }: Props) {
             source={view.image}
             style={{ width: "100%", height: "100%" }}
             resizeMode="cover"
+          resizeMethod="resize"
           />
         </Animated.View>
       ) : null}

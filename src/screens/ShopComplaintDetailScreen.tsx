@@ -180,7 +180,8 @@ export function ShopComplaintDetailScreen() {
             <View className="flex-row" style={{ flexWrap: "wrap", gap: 8 }}>
               {c.evidence.map((e, i) => (
                 <Pressable key={i} onPress={() => setViewer(i)} className="active:opacity-80" style={{ width: 96, height: 96, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f3f3" }}>
-                  <Image source={e.source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <Image source={e.source} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                   {e.video ? (
                     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.22)" }}>
                       <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}>
@@ -198,7 +199,8 @@ export function ShopComplaintDetailScreen() {
             <View style={{ gap: 14 }}>
               {c.items.map((it, i) => (
                 <View key={i} className="flex-row items-center" style={{ gap: 12 }}>
-                  <Image source={it.image} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                  <Image source={it.image} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text numberOfLines={1} style={{ fontSize: 13.5, color: "#0a0a0a", fontWeight: "500" }}>{it.name}</Text>
                     {it.option ? <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }}>{it.option}</Text> : null}

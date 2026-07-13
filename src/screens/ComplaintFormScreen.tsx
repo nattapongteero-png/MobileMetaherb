@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState, type ReactNode } from "react";
 import { View, Text, Image, Pressable, ScrollView, TextInput, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -206,7 +207,8 @@ export function ComplaintFormScreen() {
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               {images.map((img, i) => (
                 <View key={i}>
-                  <Image source={{ uri: img }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                  <Image source={{ uri: img }} style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                   <Pressable
                     onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
                     hitSlop={6}
@@ -247,7 +249,8 @@ export function ComplaintFormScreen() {
               {order.items.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
-                    <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>
@@ -306,7 +309,8 @@ export function ComplaintFormScreen() {
       {/* Floating Liquid-Glass submit */}
       <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}>
             <Pressable
               onPress={handleSubmit}
               className="flex-row items-center justify-center active:opacity-80"

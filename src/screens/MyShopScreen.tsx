@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
@@ -1195,7 +1196,8 @@ function ShopProfileEditSheet({ visible, onClose }: { visible: boolean; onClose:
               {/* Banner — shows the CURRENT live banner (custom upload, else the
                   storefront's default image) so the preview matches the real shop. */}
               <Pressable onPress={() => pick(setBanner)} className="active:opacity-95" style={{ height: 158, borderRadius: 22, overflow: "hidden", backgroundColor: "#eef7f1" }}>
-                <Image source={banner ? { uri: banner } : SHOP.banner} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={banner ? { uri: banner } : SHOP.banner} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                 <LinearGradient pointerEvents="none" colors={["transparent", "rgba(0,0,0,0.30)"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 72 }} />
                 <View style={{ position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.42)", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 }}>
                   <Camera size={13} color="#fff" strokeWidth={2.3} />
@@ -1207,7 +1209,9 @@ function ShopProfileEditSheet({ visible, onClose }: { visible: boolean; onClose:
                 <Pressable onPress={() => pick(setLogo)} className="active:opacity-80">
                   <View style={{ width: 94, height: 94, borderRadius: 47, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.22, shadowRadius: 9, elevation: 7 }}>
                     <View style={{ width: 86, height: 86, borderRadius: 43, backgroundColor: "#eef7f1", overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-                      {logo ? <Image source={{ uri: logo }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
+                      {logo ? <Image source={{ uri: logo }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" /> : <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />}
                     </View>
                   </View>
                   <View style={{ position: "absolute", bottom: 1, right: 1, width: 31, height: 31, borderRadius: 15.5, backgroundColor: BRAND_GREEN, borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center" }}>
@@ -1491,7 +1495,8 @@ function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; b
       <View style={{ height: BANNER_H, backgroundColor: "#e5e7eb" }}>
         {/* No gradient/shade on the banner — show the raw image. The floating
             back/share buttons rely on their own glass background for contrast. */}
-        <Animated.Image source={bannerSource} style={[{ position: "absolute", top: 0, left: 0, right: 0, height: BANNER_H }, bannerXf]} resizeMode="cover" />
+        <Animated.Image source={bannerSource} style={[{ position: "absolute", top: 0, left: 0, right: 0, height: BANNER_H }, bannerXf]} resizeMode="cover"
+          resizeMethod="resize" />
       </View>
 
       {/* Shop info card — overlaps the banner (web hero) */}
@@ -1499,9 +1504,11 @@ function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; b
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(49,151,84,0.1)", borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               {shopLogoUri ? (
-                <Image source={{ uri: shopLogoUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={{ uri: shopLogoUri }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               ) : (
-                <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               )}
             </View>
             <View style={{ flex: 1, gap: 5 }}>
@@ -1592,7 +1599,8 @@ function SettingsTab({ insetsBottom, onScroll }: { insetsBottom: number; onScrol
       <View style={{ backgroundColor: "white", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, padding: 16, gap: 14 }}>
         <View className="flex-row items-center" style={{ gap: 12 }}>
           <View style={{ width: 54, height: 54, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: DIVIDER_GRAY }}>
-            <Image source={shopLogoUri ? { uri: shopLogoUri } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <Image source={shopLogoUri ? { uri: shopLogoUri } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
           </View>
           <View style={{ flex: 1 }}>
             <View className="flex-row items-center" style={{ gap: 6 }}>
@@ -3894,7 +3902,8 @@ export function QuotationCard({ doc, onOpenDetail }: { doc: MarketDoc; onOpenDet
       <View style={{ gap: 12 }}>
         {doc.items.map((item, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>{item.name}</Text>
               <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>
@@ -4094,7 +4103,8 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
       {/* Header — image + name + price/-% + 3-dot */}
       <View className="flex-row" style={{ gap: 12 }}>
         <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: SURFACE_GRAY }}>
-          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: p.status === "soldout" ? 0.55 : 1 }} resizeMode="cover" />
+          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: p.status === "soldout" ? 0.55 : 1 }} resizeMode="cover"
+          resizeMethod="resize" />
           {p.status === "soldout" ? (
             <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
               <Text style={{ color: "white", fontSize: 12, fontWeight: "800" }}>หมด</Text>
@@ -5216,7 +5226,8 @@ export function PMCard({ p, onMenu, onPreview }: { p: PMProduct; onMenu: (e: Ges
       <View className="flex-row items-center" style={{ gap: 12 }}>
         {/* iPad gets a larger thumbnail so the photo reads in the wider card. */}
         <View style={{ width: isTablet() ? 84 : 52, height: isTablet() ? 84 : 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
-          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover" />
+          <Image source={p.image} style={{ width: "100%", height: "100%", opacity: dimmed ? 0.55 : 1 }} resizeMode="cover"
+          resizeMethod="resize" />
           {overlay ? (
             <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.32)" }}>
               <Text style={{ color: "white", fontSize: 11, fontWeight: "800" }}>{overlay}</Text>
@@ -5454,7 +5465,8 @@ export function DocCard({ doc, kind, onOpenDetail }: { doc: MarketDoc; kind: Doc
       <View style={{ gap: 12 }}>
         {shown.map((item, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+            <Image source={matImg(item.name)} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>{item.name}</Text>
               <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>
@@ -5552,7 +5564,8 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
         <View style={{ gap: 14 }}>
           {doc.items.map((item, i) => (
             <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Image source={matImg(item.name)} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+              <Image source={matImg(item.name)} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
                 <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>
                 <View className="flex-row items-center" style={{ gap: 6, flexWrap: "wrap" }}>
@@ -5720,7 +5733,8 @@ export function DocDetailView({ doc, kind, insetsBottom = 24 }: { doc: MarketDoc
       <LinearGradient pointerEvents="none" colors={["transparent", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 90 }} />
       <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insetsBottom + 8 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
             {primaryAction ? (
               <>
                 {/* Contact — circular icon button (only when a primary pill is shown) */}
@@ -5967,7 +5981,8 @@ export function OrderCard({ order }: { order: ShopOrder }) {
       <View style={{ gap: 14 }}>
         {shownItems.map((item, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+            <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>{item.name}</Text>
               <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>{item.option}</Text>

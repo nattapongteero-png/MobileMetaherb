@@ -24,8 +24,7 @@ const INACTIVE = "#5b6472";
 
 /**
  * Floating tab bar using Apple's real iOS 26 Liquid Glass material via
- * expo-glass-effect's <GlassView
-          tintColor={GLASS_BAR_TINT}> (UIGlassEffect / UIVisualEffectView).
+ * expo-glass-effect's <GlassView> (UIGlassEffect / UIVisualEffectView).
  * Falls back to a plain translucent view below iOS 26. First-party Expo
  * module — no config plugin (per AGENTS.md).
  */
@@ -48,6 +47,7 @@ export function LiquidGlassTabBar({
           glassEffectStyle="regular"
           colorScheme="light"
           isInteractive
+          tintColor={GLASS_BAR_TINT}
           style={styles.bar}
         >
           <View style={styles.row}>

@@ -257,7 +257,8 @@ export function PaymentMethodScreen() {
                                 style={[styles.row, { paddingLeft: 56, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: SEP }]}
                               >
                                 {app.image ? (
-                                  <Image source={app.image} style={{ width: 28, height: 28, borderRadius: 7 }} resizeMode="cover" />
+                                  <Image source={app.image} style={{ width: 28, height: 28, borderRadius: 7 }} resizeMode="cover"
+          resizeMethod="resize" />
                                 ) : null}
                                 <View style={{ flex: 1, marginLeft: 12 }}>
                                   <Text style={{ fontSize: 16, color: LABEL, fontWeight: aActive ? "600" : "400" }}>{app.label}</Text>
@@ -305,7 +306,8 @@ export function PaymentMethodScreen() {
                   >
                     <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
                       {m.image ? (
-                        <Image source={m.image} style={{ width: 30, height: 30, borderRadius: 7 }} resizeMode="cover" />
+                        <Image source={m.image} style={{ width: 30, height: 30, borderRadius: 7 }} resizeMode="cover"
+          resizeMethod="resize" />
                       ) : m.Icon ? (
                         <m.Icon size={22} color={active ? BRAND_GREEN : "#9ca3af"} />
                       ) : null}

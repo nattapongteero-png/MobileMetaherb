@@ -204,7 +204,8 @@ export function ShopAccountScreen() {
           <Section>
             <View style={{ alignItems: "center", gap: 12 }}>
               <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(49,151,84,0.1)", borderWidth: 2, borderColor: "rgba(49,151,84,0.3)", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                <Image source={logo ? { uri: logo } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={logo ? { uri: logo } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               </View>
               <View style={{ alignItems: "center", gap: 6 }}>
                 <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", color: "#0a0a0a" }}>{name}</Text>
@@ -269,7 +270,8 @@ export function ShopAccountScreen() {
             <View style={{ alignItems: "center", gap: 8 }}>
               <Pressable onPress={pickLogo} className="active:opacity-80">
                 <View style={{ width: 92, height: 92, borderRadius: 46, backgroundColor: "rgba(49,151,84,0.1)", borderWidth: 2, borderColor: "rgba(49,151,84,0.3)", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  <Image source={dLogo ? { uri: dLogo } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <Image source={dLogo ? { uri: dLogo } : SHOP.logo} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                 </View>
                 <View style={{ position: "absolute", bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: BRAND_GREEN, borderWidth: 2.5, borderColor: "#fff", alignItems: "center", justifyContent: "center" }}>
                   <Camera size={14} color="#fff" strokeWidth={2.2} />

@@ -187,7 +187,8 @@ export function AccountInfoScreen() {
             <View style={{ alignItems: "center", gap: 12 }}>
               <Pressable onPress={changePhoto} className="active:opacity-80">
                 <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(49,151,84,0.1)", borderWidth: 2, borderColor: "rgba(49,151,84,0.3)", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                  {avatar ? <Image source={{ uri: avatar }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : <User size={46} color={BRAND_GREEN} strokeWidth={1.8} />}
+                  {avatar ? <Image source={{ uri: avatar }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" /> : <User size={46} color={BRAND_GREEN} strokeWidth={1.8} />}
                 </View>
                 <View style={{ position: "absolute", bottom: 0, right: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: BRAND_GREEN, borderWidth: 2.5, borderColor: "#fff", alignItems: "center", justifyContent: "center" }}>
                   <Camera size={14} color="#fff" strokeWidth={2.2} />

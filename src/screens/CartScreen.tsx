@@ -108,6 +108,7 @@ function CartItemRow({ item, isLast, selected, onToggle, onOpen, onQty, onRemove
             source={item.image}
             style={{ width: "100%", height: "100%", opacity: item.inStock ? 1 : 0.45 }}
             resizeMode="cover"
+          resizeMethod="resize"
           />
         </Pressable>
         {/* Content column stretches to the image height; on iPad the qty/price

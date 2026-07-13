@@ -113,7 +113,8 @@ export function ShopOrderReviewScreen() {
             return (
               <View key={r.itemIndex} style={{ borderWidth: 1, borderColor: "#f0f0f0", borderRadius: 20, padding: 14, gap: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <Image source={item.image} style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                  <Image source={item.image} style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "500", color: "#0a0a0a" }}>{item.name}</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>

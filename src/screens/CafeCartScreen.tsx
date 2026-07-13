@@ -69,7 +69,8 @@ export function CafeCartScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
           {lines.map((l) => (
             <Pressable key={l.key} onPress={() => editLine(l)} className="active:opacity-80" style={{ flexDirection: "row", gap: 12, backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
-              <Image source={l.image} style={{ width: ITEM_IMG, height: ITEM_IMG, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
+              <Image source={l.image} style={{ width: ITEM_IMG, height: ITEM_IMG, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
                   <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: TEXT_PRIMARY }}>{l.name}</Text>

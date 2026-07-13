@@ -82,7 +82,8 @@ function OrderCard({
       <View style={{ gap: 14 }}>
         {shownItems.map((item, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+            <Image source={item.image} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={1}>
                 {item.name}

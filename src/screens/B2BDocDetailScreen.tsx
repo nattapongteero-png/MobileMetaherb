@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState } from "react";
 import { View, Text, Image, Pressable, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -235,7 +236,8 @@ export function B2BDocDetailScreen() {
               {items.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                   <View style={{ width: 56, height: 56, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0", alignItems: "center", justifyContent: "center" }}>
-                    {item.image ? <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : <Package size={22} color="#d4d4d4" />}
+                    {item.image ? <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" /> : <Package size={22} color="#d4d4d4" />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>
@@ -365,7 +367,8 @@ export function B2BDocDetailScreen() {
         {answerable ? (
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Pressable
                   onPress={onReject}
                   className="active:opacity-80 items-center justify-center"
@@ -388,7 +391,8 @@ export function B2BDocDetailScreen() {
         {showPayBar ? (
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, flexDirection: "row", alignItems: "center", gap: 8 }}>
                 {/* Chat — circular icon button inside the bar */}
                 <Pressable onPress={onChat} hitSlop={6} className="active:opacity-70" style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(49,151,84,0.1)" }}>
                   <MessageCircle size={22} color={BRAND_GREEN} />

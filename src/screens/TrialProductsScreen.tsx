@@ -527,11 +527,14 @@ function TrialCard({ p, onOpen, width }: { p: TrialProduct; onOpen: () => void; 
         <Image
           source={p.imageSrc ?? { uri: p.image }}
           // No borderRadius on the Image itself: under Android + Fabric an
-          // <Image resizeMode="cover"> with per-corner radii renders BLANK. The
+          // cover-mode Image with per-corner radii renders BLANK. The
           // parent View already clips the top corners (overflow:hidden + radii),
           // so the image needs none of its own.
           style={{ width: "100%", height: "100%" }}
           resizeMode="cover"
+          // Fabric/Fresco: ≳600K-px images decode async on first commit and
+          // can stay blank until remount — "resize" repaints reliably.
+          resizeMethod="resize"
         />
 
         {/* Top-left status badge */}

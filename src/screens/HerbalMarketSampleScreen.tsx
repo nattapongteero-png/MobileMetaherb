@@ -426,7 +426,8 @@ export function HerbalMarketSampleScreen() {
           {/* Material info */}
           <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ width: 80, height: 80, borderRadius: 12, overflow: "hidden", backgroundColor: "#f5f5f5" }}>
-              <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+              <Image source={imgSource(material.image)} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               <View
                 style={{
                   position: "absolute",

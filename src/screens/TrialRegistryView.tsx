@@ -141,6 +141,7 @@ function ProductCard({
           source={source}
           style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: "#f3f4f6", opacity: closed ? 0.55 : 1 }}
           resizeMode="cover"
+          resizeMethod="resize"
         />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: TEXT_PRIMARY }}>{p.name}</Text>

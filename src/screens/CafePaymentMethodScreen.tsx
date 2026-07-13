@@ -57,7 +57,8 @@ export function CafePaymentMethodScreen() {
               >
                 <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
                   {m.image ? (
-                    <Image source={m.image} style={{ width: 30, height: 30, borderRadius: 7 }} resizeMode="cover" />
+                    <Image source={m.image} style={{ width: 30, height: 30, borderRadius: 7 }} resizeMode="cover"
+          resizeMethod="resize" />
                   ) : m.Icon ? (
                     <m.Icon size={22} color={active ? BRAND_GREEN : "#9ca3af"} />
                   ) : null}

@@ -162,7 +162,8 @@ export function ShopProductDetailScreen() {
           <Section title="รูปภาพสินค้า">
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1, aspectRatio: 1, borderRadius: 18, overflow: "hidden", backgroundColor: "#f0f0f0", borderWidth: 2, borderColor: BRAND_GREEN }}>
-                <Image source={p.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={p.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                 <View style={{ position: "absolute", top: 6, right: 6, backgroundColor: BRAND_GREEN, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
                   <Text style={{ fontSize: 9, fontWeight: "700", color: "#fff" }}>หลัก</Text>
                 </View>
@@ -189,7 +190,8 @@ export function ShopProductDetailScreen() {
                   const image = it.custom?.image ?? RAW_PRODUCT_BY_ID[it.id]?.image ?? p.image;
                   return (
                     <View key={it.id} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <Image source={image} style={{ width: isTablet() ? 72 : 48, height: isTablet() ? 72 : 48, borderRadius: 10, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                      <Image source={image} style={{ width: isTablet() ? 72 : 48, height: isTablet() ? 72 : 48, borderRadius: 10, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }}>{it.label}</Text>
                         <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>คงเหลือ {optionStock(i).toLocaleString()} ชิ้น</Text>

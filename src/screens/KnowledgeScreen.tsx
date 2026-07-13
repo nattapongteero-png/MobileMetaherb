@@ -58,7 +58,8 @@ function ArticleCard({ a, onPress }: { a: Article; onPress: () => void }) {
     >
       {/* Image left with view + date overlays */}
       <View style={{ width: tablet ? 175 : 130 }}>
-        <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+        <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
         <View style={{ flex: 1, justifyContent: "space-between", padding: 8 }}>
           <Pill style={{ alignSelf: "flex-start" }}>
             <Eye size={11} color="#fff" />
@@ -102,7 +103,8 @@ function ArticleCard({ a, onPress }: { a: Article; onPress: () => void }) {
 function VideoCard({ v }: { v: VideoItem }) {
   return (
     <Pressable className="active:opacity-90" style={{ width: VIDEO_WIDTH, height: VIDEO_HEIGHT, borderRadius: 16, overflow: "hidden" }}>
-      <Image source={{ uri: v.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+      <Image source={{ uri: v.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
       <View style={{ flex: 1, justifyContent: "space-between", padding: 10 }}>
         <Pill style={{ alignSelf: "flex-start" }}>
           <Eye size={12} color="#fff" />

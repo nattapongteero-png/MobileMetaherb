@@ -104,7 +104,8 @@ function DocCard({ kind, doc, onPress }: { kind: DocKind; doc: AnyDoc; onPress: 
           <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ width: 52, height: 52, borderRadius: 12, overflow: "hidden", backgroundColor: "#f0f0f0", alignItems: "center", justifyContent: "center" }}>
               {item.image ? (
-                <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               ) : (
                 <Package size={20} color="#d4d4d4" />
               )}

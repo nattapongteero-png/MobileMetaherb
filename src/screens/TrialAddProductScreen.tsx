@@ -699,7 +699,8 @@ export function TrialAddProductScreen() {
                     >
                       {uploaded ? (
                         <>
-                          <Image source={{ uri: uploaded }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+                          <Image source={{ uri: uploaded }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                           <Pressable
                             onPress={() => removeImage(slot)}
                             hitSlop={6}

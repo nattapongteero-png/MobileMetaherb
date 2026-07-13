@@ -337,7 +337,8 @@ export function AddProductScreen() {
                 style={{ flex: 1, aspectRatio: 1, borderRadius: 18, backgroundColor: "#f9f9f9", borderWidth: 2, borderColor: img ? BRAND_GREEN : i === 0 ? "rgba(49,151,84,0.4)" : "#dcdcdc", borderStyle: img ? "solid" : "dashed", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                 {img ? (
                   <>
-                    <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                     <Pressable onPress={() => setImages((p) => { const n = [...p]; n[i] = null; return n; })} hitSlop={8} style={{ position: "absolute", top: 6, left: 6, width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}>
                       <X size={14} color="#fff" strokeWidth={2.4} />
                     </Pressable>
@@ -520,7 +521,8 @@ export function AddProductScreen() {
                   <View className="flex-row items-start" style={{ gap: 12 }}>
                     <Pressable onPress={() => pickVarImage(i)} className="active:opacity-80" style={{ width: 84, height: 84, borderRadius: 14, backgroundColor: "#f9f9f9", borderWidth: 2, borderColor: v.image ? BRAND_GREEN : "#dcdcdc", borderStyle: v.image ? "solid" : "dashed", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                       {v.image ? (
-                        <Image source={{ uri: v.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                        <Image source={{ uri: v.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                       ) : (
                         <>
                           <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e5e5", alignItems: "center", justifyContent: "center" }}>

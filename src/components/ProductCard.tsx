@@ -135,6 +135,9 @@ export function ProductCard({ product, width, preview, onPress }: {
           source={product.image as number}
           style={{ width: "100%", height: "100%" }}
           resizeMode="cover"
+          // Fabric/Fresco: 800×800 catalog shots decode async on first commit
+          // and can stay blank until remount — "resize" repaints reliably.
+          resizeMethod="resize"
         />
 
         {/* Top-right discount tag — "ลด N%" (matches web home cards). A merged

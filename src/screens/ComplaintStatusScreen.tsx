@@ -127,7 +127,8 @@ export function ComplaintStatusScreen() {
           {/* Evidence */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
             {complaint.evidence.map((ev, i) => (
-              <Image key={i} source={ev.source} style={{ width: 96, height: 96, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+              <Image key={i} source={ev.source} style={{ width: 96, height: 96, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
             ))}
           </View>
         </Card>

@@ -307,6 +307,7 @@ export function PaymentScreen() {
                     source={item.image}
                     style={{ width: "100%", height: "100%" }}
                     resizeMode="cover"
+          resizeMethod="resize"
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -485,7 +486,8 @@ export function PaymentScreen() {
               ) : selectedCard ? (
                 <CardBrandIcon brand={selectedCard.brand} size={30} />
               ) : selectedMethod?.image ? (
-                <Image source={selectedMethod.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={selectedMethod.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               ) : selectedMethod?.Icon ? (
                 <selectedMethod.Icon size={22} color="#319754" />
               ) : null}

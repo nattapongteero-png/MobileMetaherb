@@ -145,7 +145,8 @@ export function ArticleDetailScreen() {
             transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
           }}
         >
-          <Image source={{ uri: article.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+          <Image source={{ uri: article.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
         </Animated.View>
 
         {/* Content — flat, square edges (no rounded corners over the cover) */}

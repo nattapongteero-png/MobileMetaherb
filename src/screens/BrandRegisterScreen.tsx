@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -103,7 +104,8 @@ export function BrandRegisterScreen() {
         {/* Floating submit bar */}
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}>
               <Pressable onPress={submit} disabled={!isValid} className="active:opacity-90" style={{ height: 50, borderRadius: 999, backgroundColor: isValid ? BRAND_GREEN : "#cfd4d1", alignItems: "center", justifyContent: "center" }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>ส่งใบสมัครแบรนด์ทดสอบ</Text>
               </Pressable>

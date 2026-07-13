@@ -226,7 +226,8 @@ export function ShopOrderDetailScreen() {
             <View style={{ gap: 14 }}>
               {order.items.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <Image source={item.image} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover" />
+                  <Image source={item.image} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f0f0f0" }} resizeMode="cover"
+          resizeMethod="resize" />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13.5, fontWeight: "500", color: "#0a0a0a" }} numberOfLines={2}>{item.name}</Text>
                     <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 3 }} numberOfLines={1}>{item.option}</Text>

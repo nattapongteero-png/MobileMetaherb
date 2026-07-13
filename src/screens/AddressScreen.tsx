@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { View, Text, Pressable, ScrollView, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -89,7 +90,8 @@ export function AddressScreen() {
       {/* Floating add button → opens the shared add-address sheet */}
       <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", flexDirection: "row", padding: 8 }}>
             <Pressable onPress={() => nav.navigate("AddAddress")} className="flex-row items-center justify-center active:opacity-80" style={{ flex: 1, backgroundColor: BRAND_GREEN, borderRadius: 999, height: 50, gap: 6 }}>
               <Plus size={18} color="#fff" strokeWidth={2.6} />
               <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>เพิ่มที่อยู่ใหม่</Text>

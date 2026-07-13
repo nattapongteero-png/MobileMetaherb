@@ -193,7 +193,8 @@ export function TrialRegistryDetailScreen() {
                       overflow: "hidden",
                     }}
                   >
-                    <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
                   </View>
                   {/* rating badge — centered on the avatar's bottom edge */}
                   <View style={{ position: "absolute", left: 0, right: 0, bottom: -10, alignItems: "center" }}>

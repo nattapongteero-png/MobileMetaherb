@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { useMemo, useState } from "react";
 import {
   View,
@@ -275,6 +276,7 @@ export function TrialApplyScreen() {
                 source={imgSource(product.imageSrc ?? product.image)}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="cover"
+          resizeMethod="resize"
               />
               <View style={{ position: "absolute", top: 6, left: 6 }}>
                 <View
@@ -592,6 +594,7 @@ export function TrialApplyScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
+              tintColor={GLASS_BAR_TINT}
             style={{ borderRadius: 34, overflow: "hidden", padding: 9 }}
           >
             <Pressable

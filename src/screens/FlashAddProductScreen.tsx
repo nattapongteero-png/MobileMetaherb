@@ -53,7 +53,8 @@ function FSLabel({ children, required }: { children: ReactNode; required?: boole
 function FSProductHeader({ image, name, originalPrice, flashPrice, stock }: { image: number; name: string; originalPrice: number; flashPrice: number; stock: string }) {
   return (
     <View className="flex-row items-start" style={{ gap: 16 }}>
-      <Image source={image} style={{ width: 72, height: 72, borderRadius: 16, backgroundColor: "#d4d4d8" }} resizeMode="cover" />
+      <Image source={image} style={{ width: 72, height: 72, borderRadius: 16, backgroundColor: "#d4d4d8" }} resizeMode="cover"
+          resizeMethod="resize" />
       <View style={{ flex: 1, justifyContent: "space-between", alignSelf: "stretch", gap: 8 }}>
         <Text style={{ fontSize: 14, fontWeight: "600", color: "#0a0a0a" }} numberOfLines={1}>{name}</Text>
         <View className="flex-row items-center justify-between" style={{ gap: 8 }}>
@@ -213,7 +214,8 @@ export function FlashAddProductScreen() {
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 + insets.bottom }}>
             {list.map((prod) => (
               <Pressable key={prod.id} onPress={() => { Haptics.selectionAsync(); setPicked(prod); setStep(2); }} className="flex-row items-center active:bg-neutral-50" style={{ backgroundColor: "white", borderWidth: 1, borderColor: "#ececed", borderRadius: 16, padding: 12, gap: 12 }}>
-                <Image source={prod.image as number} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: SURFACE_GRAY }} resizeMode="cover" />
+                <Image source={prod.image as number} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: SURFACE_GRAY }} resizeMode="cover"
+          resizeMethod="resize" />
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: TEXT_PRIMARY }} numberOfLines={1}>{prod.name}</Text>
                   <Text style={{ fontSize: 12.5, color: TEXT_MUTED }} numberOfLines={1}>{prod.category}</Text>

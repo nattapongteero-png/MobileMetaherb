@@ -352,7 +352,8 @@ function MarketCard({ m, width, onPress }: { m: HerbalMaterial; width: number; o
     >
       {/* Image — 4:3 like the web market card */}
       <View style={{ width: "100%", height: 176, backgroundColor: "#f3f4f6" }}>
-        <Image source={m.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+        <Image source={m.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
         {m.supplierVerified ? (
           <View
             style={{
@@ -429,7 +430,8 @@ function TrialMiniCard({ p, width, onPress }: { p: TrialProduct; width: number; 
     >
       {/* Hero — tier-colored bg + image (own top radius so the image clips on iOS) */}
       <View style={{ width: "100%", height: 176, backgroundColor: palette.bg, borderTopLeftRadius: 15, borderTopRightRadius: 15, overflow: "hidden" }}>
-        <Image source={p.imageSrc ?? { uri: p.image }} style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }} resizeMode="cover" />
+        <Image source={p.imageSrc ?? { uri: p.image }} style={{ width: "100%", height: "100%", borderTopLeftRadius: 15, borderTopRightRadius: 15 }} resizeMode="cover"
+          resizeMethod="resize" />
         {/* Top-left status badge — only meaningful states */}
         {isClosed ? (
           <View style={{ position: "absolute", left: 10, top: 10, height: OVERLAY_TAG_H, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "rgba(31,41,55,0.85)", borderRadius: 999, paddingHorizontal: 9 }}>
@@ -559,7 +561,8 @@ function ArticleRow({ a, onPress }: { a: Article; onPress: () => void }) {
     >
       {/* Image left with views (top) + date (bottom) overlay pills. */}
       <View style={{ width: tablet ? 175 : 130 }}>
-        <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+        <Image source={{ uri: a.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
         <View style={{ flex: 1, justifyContent: "space-between", padding: 8 }}>
           <ArticleOverlayPill>
             <Eye size={11} color="#fff" />
@@ -593,7 +596,8 @@ function VideoTile({ v, width, onPress }: { v: VideoItem; width: number; onPress
   const height = Math.round((width * 5) / 4); // 4:5 portrait — same as Knowledge
   return (
     <Pressable onPress={onPress} className="active:opacity-90" style={{ width, height, borderRadius: 16, overflow: "hidden", backgroundColor: "#e5e5e5" }}>
-      <Image source={{ uri: v.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover" />
+      <Image source={{ uri: v.image }} style={{ position: "absolute", width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
       <View style={{ flex: 1, justifyContent: "space-between", padding: 10 }}>
         <View className="flex-row items-center self-start" style={{ gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
           <Eye size={12} color="#fff" />
@@ -985,6 +989,10 @@ export function HomeScreen() {
                         height: HERO_HEIGHT,
                       }}
                       resizeMode="cover"
+                      // Fabric/Fresco: images ≳600K px decode async on first
+                      // commit and the result is dropped — blank until remount.
+                      // "resize" decodes through a path that repaints reliably.
+                      resizeMethod="resize"
                     />
                   )}
                 />
@@ -1050,6 +1058,7 @@ export function HomeScreen() {
                       source={src}
                       style={{ width: "100%", height: "100%" }}
                       resizeMode="cover"
+          resizeMethod="resize"
                     />
                   </View>
                 ))}

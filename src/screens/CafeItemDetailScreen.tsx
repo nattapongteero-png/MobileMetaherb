@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 /**
  * META Caffe — menu item detail / customisation page.
  * Laid out like ProductDetailScreen: full-bleed square hero with a floating glass
@@ -101,7 +102,8 @@ export function CafeItemDetailScreen() {
         {/* Full-bleed square hero — zooms on pull-down */}
         <Animated.View style={{ width: SCREEN_WIDTH, height: HERO_H, backgroundColor: "#f0f0f0", transform: [{ translateY: heroTranslateY }, { scale: heroScale }] }}>
           <Pressable onPress={() => setViewerOpen(true)} style={{ width: "100%", height: "100%" }}>
-            <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <Image source={item.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
           </Pressable>
           {hitRank > 0 ? (
             <View style={{ position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(234,88,12,0.95)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -191,7 +193,8 @@ export function CafeItemDetailScreen() {
       {/* Floating Liquid-Glass action bar */}
       <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingBottom: 24 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ borderRadius: 34, overflow: "hidden", padding: 9, gap: 9 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light"
+              tintColor={GLASS_BAR_TINT} style={{ borderRadius: 34, overflow: "hidden", padding: 9, gap: 9 }}>
             {/* Quantity row — above the button */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8, paddingTop: 2 }}>
               <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>จำนวน</Text>

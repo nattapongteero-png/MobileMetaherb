@@ -190,7 +190,8 @@ export function AboutScreen() {
           {hasVideo ? (
             <HeroVideo height={insets.top + 420} />
           ) : (
-            <Image source={IMG_HERB} style={{ width: "100%", height: insets.top + 420 }} resizeMode="cover" />
+            <Image source={IMG_HERB} style={{ width: "100%", height: insets.top + 420 }} resizeMode="cover"
+          resizeMethod="resize" />
           )}
           <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(13,31,13,0.6)" }} />
           <View style={{ position: "absolute", left: 20, right: 20, bottom: 28, gap: 12 }}>
@@ -246,7 +247,8 @@ export function AboutScreen() {
             </Text>
           </View>
 
-          <Image source={IMG_TEA} style={{ width: "100%", height: 200, borderRadius: 24 }} resizeMode="cover" />
+          <Image source={IMG_TEA} style={{ width: "100%", height: 200, borderRadius: 24 }} resizeMode="cover"
+          resizeMethod="resize" />
 
           <View style={{ gap: 14, marginTop: 4 }}>
             {STORY_FEATURES.map((item) => (
@@ -289,7 +291,8 @@ export function AboutScreen() {
         {/* ===== MISSION (white) ===== */}
         <View onLayout={(e) => setMissionY(e.nativeEvent.layout.y)} style={{ backgroundColor: "#fff", paddingHorizontal: 20, paddingVertical: 32, gap: 16 }}>
           <View style={{ borderRadius: 24, overflow: "hidden", backgroundColor: DARK }}>
-            <Image source={IMG_MISSION} style={{ width: "100%", height: 320 }} resizeMode="cover" />
+            <Image source={IMG_MISSION} style={{ width: "100%", height: 320 }} resizeMode="cover"
+          resizeMethod="resize" />
             <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(13,31,13,0.55)" }} />
             <View style={{ position: "absolute", top: 16, left: 16 }}>
               <Text style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}>พันธกิจและวิสัยทัศน์</Text>

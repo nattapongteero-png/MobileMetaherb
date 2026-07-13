@@ -71,7 +71,8 @@ export function TrueMoneyLinkScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 24, alignItems: "center" }} showsVerticalScrollIndicator={false}>
-        <Image source={TRUEMONEY_LOGO} style={{ width: 72, height: 72, borderRadius: 18 }} resizeMode="cover" />
+        <Image source={TRUEMONEY_LOGO} style={{ width: 72, height: 72, borderRadius: 18 }} resizeMode="cover"
+          resizeMethod="resize" />
 
         {step === "phone" ? (
           <>

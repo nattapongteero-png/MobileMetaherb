@@ -70,7 +70,8 @@ export function CafeCheckoutScreen() {
           <View style={{ gap: 12 }}>
             {lines.map((l) => (
               <View key={l.key} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Image source={l.image} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#f5f5f5" }} resizeMode="cover" />
+                <Image source={l.image} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#f5f5f5" }} resizeMode="cover"
+          resizeMethod="resize" />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "600", color: TEXT_PRIMARY }}>{l.name} ×{l.qty}</Text>
                   {l.summary ? <Text numberOfLines={1} style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 1 }}>{l.summary}</Text> : null}
@@ -107,7 +108,8 @@ export function CafeCheckoutScreen() {
           >
             <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
               {method.image ? (
-                <Image source={method.image} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <Image source={method.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
               ) : method.Icon ? (
                 <method.Icon size={22} color={BRAND_GREEN} />
               ) : null}
