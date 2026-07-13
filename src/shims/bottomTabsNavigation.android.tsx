@@ -48,7 +48,7 @@ function toJsIcon(original: unknown) {
   const spec = original({}) ?? {};
   const name = SF_TO_IONICON[spec.sfSymbol];
   if (!name) return undefined;
-  return ({ color }: { color: string }) => <Ionicons name={name as any} size={22} color={color} />;
+  return ({ color }: { color: string }) => <Ionicons name={name as any} size={24} color={color} />;
 }
 
 function cleanOptions(options: any) {
@@ -197,7 +197,7 @@ function FloatingPillTabBar({
               <Text
                 numberOfLines={1}
                 style={{
-                  fontSize: 10,
+                  fontSize: 9,
                   color,
                   fontFamily: "IBMPlexSansThaiLooped_500Medium",
                   ...(labelStyle ?? null),
