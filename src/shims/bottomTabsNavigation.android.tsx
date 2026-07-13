@@ -43,10 +43,11 @@ const SF_TO_LUCIDE: Record<string, React.ComponentType<AnyProps>> = {
 // Floating-pill geometry. Kept in sync with bottomTabs.android.ts (the height
 // hook), which returns floatBottomFor(insets) + BAR_HEIGHT + SCENE_GAP.
 const BAR_HEIGHT = 60;
-const BAR_RADIUS = 28;
-const SIDE_MARGIN = 14;
-/** How high the pill floats above the very bottom (clears the gesture area). */
-export const floatBottomFor = (insetBottom: number) => (insetBottom > 0 ? insetBottom : 14);
+const BAR_RADIUS = 30;
+const SIDE_MARGIN = 16;
+/** How high the pill floats above the very bottom — always a clear gap above
+ *  the gesture area, so it reads as floating on every device (iOS-26 feel). */
+export const floatBottomFor = (insetBottom: number) => Math.max(insetBottom, 10) + 14;
 
 /** `tabBarIcon: () => ({ sfSymbol })` → a lucide element in the tab's tint. */
 function toJsIcon(original: unknown) {
@@ -83,10 +84,10 @@ function FrostedGlass() {
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.80)",
+          backgroundColor: "rgba(255,255,255,0.82)",
           borderRadius: BAR_RADIUS,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: "rgba(0,0,0,0.08)",
+          borderWidth: 1,
+          borderColor: "rgba(0,0,0,0.10)",
           overflow: "hidden",
         },
       ]}
@@ -107,22 +108,33 @@ function FloatingPillTabBar({
   const floatBottom = floatBottomFor(insets.bottom);
 
   return (
+    // Full-width overlay anchored to the bottom; the pill sits INSIDE it with
+    // plain margins, so the side insets can't be overridden by the navigator.
     <View
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        left: SIDE_MARGIN,
-        right: SIDE_MARGIN,
-        bottom: floatBottom,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingHorizontal: SIDE_MARGIN,
+        paddingBottom: floatBottom,
+        alignItems: "stretch",
+      }}
+    >
+    <View
+      pointerEvents="box-none"
+      style={{
         height: BAR_HEIGHT,
         borderRadius: BAR_RADIUS,
         // Shadow lives on this (un-clipped) layer so it isn't cut by the blur's
-        // overflow:hidden.
-        elevation: 14,
+        // overflow:hidden. Strong enough to read against a white page.
+        elevation: 18,
         shadowColor: "#0b3d24",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        backgroundColor: "transparent",
       }}
     >
       <FrostedGlass />
@@ -148,8 +160,20 @@ function FloatingPillTabBar({
               accessibilityRole="button"
               accessibilityState={focused ? { selected: true } : {}}
               android_ripple={{ color: "rgba(49,151,84,0.12)", borderless: true }}
-              style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 3 }}
+              style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
             >
+              {/* iOS-26-style selection: the focused tab sits in a soft green capsule */}
+              <View
+                style={{
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  paddingHorizontal: 16,
+                  paddingVertical: 5,
+                  borderRadius: 18,
+                  backgroundColor: focused ? "rgba(49,151,84,0.13)" : "transparent",
+                }}
+              >
               {icon}
               <Text
                 numberOfLines={1}
@@ -162,10 +186,12 @@ function FloatingPillTabBar({
               >
                 {label}
               </Text>
+              </View>
             </Pressable>
           );
         })}
       </View>
+    </View>
     </View>
   );
 }
