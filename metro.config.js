@@ -18,6 +18,13 @@ const BOTTOM_TABS = {
   "react-native-bottom-tabs": p("src/shims/bottomTabs.web.tsx"),
 };
 
+// Android has no UITabBarController — swap the native tab bar for a JS one
+// dressed as frosted glass. iOS keeps the real Liquid Glass bar.
+const BOTTOM_TABS_ANDROID = {
+  "@bottom-tabs/react-navigation": p("src/shims/bottomTabsNavigation.android.tsx"),
+  "react-native-bottom-tabs": p("src/shims/bottomTabs.android.ts"),
+};
+
 // pdf-lib / fontkit ship ESM "module" builds that break tslib interop under
 // Metro web (`tslib.default.__extends` undefined). Web only — native is fine.
 const WEB_ONLY = {
@@ -34,6 +41,7 @@ const EXPO_GO_ONLY = {
 function resolveShim(moduleName, platform) {
   const isWeb = platform === "web";
   if (BOTTOM_TABS[moduleName] && (isWeb || EXPO_GO)) return BOTTOM_TABS[moduleName];
+  if (BOTTOM_TABS_ANDROID[moduleName] && platform === "android") return BOTTOM_TABS_ANDROID[moduleName];
   if (WEB_ONLY[moduleName] && isWeb) return WEB_ONLY[moduleName];
   if (EXPO_GO_ONLY[moduleName] && EXPO_GO) return EXPO_GO_ONLY[moduleName];
   return null;
