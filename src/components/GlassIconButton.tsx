@@ -29,14 +29,14 @@ export function GlassIconButton({
 }) {
   // Soft SVG ground shadow — Android elevation bleeds through translucent
   // fills and boxShadow doesn't render here, so the shadow is its own layer.
-  const pad = 9;
+  const pad = 5;
   const d = size + pad * 2;
   return (
     <Pressable onPress={onPress} disabled={disabled} hitSlop={8} accessibilityLabel={accessibilityLabel} accessibilityState={{ ...accessibilityState, disabled }} style={disabled ? { opacity: 0.4 } : undefined}>
       <Svg width={d} height={d} pointerEvents="none" style={{ position: "absolute", left: -pad, top: -pad + 3 }}>
         <Defs>
           <RadialGradient id="glassBtnShadow" cx="50%" cy="50%" r="50%">
-            <Stop offset="55%" stopColor="#000" stopOpacity="0.09" />
+            <Stop offset="68%" stopColor="#000" stopOpacity="0.09" />
             <Stop offset="100%" stopColor="#000" stopOpacity="0" />
           </RadialGradient>
         </Defs>
