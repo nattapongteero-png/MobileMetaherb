@@ -1146,7 +1146,7 @@ export function ProductDetailScreen({ route }: Props) {
             <GlassView
               glassEffectStyle="regular"
               colorScheme="light"
-              tintColor="rgba(49,151,84,0.1)"
+              tintColor={Platform.OS === "android" ? "#eaf4ee" : "rgba(49,151,84,0.1)"}
               isInteractive
               style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
             >
@@ -1169,7 +1169,7 @@ export function ProductDetailScreen({ route }: Props) {
               <GlassView
                 glassEffectStyle="regular"
                 colorScheme="light"
-                tintColor="rgba(219,139,10,0.1)"
+                tintColor={Platform.OS === "android" ? "#fbf1e2" : "rgba(219,139,10,0.1)"}
                 isInteractive
                 style={{ width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" }}
               >
