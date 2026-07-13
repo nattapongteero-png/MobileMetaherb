@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -66,7 +67,7 @@ export function ShopHerbalFilterScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
-            tintColor="rgba(49,151,84,0.92)"
+            tintColor={glassTint("rgba(49,151,84,0.92)", "#319754")}
             isInteractive
             style={{ width: 44, height: 44, borderRadius: 22, overflow: "hidden", alignItems: "center", justifyContent: "center" }}
           >

@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useCallback, useRef, useState } from "react";
 import { View, Text, Animated, Dimensions, Platform, Pressable, ScrollView, RefreshControl } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -98,7 +99,7 @@ export function ProductsScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
-            tintColor="rgba(255,255,255,0.45)"
+            tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")}
             isInteractive
             style={{
               width: 40,

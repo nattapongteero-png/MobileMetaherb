@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useRef, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, type View as RNView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -71,7 +72,7 @@ function PillSelect<T extends string>({
         <GlassView
           glassEffectStyle="regular"
           colorScheme="light"
-          tintColor="rgba(255,255,255,0.6)"
+          tintColor={glassTint("rgba(255,255,255,0.6)", "rgba(255,255,255,0.9)")}
           isInteractive
           style={{
             height: 50,
@@ -94,7 +95,7 @@ function PillSelect<T extends string>({
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
         <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
           <View style={[styles.popoverShadow, { left: anchor.x, top: anchor.y, width: anchor.width }]}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor="rgba(255,255,255,0.45)" style={styles.popover}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")} style={styles.popover}>
               {options.map((o) => {
                 const active = o.key === value;
                 return (
@@ -209,7 +210,7 @@ export function ProductFilterScreen() {
           <GlassView
             glassEffectStyle="regular"
             colorScheme="light"
-            tintColor="rgba(49,151,84,0.92)"
+            tintColor={glassTint("rgba(49,151,84,0.92)", "#319754")}
             isInteractive
             style={{ width: 44, height: 44, borderRadius: 22, overflow: "hidden", alignItems: "center", justifyContent: "center" }}
           >

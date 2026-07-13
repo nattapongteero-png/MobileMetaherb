@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, ScrollView, TextInput, Pressable, Image, Dimensions,
@@ -594,7 +595,7 @@ function EmptyState({ onChip, topPad = 0 }: { onChip: (s: string) => void; topPa
         <GlassView
           glassEffectStyle="regular"
           colorScheme="light"
-          tintColor="rgba(255,255,255,0.6)"
+          tintColor={glassTint("rgba(255,255,255,0.6)", "rgba(255,255,255,0.9)")}
           style={{ width: 88, height: 88, borderRadius: 44, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}
         >
           <Image source={META_AI} style={{ width: 76, height: 76 }} resizeMode="contain" />

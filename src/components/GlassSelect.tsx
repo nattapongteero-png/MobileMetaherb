@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useRef, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, type View as RNView } from "react-native";
 import { ChevronDown, Check, Search } from "lucide-react-native";
@@ -83,7 +84,7 @@ export function GlassSelect<T extends string>({
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
         <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
           <View style={[styles.popoverShadow, { left: anchor.x, top: anchor.y, width: anchor.width }]}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor="rgba(255,255,255,0.45)" style={styles.popover}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")} style={styles.popover}>
               {searchable ? (
                 <View
                   className="flex-row items-center"

@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 /**
  * น้องเมต้า — ผู้จัดการร้านค้า AI chat (owner-facing).
  * Same polished shell as the customer assistant (AIAssistantScreen) — bobbing
@@ -537,7 +538,7 @@ function EmptyState({ onChip, briefing }: { onChip: (s: string) => void; briefin
     <Pressable onPress={() => Keyboard.dismiss()} style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, paddingTop: 24, paddingBottom: 150 }}>
         <Animated.View style={[{ marginBottom: 16, borderRadius: 44, shadowColor: "#7c2d12", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 20, elevation: 6 }, orbFloat]}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" tintColor="rgba(255,255,255,0.6)" style={{ width: 88, height: 88, borderRadius: 44, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={glassTint("rgba(255,255,255,0.6)", "rgba(255,255,255,0.9)")} style={{ width: 88, height: 88, borderRadius: 44, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}>
             <Image source={META_CHAR} style={{ width: 76, height: 76 }} resizeMode="contain" />
           </GlassView>
         </Animated.View>

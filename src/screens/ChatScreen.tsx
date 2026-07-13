@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -398,7 +399,7 @@ export function ChatScreen() {
                     <GlassView
                       glassEffectStyle="regular"
                       colorScheme="light"
-                      tintColor="rgba(49,151,84,0.12)"
+                      tintColor={glassTint("rgba(49,151,84,0.12)", "#e6f2ea")}
                       isInteractive
                       style={{ height: 34, paddingHorizontal: 14, borderRadius: 999, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(49,151,84,0.3)" }}
                     >

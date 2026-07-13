@@ -1,3 +1,4 @@
+import { GLASS_BAR_TINT } from "../theme/tokens";
 import { GlassView } from "expo-glass-effect";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +24,8 @@ const INACTIVE = "#5b6472";
 
 /**
  * Floating tab bar using Apple's real iOS 26 Liquid Glass material via
- * expo-glass-effect's <GlassView> (UIGlassEffect / UIVisualEffectView).
+ * expo-glass-effect's <GlassView
+          tintColor={GLASS_BAR_TINT}> (UIGlassEffect / UIVisualEffectView).
  * Falls back to a plain translucent view below iOS 26. First-party Expo
  * module — no config plugin (per AGENTS.md).
  */

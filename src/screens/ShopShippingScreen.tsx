@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useState } from "react";
 import {
   View,
@@ -152,7 +153,7 @@ function SheetHeader({ title, onClose, onSave }: { title: string; onClose: () =>
         <X size={22} color="#1a1a1a" strokeWidth={2.6} />
       </GlassIconButton>
       <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
-      <GlassIconButton onPress={onSave} size={44} accessibilityLabel="บันทึก" tintColor="rgba(49,151,84,0.22)">
+      <GlassIconButton onPress={onSave} size={44} accessibilityLabel="บันทึก" tintColor={glassTint("rgba(49,151,84,0.22)", "#d2e8d9")}>
         <Check size={22} color={BRAND_GREEN_DARK} strokeWidth={3} />
       </GlassIconButton>
     </View>

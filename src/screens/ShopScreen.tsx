@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
@@ -549,7 +550,7 @@ export function ShopScreen() {
                 <GlassView
                   glassEffectStyle="regular"
                   colorScheme="light"
-                  tintColor="rgba(255,255,255,0.45)"
+                  tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")}
                   isInteractive
                   style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" }}
                 >
@@ -597,7 +598,7 @@ export function ShopScreen() {
                 <GlassView
                   glassEffectStyle="regular"
                   colorScheme="light"
-                  tintColor="rgba(255,255,255,0.45)"
+                  tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")}
                   isInteractive
                   style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" }}
                 >

@@ -1,3 +1,4 @@
+import { glassTint } from "../theme/tokens";
 import { View, Text, Pressable } from "react-native";
 import { GlassView } from "expo-glass-effect";
 import * as Haptics from "expo-haptics";
@@ -113,7 +114,7 @@ export function PinKeypad({
                   <GlassView
                     glassEffectStyle="regular"
                     colorScheme="light"
-                    tintColor="rgba(255,255,255,0.5)"
+                    tintColor={glassTint("rgba(255,255,255,0.5)", "rgba(255,255,255,0.9)")}
                     isInteractive
                     style={{
                       width: KEY,

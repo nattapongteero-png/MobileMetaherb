@@ -39,3 +39,7 @@ export const GLASS_BAR_TINT = Platform.OS === "android" ? "#ffffff" : undefined;
 // (translucent tints let scrolled content bleed through); real tints on iOS.
 export const GLASS_CHIP_GREEN = Platform.OS === "android" ? "#eaf4ee" : "rgba(49,151,84,0.1)";
 export const GLASS_CHIP_AMBER = Platform.OS === "android" ? "#fbf1e2" : "rgba(219,139,10,0.1)";
+/** Per-site glass tint: the real translucent tint on iOS, an opaque (or near-
+ *  opaque) stand-in on Android, where fake glass lets content bleed through. */
+export const glassTint = (ios: string, android: string) =>
+  Platform.OS === "android" ? android : ios;
