@@ -14,30 +14,23 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
-import {
-  ChartColumn,
-  CreditCard,
-  Home,
-  Leaf,
-  Package,
-  Settings,
-  Store,
-  User,
-} from "lucide-react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 type AnyProps = Record<string, any>;
 
-// Every SF Symbol used by the app's two tab bars, mapped to the lucide icon
-// closest in meaning. An unmapped symbol just renders a label-only tab.
-const SF_TO_LUCIDE: Record<string, React.ComponentType<AnyProps>> = {
-  "house.fill": Home,
-  "shippingbox.fill": Package,
-  "leaf.fill": Leaf,
-  "person.fill": User,
-  "chart.bar.fill": ChartColumn,
-  "creditcard.fill": CreditCard,
-  "storefront.fill": Store,
-  "gearshape.fill": Settings,
+// Every SF Symbol used by the app's two tab bars, mapped to the closest
+// FILLED Ionicons glyph — Ionicons' solid style mirrors Apple's .fill symbols,
+// which read much clearer at tab-bar size than outline strokes.
+// An unmapped symbol just renders a label-only tab.
+const SF_TO_IONICON: Record<string, string> = {
+  "house.fill": "home",
+  "shippingbox.fill": "cube",
+  "leaf.fill": "leaf",
+  "person.fill": "person",
+  "chart.bar.fill": "bar-chart",
+  "creditcard.fill": "card",
+  "storefront.fill": "storefront",
+  "gearshape.fill": "settings",
 };
 
 // Floating-pill geometry. Kept in sync with bottomTabs.android.ts (the height
@@ -49,13 +42,13 @@ const SIDE_MARGIN = 16;
  *  the gesture area, so it reads as floating on every device (iOS-26 feel). */
 export const floatBottomFor = (insetBottom: number) => Math.max(insetBottom, 10) + 14;
 
-/** `tabBarIcon: () => ({ sfSymbol })` → a lucide element in the tab's tint. */
+/** `tabBarIcon: () => ({ sfSymbol })` → a filled Ionicons glyph in the tab's tint. */
 function toJsIcon(original: unknown) {
   if (typeof original !== "function") return undefined;
   const spec = original({}) ?? {};
-  const Icon = SF_TO_LUCIDE[spec.sfSymbol];
-  if (!Icon) return undefined;
-  return ({ color }: { color: string }) => <Icon size={22} color={color} strokeWidth={2} />;
+  const name = SF_TO_IONICON[spec.sfSymbol];
+  if (!name) return undefined;
+  return ({ color }: { color: string }) => <Ionicons name={name as any} size={23} color={color} />;
 }
 
 function cleanOptions(options: any) {
