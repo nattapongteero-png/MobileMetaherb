@@ -1,3 +1,4 @@
+import { modalTopPad } from "../theme/layout";
 import { glassTint } from "../theme/tokens";
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
@@ -58,7 +59,7 @@ export function ShopHerbalFilterScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

@@ -163,7 +163,7 @@ export function TrialRequestDetailScreen() {
             </View>
 
             <View style={{ flexDirection: "row", gap: 14 }}>
-              <Image
+              <Image resizeMethod="resize"
                 source={imgSource(product.imageSrc ?? product.image)}
                 style={{ width: 84, height: 84, borderRadius: 12, backgroundColor: "#f3f4f6" }}
               />

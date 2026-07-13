@@ -18,6 +18,7 @@ import { X, Search, MapPin, Check } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { usePayment } from "../context/PaymentContext";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import { POSTAL_CODES, type PostalEntry } from "../data/thaiPostalCodes";
 import type { RootStackParamList } from "../navigation/RootStack";
 
@@ -118,9 +119,10 @@ export function AddAddressScreen() {
       style={{ flex: 1, backgroundColor: "white" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Android: clear the status bar (iOS modal card already starts below it) */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}
+        style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}
       >
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
@@ -197,6 +199,8 @@ export function AddAddressScreen() {
         visible={postalOpen}
         animationType="slide"
         presentationStyle="pageSheet"
+        statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={() => {
           setPostalOpen(false);
           setPostalQuery("");
@@ -206,7 +210,7 @@ export function AddAddressScreen() {
           style={{ flex: 1, backgroundColor: "white" }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
             <GlassIconButton
               onPress={() => {
                 setPostalOpen(false);

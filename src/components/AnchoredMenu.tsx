@@ -39,7 +39,7 @@ export function AnchoredMenu({
   children: ReactNode;
 }) {
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <Pressable style={{ flex: 1 }} onPress={onClose}>
         <View
           style={[

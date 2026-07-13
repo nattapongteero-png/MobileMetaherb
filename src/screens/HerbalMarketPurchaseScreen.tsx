@@ -321,7 +321,7 @@ export function HerbalMarketPurchaseScreen() {
           {/* Item row */}
           <View style={{ flexDirection: "row", gap: 12, padding: 16 }}>
             <View style={{ width: 72, height: 72, borderRadius: 10, overflow: "hidden", backgroundColor: "#f1f1f1" }}>
-              <Image source={imgSource(material.image)} style={{ width: 72, height: 72 }} />
+              <Image resizeMethod="resize" source={imgSource(material.image)} style={{ width: 72, height: 72 }} />
               <View
                 style={{
                   position: "absolute",

@@ -20,6 +20,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Landmark, Check, X, Pencil, ShieldCheck, ChevronDown, Search } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { modalTopPad } from "../theme/layout";
 import { THAI_BANKS, bankByCode, bankLogo } from "../data/bankAccounts";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -65,8 +66,10 @@ function ViewRow({ label, value }: { label: string; value: string }) {
 }
 
 function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+    // Android: clear the status bar (iOS modal card already starts below it)
+    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
       <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
         <X size={22} color="#1a1a1a" strokeWidth={2.6} />
       </GlassIconButton>
@@ -235,7 +238,7 @@ export function ShopPayoutScreen() {
       </View>
 
       {/* Edit page-sheet */}
-      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
+      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setEditing(false)}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="แก้ไขบัญชีรับเงิน" onClose={() => setEditing(false)} onSave={saveEdit} canSave={canSave} />
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
@@ -262,9 +265,9 @@ export function ShopPayoutScreen() {
           </ScrollView>
 
           {/* Bank search — page-sheet (mirrors AddBankAccountScreen) */}
-          <Modal visible={bankOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setBankOpen(false); setBankQuery(""); }}>
+          <Modal visible={bankOpen} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => { setBankOpen(false); setBankQuery(""); }}>
             <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-              <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+              <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
                 <GlassIconButton onPress={() => { setBankOpen(false); setBankQuery(""); }} size={44} accessibilityLabel="ปิด">
                   <X size={22} color="#1a1a1a" strokeWidth={2.6} />
                 </GlassIconButton>

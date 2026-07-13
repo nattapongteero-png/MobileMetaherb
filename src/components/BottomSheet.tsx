@@ -7,6 +7,8 @@ import {
   Animated,
   Modal,
   Dimensions,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -68,9 +70,35 @@ export function BottomSheet({
   noHeader,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const winHeight = useWindowDimensions().height;
+  // Android renders full-screen edge-to-edge (no iOS detent gap), so cap the
+  // sheet below the status bar + a small breathing gap. 0 on iOS — the 0.9
+  // ratio already clears the notch there; iOS output stays byte-identical.
+  const topGuard = Platform.OS === "android" ? insets.top + 12 : 0;
+  const sheetMaxHeight = Math.min(winHeight * maxHeightRatio, winHeight - topGuard);
+  const sheetMinHeight = Math.min(winHeight * minHeightRatio, sheetMaxHeight);
   const [mounted, setMounted] = useState(false);
+  // Android: mount children a couple of frames AFTER the modal's native window
+  // is displayed (Modal onShow). Fabric drops async Fresco decode results for
+  // images committed during a window's initial mount (same race as the
+  // screen-level blank-image bug), so images inside sheets randomly blank.
+  // A JS-side rAF fires too early — it can run before the dialog attaches —
+  // so we anchor on onShow instead. The sheet is still at the very start of
+  // its slide-up then, so the defer is invisible. iOS renders immediately.
+  const [contentReady, setContentReady] = useState(Platform.OS !== "android");
+  // Bumped once per open, after the slide-up lands: remounting the content is
+  // the only reliable healer for a decode that still got dropped — painted
+  // images redraw from Fresco's cache, dropped ones decode again and paint.
+  const [contentEpoch, setContentEpoch] = useState(0);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  const handleAndroidShow = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setContentReady(true));
+    });
+    setTimeout(() => setContentEpoch((e) => e + 1), 450);
+  };
 
   useEffect(() => {
     if (visible) {
@@ -103,7 +131,12 @@ export function BottomSheet({
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
-        if (finished) setMounted(false);
+        if (finished) {
+          setMounted(false);
+          // Reset only after the close animation so children stay visible
+          // while the sheet slides down.
+          if (Platform.OS === "android") setContentReady(false);
+        }
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,6 +168,11 @@ export function BottomSheet({
       transparent
       animationType="none"
       onRequestClose={onClose}
+      onShow={Platform.OS === "android" ? handleAndroidShow : undefined}
+      // Android: extend the modal window under both system bars so the dim
+      // backdrop covers the whole screen and insets report real values.
+      statusBarTranslucent
+      navigationBarTranslucent
     >
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
         {/* Backdrop — fade only */}
@@ -159,8 +197,8 @@ export function BottomSheet({
               backgroundColor: "white",
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              minHeight: SCREEN_HEIGHT * minHeightRatio,
-              maxHeight: SCREEN_HEIGHT * maxHeightRatio,
+              minHeight: sheetMinHeight,
+              maxHeight: sheetMaxHeight,
               transform: [{ translateY }],
             }}
           >
@@ -269,12 +307,13 @@ export function BottomSheet({
                 noHeader sheets hug their content (no flex:1) so the sheet height
                 fits exactly, unless fill/fillContent asks it to stretch. */}
             <View
+              key={contentEpoch}
               style={{
                 flex: fill || fillContent || (!centerTitle && !noHeader) ? 1 : undefined,
                 paddingBottom: insets.bottom,
               }}
             >
-              {children}
+              {contentReady ? children : null}
             </View>
           </Animated.View>
         </GestureDetector>

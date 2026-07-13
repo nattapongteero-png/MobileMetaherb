@@ -8,6 +8,7 @@ import { useRefund, TRUEWALLET_ID } from "../context/RefundContext";
 import { bankByCode } from "../data/bankAccounts";
 import { maskPhone } from "./TrueMoneyLinkScreen";
 import { BRAND_GREEN } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const GROUPED_BG = "#f2f2f7";
@@ -39,7 +40,8 @@ export function RefundChannelSelectScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
-      <View style={styles.header}>
+      {/* Android: clear the status bar (iOS modal card already starts below it) */}
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

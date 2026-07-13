@@ -53,3 +53,14 @@ export const contentWidth = () => Math.min(appWidth(), CONTENT_MAX_WIDTH);
  */
 export const tabletSearchBarWidth = () =>
   Math.min(Math.max(appWidth() - 460, 300), 560);
+
+/**
+ * Extra top padding for modal-presented surfaces (nav `presentation:"modal"`
+ * screens and pageSheet-style <Modal> forms). iOS shows these as native cards
+ * that already start below the status bar (top inset inside the card is 0),
+ * so this adds nothing there. Android has no native card — the same surface
+ * renders full-screen edge-to-edge and must clear the status bar / camera
+ * cutout itself. Pass `useSafeAreaInsets().top`.
+ */
+export const modalTopPad = (insetTop: number): number =>
+  Platform.OS === "android" ? insetTop : 0;

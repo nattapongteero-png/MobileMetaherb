@@ -17,6 +17,7 @@ import { RangeSlider } from "../components/RangeSlider";
 import { GlassView } from "expo-glass-effect";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 
 const GROUPED_BG = "#f2f2f7"; // iOS systemGroupedBackground
 const LABEL = "#1c1c1e";
@@ -92,7 +93,7 @@ function PillSelect<T extends string>({
 
       {/* Floating menu under the box — transparent backdrop (no dim) closes it;
           only one menu can be open at a time since the backdrop blocks others. */}
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
           <View style={[styles.popoverShadow, { left: anchor.x, top: anchor.y, width: anchor.width }]}>
             <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")} style={styles.popover}>
@@ -201,7 +202,8 @@ export function ProductFilterScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
       {/* Header — circular close / title / circular done (iOS sheet style) */}
-      <View style={styles.header}>
+      {/* Android: clear the status bar (iOS modal card already starts below it) */}
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

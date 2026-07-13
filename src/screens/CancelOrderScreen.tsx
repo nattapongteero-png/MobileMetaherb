@@ -7,6 +7,7 @@ import { X, Check } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -53,7 +54,8 @@ export function CancelOrderScreen() {
       {/* Header — same style as AddCard (circular close / centered title / spacer) */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}
+        // Android: clear the status bar (iOS modal card already starts below it)
+        style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}
       >
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />

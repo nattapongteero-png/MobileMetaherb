@@ -124,7 +124,7 @@ export function OwnerTrialRequestDetailScreen() {
           {/* ข้อมูลผู้สมัคร */}
           <Section title="ข้อมูลผู้สมัคร">
             <View className="flex-row items-center" style={{ gap: 12, marginBottom: 10 }}>
-              <Image source={{ uri: portrait }} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#f3f4f6" }} />
+              <Image resizeMethod="resize" source={{ uri: portrait }} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#f3f4f6" }} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }}>{reg.name || "ผู้สมัคร"}</Text>
                 <Text style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 2 }}>{reg.phone || "—"}</Text>

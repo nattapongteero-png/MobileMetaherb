@@ -23,6 +23,7 @@ import { Check, MapPin, Pencil, Search, Store, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import { useSeller } from "../context/SellerContext";
 import { POSTAL_CODES, type PostalEntry } from "../data/thaiPostalCodes";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -186,9 +187,10 @@ export function ShopAddressScreen() {
       </View>
 
       {/* Edit address — same UX as the customer "เพิ่มที่อยู่" (address part only) */}
-      <Modal visible={sheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(false)}>
+      <Modal visible={sheet} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSheet(false)}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+          {/* Android: clear the status bar (iOS modal card already starts below it) */}
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
             <GlassIconButton onPress={() => setSheet(false)} size={44} accessibilityLabel="ปิด">
               <X size={22} color="#1a1a1a" strokeWidth={2.6} />
             </GlassIconButton>
@@ -230,9 +232,9 @@ export function ShopAddressScreen() {
       </Modal>
 
       {/* Postal-code search — page-sheet (same as AddAddressScreen) */}
-      <Modal visible={postalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setPostalOpen(false); setPostalQuery(""); }}>
+      <Modal visible={postalOpen} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => { setPostalOpen(false); setPostalQuery(""); }}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
             <GlassIconButton onPress={() => { setPostalOpen(false); setPostalQuery(""); }} size={44} accessibilityLabel="ปิด">
               <X size={22} color="#1a1a1a" strokeWidth={2.6} />
             </GlassIconButton>

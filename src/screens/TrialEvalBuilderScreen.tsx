@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar, Check, Clock, FileText, Info, X } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN, TEXT_PRIMARY } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import {
   generateEvalQuestions,
   PHASE_META,
@@ -65,7 +66,7 @@ export function TrialEvalBuilderScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       {/* Header — same style as AddCard (circular close / centered title / spacer) */}
-      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

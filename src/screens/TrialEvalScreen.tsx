@@ -125,7 +125,7 @@ export function TrialEvalScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
           {/* Product header */}
           <View style={{ backgroundColor: "#fff", marginTop: 8, paddingHorizontal: 16, paddingVertical: 16, flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image source={imgSource(product.imageSrc ?? product.image)} style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#f3f4f6" }} />
+            <Image resizeMethod="resize" source={imgSource(product.imageSrc ?? product.image)} style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#f3f4f6" }} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11, fontWeight: "600", color: "#319754", letterSpacing: 0.4 }}>แบบประเมินผลิตภัณฑ์ทดสอบ</Text>
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#1a1a1a" }} numberOfLines={1}>{product.name}</Text>

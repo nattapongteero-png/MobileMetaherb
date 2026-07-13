@@ -7,6 +7,7 @@ import { Ban, Check, PackageCheck, RotateCcw, X, type LucideIcon } from "lucide-
 import { GlassIconButton } from "../components/GlassIconButton";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import { STATUS_COLOR, type ComplaintStatus } from "../data/shopComplaints";
 import { useComplaints } from "../context/ComplaintContext";
 import type { RootStackParamList } from "../navigation/RootStack";
@@ -60,7 +61,8 @@ export function ComplaintDecideScreen() {
       {/* Header — same style as AddCard (circular close / centered title / spacer) */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}
+        // Android: clear the status bar (iOS modal card already starts below it)
+        style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}
       >
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />

@@ -81,7 +81,7 @@ export function GlassSelect<T extends string>({
       </PressableScale>
 
       {/* Floating glass menu — transparent backdrop (no dim) closes it on tap-out. */}
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
           <View style={[styles.popoverShadow, { left: anchor.x, top: anchor.y, width: anchor.width }]}>
             <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive tintColor={glassTint("rgba(255,255,255,0.45)", "rgba(255,255,255,0.9)")} style={styles.popover}>

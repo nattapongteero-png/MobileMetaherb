@@ -1,3 +1,4 @@
+import { modalTopPad } from "../theme/layout";
 import { useRef, useState } from "react";
 import {
   View,
@@ -61,7 +62,7 @@ export function TrueMoneyLinkScreen() {
       {/* Header — circular close / centered title / right spacer (app style). */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}
+        style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}
       >
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />

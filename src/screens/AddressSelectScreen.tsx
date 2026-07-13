@@ -1,3 +1,4 @@
+import { modalTopPad } from "../theme/layout";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -26,7 +27,7 @@ export function AddressSelectScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

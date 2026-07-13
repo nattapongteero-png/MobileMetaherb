@@ -758,7 +758,7 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
             <View style={{ paddingHorizontal: 10 }}>
               {m.items.map((p, i) => (
                 <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: i < m.items.length - 1 ? 1 : 0, borderBottomColor: "#ecf2ee" }}>
-                  <Image source={getRealProductImage(p.id)} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
+                  <Image resizeMethod="resize" source={getRealProductImage(p.id)} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
                   <Text numberOfLines={2} style={{ flex: 1, fontSize: 12.5, color: "#262626", lineHeight: 17 }}>{p.name}</Text>
                   <Text style={{ fontSize: 12.5, color: "#525252", fontWeight: "600" }}>฿{p.price.toLocaleString()}</Text>
                 </View>
@@ -792,7 +792,7 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
         <View style={card}>
           <Text style={{ fontSize: 13.5, color: "#333", marginBottom: 8 }}>{m.text}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Image source={getRealProductImage(m.product.id)} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f3f4f6" }} />
+            <Image resizeMethod="resize" source={getRealProductImage(m.product.id)} style={{ width: 56, height: 56, borderRadius: 12, backgroundColor: "#f3f4f6" }} />
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ fontSize: 13, color: "#1a1a1a", fontWeight: "600" }}>{m.product.name}</Text>
               <Text style={{ fontSize: 12, color: "#737373", marginTop: 2 }}>฿{m.product.price.toLocaleString()}{m.product.originalPrice ? `  (เดิม ฿${m.product.originalPrice.toLocaleString()})` : ""}</Text>
@@ -816,7 +816,7 @@ function MessageBubble({ m, onSend, onNav, onProduct }: {
               <View style={{ paddingHorizontal: 10 }}>
                 {m.items.map((it, i) => (
                   <View key={it.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: i < m.items.length - 1 ? 1 : 0, borderBottomColor: "#efefef" }}>
-                    <Image source={it.image ?? getRealProductImage(it.id.replace(/^c-/, ""))} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
+                    <Image resizeMethod="resize" source={it.image ?? getRealProductImage(it.id.replace(/^c-/, ""))} style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: "#fff" }} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text numberOfLines={2} style={{ fontSize: 12.5, color: "#262626", lineHeight: 17 }}>{it.name}</Text>
                       <Text style={{ fontSize: 11, color: "#a3a3a3", marginTop: 2 }}>฿{it.price.toLocaleString()} × {it.quantity}</Text>

@@ -10,6 +10,7 @@ import { useNavigation } from "@react-navigation/native";
 import { X } from "lucide-react-native";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { BRAND_GREEN } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import { CAFE_PAY_METHODS } from "../data/cafePayment";
 import { useCafeCart } from "../context/CafeCartContext";
 
@@ -31,7 +32,7 @@ export function CafePaymentMethodScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
       {/* Header — close / title (iOS sheet style) */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>

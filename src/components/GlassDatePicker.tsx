@@ -96,7 +96,7 @@ export function GlassDatePicker({
         <Calendar size={18} color={open ? BRAND_GREEN : "#9ca3af"} strokeWidth={2.2} />
       </PressableScale>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
         <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
           <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — centered title, X top-right */}
@@ -294,7 +294,7 @@ export function GlassDateRangePicker({
       <FieldPill field="start" label={startLabel} val={start} />
       <FieldPill field="end" label={endLabel} val={end} />
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
         <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
           <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — step-aware title, X top-right */}

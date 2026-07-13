@@ -1,3 +1,4 @@
+import { modalTopPad } from "../theme/layout";
 import { useState, type ReactNode } from "react";
 import { View, Text, TextInput, Pressable, ScrollView, Switch, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,7 +71,7 @@ export function AddCardScreen() {
           centered title / right spacer). */}
       <View
         className="flex-row items-center justify-between"
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}
+        style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}
       >
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />

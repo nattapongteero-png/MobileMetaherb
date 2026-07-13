@@ -331,7 +331,7 @@ export function RegistrationCard({
       {/* Header — avatar | name + phone | status pill (tinted, peer style) */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         {hasName ? (
-          <Image
+          <Image resizeMethod="resize"
             source={{ uri: portraitForApplicant(reg.name, reg.gender) }}
             style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#f3f4f6" }}
           />
@@ -356,7 +356,7 @@ export function RegistrationCard({
       {/* Product line — image + name + reward */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, backgroundColor: "#f9fafb", borderRadius: 12, padding: 10 }}>
         <View style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-          {imgSrc && <Image source={imgSrc} style={{ width: 40, height: 40 }} />}
+          {imgSrc && <Image resizeMethod="resize" source={imgSrc} style={{ width: 40, height: 40 }} />}
         </View>
         <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, fontWeight: "600", color: "#374151" }}>
           {product.name || reg.trialId}
@@ -603,7 +603,7 @@ export function EvalSummary({
     >
       {/* applicant + product header */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <Image
+        <Image resizeMethod="resize"
           source={{ uri: portraitForApplicant(reg.name || "?", reg.gender) }}
           style={{ width: 44, height: 44, borderRadius: 10 }}
         />

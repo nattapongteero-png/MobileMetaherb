@@ -1,5 +1,6 @@
 import { GLASS_BAR_TINT } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   View,
@@ -398,6 +399,7 @@ function ReorderRow({ i, m, n, activeSV, hoverSV, dragSV, onReorder }: {
 
 /** Drag-and-drop reorder list — gesture-handler Pan + reanimated (smooth, UI-thread). */
 function MenuReorderList({ initial, onSave, onClose }: { initial: SectionId[]; onSave: (o: SectionId[]) => void; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<SectionId[]>(initial);
   const dataRef = useRef(data); dataRef.current = data;
   const activeSV = useSharedValue(-1);
@@ -414,7 +416,7 @@ function MenuReorderList({ initial, onSave, onClose }: { initial: SectionId[]; o
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
         <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>
@@ -517,7 +519,7 @@ function ShopMenuGrid({ onSelect }: { onSelect?: (id: SectionId) => void }) {
       ) : null}
 
       {/* Reorder sheet — drag & drop */}
-      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)}>
+      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditing(false)} statusBarTranslucent navigationBarTranslucent>
         <MenuReorderList initial={order} onSave={saveOrder} onClose={() => setEditing(false)} />
       </Modal>
     </View>
@@ -1129,8 +1131,10 @@ function FieldLabel({ children }: { children: string }) {
 }
 
 function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+    // Android: clear the status bar (iOS modal card already starts below it)
+    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
       <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
         <X size={22} color="#1a1a1a" strokeWidth={2.6} />
       </GlassIconButton>
@@ -1184,7 +1188,7 @@ function ShopProfileEditSheet({ visible, onClose }: { visible: boolean; onClose:
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <SheetHeader title="แก้ไขโปรไฟล์ร้านค้า" onClose={onClose} onSave={save} canSave={name.trim().length > 0} />
         <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
@@ -2255,9 +2259,9 @@ function SettlementDetailSheet({ s, onClose }: { s: Settlement; onClose: () => v
   const b = s.breakdown;
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <View style={{ flex: 1, backgroundColor: "white" }}>
-        <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+        <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 8 }}>
           <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
             <X size={22} color="#1a1a1a" strokeWidth={2.6} />
           </GlassIconButton>
@@ -3222,10 +3226,16 @@ function SalesLineCard({ line }: { line: SalesLine }) {
     >
       {/* Identity */}
       <View className="flex-row" style={{ gap: 10 }}>
-        <Image
-          source={line.image}
-          style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: SURFACE_GRAY }}
-        />
+        {/* Rounded wrapper (not borderRadius on Image) — direct radius on Image
+            blanks randomly inside Android modals (Fabric decode race). */}
+        <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: SURFACE_GRAY, overflow: "hidden" }}>
+          <Image
+            resizeMethod="resize"
+            source={line.image}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
+          />
+        </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             style={{ fontSize: 14, fontWeight: "600", color: "#1a1a1a" }}
@@ -6178,7 +6188,7 @@ function TopRow({
 
       {/* Thumbnail (products only) */}
       {image != null ? (
-        <Image
+        <Image resizeMethod="resize"
           source={image}
           style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: SURFACE_GRAY }}
         />

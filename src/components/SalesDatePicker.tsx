@@ -134,7 +134,7 @@ export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel
         <Text style={{ fontSize: 12.5, fontWeight: "700", color: BRAND_GREEN_DARK }}>{salesDateLabel(period, sel)}</Text>
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
         <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
           <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             {/* Header — step-aware title, X top-right */}

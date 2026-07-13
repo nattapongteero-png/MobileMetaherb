@@ -192,7 +192,7 @@ function TrialItemCard({
       </View>
 
       <View style={{ flexDirection: "row", gap: 14 }}>
-        <Image
+        <Image resizeMethod="resize"
           source={imgSource(product.imageSrc ?? product.image)}
           style={{ width: 96, height: 96, borderRadius: 12, backgroundColor: "#f3f4f6" }}
         />

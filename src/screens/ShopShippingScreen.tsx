@@ -35,6 +35,7 @@ import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassSelect } from "../components/GlassSelect";
 import { NumberStepper } from "../components/NumberStepper";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, TEXT_SECONDARY } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 
 // ── Carriers (ported from web initialCarriers) ──────────────────────────────
 interface Carrier {
@@ -147,8 +148,10 @@ function EditIconButton({ onPress }: { onPress: () => void }) {
 }
 
 function SheetHeader({ title, onClose, onSave }: { title: string; onClose: () => void; onSave: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+    // Android: clear the status bar (iOS modal card already starts below it)
+    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
       <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
         <X size={22} color="#1a1a1a" strokeWidth={2.6} />
       </GlassIconButton>
@@ -429,7 +432,7 @@ export function ShopShippingScreen() {
       </KeyboardAvoidingView>
 
       {/* Edit ค่าจัดส่งเริ่มต้น — page-sheet (same pattern as the other settings) */}
-      <Modal visible={defaultsSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDefaultsSheet(false)}>
+      <Modal visible={defaultsSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDefaultsSheet(false)} statusBarTranslucent navigationBarTranslucent>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="แก้ไขค่าจัดส่งเริ่มต้น" onClose={() => setDefaultsSheet(false)} onSave={saveDefaults} />
           <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
@@ -447,7 +450,7 @@ export function ShopShippingScreen() {
       </Modal>
 
       {/* Edit ขนส่งรายเจ้า — page-sheet (toggle เปิด/COD + ค่าส่ง + เวลา + URL) */}
-      <Modal visible={carrierSheet !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeCarrier}>
+      <Modal visible={carrierSheet !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeCarrier} statusBarTranslucent navigationBarTranslucent>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="ตั้งค่าขนส่ง" onClose={closeCarrier} onSave={saveCarrier} />
           {cDraft ? (
@@ -502,7 +505,7 @@ export function ShopShippingScreen() {
       </Modal>
 
       {/* Edit รับที่ร้าน — page-sheet */}
-      <Modal visible={pickupDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPickupDraft(null)}>
+      <Modal visible={pickupDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPickupDraft(null)} statusBarTranslucent navigationBarTranslucent>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="รับที่ร้าน" onClose={() => setPickupDraft(null)} onSave={savePickup} />
           {pickupDraft ? (
@@ -542,7 +545,7 @@ export function ShopShippingScreen() {
       </Modal>
 
       {/* Edit พื้นที่ห่างไกล — page-sheet */}
-      <Modal visible={remoteDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setRemoteDraft(null)}>
+      <Modal visible={remoteDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setRemoteDraft(null)} statusBarTranslucent navigationBarTranslucent>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="พื้นที่ห่างไกล" onClose={() => setRemoteDraft(null)} onSave={saveRemote} />
           {remoteDraft ? (
@@ -560,7 +563,7 @@ export function ShopShippingScreen() {
       </Modal>
 
       {/* Edit เก็บเงินปลายทาง (COD) — page-sheet */}
-      <Modal visible={codDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCodDraft(null)}>
+      <Modal visible={codDraft !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCodDraft(null)} statusBarTranslucent navigationBarTranslucent>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="เก็บเงินปลายทาง (COD)" onClose={() => setCodDraft(null)} onSave={saveCod} />
           {codDraft ? (

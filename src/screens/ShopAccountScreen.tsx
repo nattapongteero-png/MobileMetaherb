@@ -21,6 +21,7 @@ import { Beaker, Camera, Check, ChevronRight, FileText, FlaskConical, Pencil, Sh
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { getImagePicker } from "../utils/imagePicker";
+import { modalTopPad } from "../theme/layout";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
 import { useSeller } from "../context/SellerContext";
 import { SHOP } from "./ShopScreen";
@@ -68,8 +69,10 @@ function ViewRow({ label, value }: { label: string; value: string }) {
 }
 
 function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+    // Android: clear the status bar (iOS modal card already starts below it)
+    <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
       <GlassIconButton onPress={onClose} size={44} accessibilityLabel="ปิด">
         <X size={22} color="#1a1a1a" strokeWidth={2.6} />
       </GlassIconButton>
@@ -262,7 +265,7 @@ export function ShopAccountScreen() {
       </View>
 
       {/* Edit shop info — native page-sheet (same shell as บัญชีของฉัน) */}
-      <Modal visible={sheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(false)}>
+      <Modal visible={sheet} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSheet(false)}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <SheetHeader title="แก้ไขข้อมูลร้านค้า" onClose={() => setSheet(false)} onSave={saveProfile} canSave={canSave} />
           <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">

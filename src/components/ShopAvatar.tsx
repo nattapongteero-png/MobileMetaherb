@@ -20,7 +20,7 @@ export function ShopAvatar({ name, size = 52 }: { name?: string; size?: number }
       }}
     >
       {shop.avatar ? (
-        <Image
+        <Image resizeMethod="resize"
           source={shop.avatar}
           style={{ width: "100%", height: "100%" }}
           resizeMode={shop.avatarFit ?? "cover"}

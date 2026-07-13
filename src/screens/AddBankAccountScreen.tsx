@@ -20,6 +20,7 @@ import { useRefund } from "../context/RefundContext";
 import { usePayment } from "../context/PaymentContext";
 import { THAI_BANKS, bankByCode, bankLogo } from "../data/bankAccounts";
 import { BRAND_GREEN } from "../theme/tokens";
+import { modalTopPad } from "../theme/layout";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
@@ -83,7 +84,8 @@ export function AddBankAccountScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+      {/* Android: clear the status bar (iOS modal card already starts below it) */}
+      <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>
@@ -140,9 +142,9 @@ export function AddBankAccountScreen() {
       </View>
 
       {/* Bank search — page-sheet modal (same style as the postal-code search) */}
-      <Modal visible={bankOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setBankOpen(false); setBankQuery(""); }}>
+      <Modal visible={bankOpen} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => { setBankOpen(false); setBankQuery(""); }}>
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + modalTopPad(insets.top), paddingBottom: 12 }}>
             <GlassIconButton onPress={() => { setBankOpen(false); setBankQuery(""); }} size={44} accessibilityLabel="ปิด">
               <X size={22} color="#1a1a1a" strokeWidth={2.6} />
             </GlassIconButton>

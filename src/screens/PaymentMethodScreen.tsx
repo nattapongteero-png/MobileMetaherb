@@ -1,3 +1,4 @@
+import { modalTopPad } from "../theme/layout";
 import { useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -53,7 +54,7 @@ export function PaymentMethodScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: GROUPED_BG }}>
       {/* Header — close / title / done (iOS sheet style) */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 16 + modalTopPad(insets.top) }]}>
         <GlassIconButton onPress={() => nav.goBack()} size={44} accessibilityLabel="ปิด">
           <X size={22} color="#1a1a1a" strokeWidth={2.6} />
         </GlassIconButton>
