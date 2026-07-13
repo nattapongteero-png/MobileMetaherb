@@ -17,7 +17,7 @@ export function GlassView({ children, style, tintColor, ...rest }: GlassViewProp
   return (
     <View
       {...rest}
-      style={[{ backgroundColor: tintColor ?? "rgba(255,255,255,0.55)", overflow: "hidden" }, style]}
+      style={[{ backgroundColor: tintColor ?? "rgba(255,255,255,0.90)", overflow: "hidden" }, style]}
     >
       {children}
     </View>
