@@ -166,7 +166,7 @@ function FloatingPillTabBar({
               left: 0,
               width: lensWidth,
               borderRadius: 23,
-              backgroundColor: "#ffffff",
+              backgroundColor: "rgba(244,244,246,0.78)",
               transform: [{ translateX: lensX }],
             }}
           />
