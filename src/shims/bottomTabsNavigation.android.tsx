@@ -94,9 +94,12 @@ function FloatingPillTabBar({
   descriptors,
   navigation,
   activeTintColor = "#319754",
-  inactiveTintColor = "#8e8e93",
   labelStyle,
 }: AnyProps) {
+  // The iOS 26 native bar renders unselected items near-black regardless of the
+  // inactive tint the app passes — mirror that here instead of the passed gray,
+  // so both platforms read the same.
+  const inactiveTintColor = "#2f3032";
   const insets = useSafeAreaInsets();
   const floatBottom = floatBottomFor(insets.bottom);
 
