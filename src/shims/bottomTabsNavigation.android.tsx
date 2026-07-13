@@ -105,8 +105,8 @@ function FloatingPillTabBar({
 
   const [rowWidth, setRowWidth] = React.useState(0);
   const itemWidth = rowWidth > 0 ? rowWidth / state.routes.length : 0;
-  // Compact lens like the iPhone's — hugs the icon+label, centered in the tab.
-  const lensWidth = Math.min(itemWidth - 10, 92);
+  // The iOS 26 lens is a full-height stadium oval spanning nearly the whole tab.
+  const lensWidth = Math.max(itemWidth - 10, 0);
   const lensX = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (itemWidth > 0) {
@@ -165,7 +165,7 @@ function FloatingPillTabBar({
               bottom: 5,
               left: 0,
               width: lensWidth,
-              borderRadius: 23,
+              borderRadius: 999,
               backgroundColor: "rgba(244,244,246,0.78)",
               transform: [{ translateX: lensX }],
             }}
