@@ -65,6 +65,7 @@ import {
   TEXT_SECONDARY,
   TEXT_MUTED,
   TEXT_DISABLED,
+  GLASS_BAR_TINT,
 } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -992,7 +993,7 @@ export function TrialAddProductScreen() {
       {/* Floating Liquid Glass save bar — same as the other create pages */}
       <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
             <Pressable onPress={save} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, gap: 8, backgroundColor: canSave ? BRAND_GREEN : "#d4d4d4" }}>
               <Save size={17} color="#fff" strokeWidth={2.6} />
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{editing ? "บันทึกการแก้ไข" : "บันทึกสินค้า"}</Text>

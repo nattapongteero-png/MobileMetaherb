@@ -16,7 +16,7 @@ import { Check, Clock } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { StarRow } from "../components/StarRow";
 import { useCafeCart } from "../context/CafeCartContext";
-import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const DRIP_GIF = require("../../assets/drepcoffee.gif"); // animated "brewing"
@@ -44,7 +44,7 @@ function FloatingBar({ label, onPress }: { label: string; onPress: () => void })
   return (
     <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
       <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-        <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+        <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
           <Pressable onPress={onPress} className="active:opacity-80" style={{ flex: 1, height: 50, borderRadius: 999, overflow: "hidden" }}>
             <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{label}</Text>

@@ -36,7 +36,7 @@ function parseFlashDate(text: string, fallback: number): string {
   return new Date(year, month, Number(m[1]), Number(m[4] ?? 0), Number(m[5] ?? 0)).toISOString();
 }
 import type { RootStackParamList } from "../navigation/RootStack";
-import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, DIVIDER_GRAY, SURFACE_GRAY } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, DIVIDER_GRAY, SURFACE_GRAY, GLASS_BAR_TINT } from "../theme/tokens";
 
 const DEFAULT_STOCK = 500;
 
@@ -274,7 +274,7 @@ export function FlashAddProductScreen() {
           <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 130 }} />
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insets.bottom + 10 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
                 {/* Confirm — primary pill (back = header back button) */}
                 <Pressable onPress={confirm} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}>
                   <Check size={20} color="#fff" strokeWidth={2.6} />

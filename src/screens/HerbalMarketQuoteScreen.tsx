@@ -27,7 +27,7 @@ import {
   Maximize2,
   type LucideIcon,
 } from "lucide-react-native";
-import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_SECONDARY, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
 import { useCart } from "../context/CartContext";
 import { createQuoteRequest } from "../store/quotes";
 import { currentUserId } from "../store/session";
@@ -969,7 +969,7 @@ export function HerbalMarketQuoteScreen() {
           (Fitts's Law: full-width pill anchored at thumb reach). */}
       <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
         <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-          <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+          <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
             <Pressable
               onPress={handlePreview}
               className="flex-row items-center justify-center active:opacity-90"

@@ -30,3 +30,8 @@ export const TEXT_DISABLED = "#a3a3a3";
 export const SURFACE_GRAY = "#f5f5f5";
 export const BORDER_GRAY = "#e5e7eb";
 export const DIVIDER_GRAY = "#f0f0f0";
+
+// Floating action bars (the height-68 Liquid Glass pills): Android has no real
+// glass material, so they render opaque white there; iOS keeps the native glass.
+import { Platform } from "react-native";
+export const GLASS_BAR_TINT = Platform.OS === "android" ? "#ffffff" : undefined;

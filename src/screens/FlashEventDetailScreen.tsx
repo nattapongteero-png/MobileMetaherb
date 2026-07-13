@@ -18,7 +18,7 @@ import { cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
 import { showToast } from "../components/Toast";
 import { removeFlash } from "../store/promotions";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { BRAND_GREEN, TEXT_PRIMARY } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_PRIMARY, GLASS_BAR_TINT } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -99,7 +99,7 @@ export function FlashEventDetailScreen() {
           <LinearGradient pointerEvents="none" colors={["rgba(250,250,250,0)", "#fafafa"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 130 }} />
           <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: insets.bottom + 10 }}>
             <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-              <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+              <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
                 <Pressable onPress={openAdd} className="flex-row items-center justify-center active:opacity-90" style={{ flex: 1, height: 50, borderRadius: 999, backgroundColor: BRAND_GREEN, gap: 8 }}>
                   <Plus size={18} color="#fff" strokeWidth={2.6} />
                   <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>เพิ่มสินค้าเข้าร่วม Flash Sale</Text>

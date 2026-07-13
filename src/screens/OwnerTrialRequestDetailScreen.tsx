@@ -11,7 +11,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { BottomFade } from "../components/BottomFade";
 import { showToast } from "../components/Toast";
 import { approveRegistration, registrationById, rejectRegistration } from "../store/trials";
-import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
 import {
   STATUS_CFG,
   portraitForApplicant,
@@ -251,7 +251,7 @@ export function OwnerTrialRequestDetailScreen() {
       {status === "approved" && reg.id && registrationById(reg.id)?.stage === "shipping" ? (
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
               <Pressable
                 onPress={() => nav.navigate("ConfirmShip", { orderId: reg.id!, kind: "trial" })}
                 className="flex-row items-center justify-center active:opacity-90"
@@ -269,7 +269,7 @@ export function OwnerTrialRequestDetailScreen() {
       {status === "pending_approval" ? (
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
-            <GlassView glassEffectStyle="regular" colorScheme="light" style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
+            <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
               <Pressable
                 onPress={reject}
                 className="flex-row items-center justify-center active:opacity-80"
