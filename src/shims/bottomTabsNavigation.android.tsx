@@ -166,8 +166,8 @@ function FloatingPillTabBar({
                   gap: 2,
                   paddingHorizontal: 16,
                   paddingVertical: 5,
-                  borderRadius: 18,
-                  backgroundColor: focused ? "rgba(49,151,84,0.13)" : "transparent",
+                  borderRadius: 16,
+                  backgroundColor: focused ? "rgba(0,0,0,0.08)" : "transparent",
                 }}
               >
               {icon}
@@ -242,3 +242,4 @@ export function createNativeBottomTabNavigator<T = AnyProps>() {
     Screen: typeof Tab.Screen;
   };
 }
+
