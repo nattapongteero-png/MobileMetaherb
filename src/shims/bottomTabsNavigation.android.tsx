@@ -69,18 +69,19 @@ function cleanOptions(options: any) {
 function FrostedGlass() {
   return (
     <BlurView
-      intensity={60}
-      tint="light"
+      intensity={80}
+      tint="extraLight"
       // Real blur on Android needs the experimental renderer; without it the
       // rgba overlay below still gives the translucent-milk fallback.
       experimentalBlurMethod="dimezisBlurView"
       style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: "rgba(255,255,255,0.78)",
+          backgroundColor: "rgba(255,255,255,0.70)",
           borderRadius: BAR_RADIUS,
+          // Liquid-glass rim: iOS shows a bright specular edge, not a dark line.
           borderWidth: 1,
-          borderColor: "rgba(0,0,0,0.10)",
+          borderColor: "rgba(255,255,255,0.75)",
           overflow: "hidden",
         },
       ]}
