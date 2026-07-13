@@ -32,8 +32,9 @@ const WEB_ONLY = {
   "@pdf-lib/fontkit": p("node_modules/@pdf-lib/fontkit/dist/fontkit.umd.js"),
 };
 
-// expo-glass-effect (iOS-26 UIGlassEffect) has no native module in Expo Go.
-// Swap only for Expo Go; web has a working glass build, native dev builds keep it.
+// expo-glass-effect (iOS-26 UIGlassEffect) has no native module in Expo Go and
+// no Liquid Glass on ANDROID either — swap for the translucent-View shim in
+// both. Web has a working glass build; native iOS dev builds keep the real one.
 const EXPO_GO_ONLY = {
   "expo-glass-effect": p("src/shims/glassEffect.tsx"),
 };
@@ -43,7 +44,7 @@ function resolveShim(moduleName, platform) {
   if (BOTTOM_TABS[moduleName] && (isWeb || EXPO_GO)) return BOTTOM_TABS[moduleName];
   if (BOTTOM_TABS_ANDROID[moduleName] && platform === "android") return BOTTOM_TABS_ANDROID[moduleName];
   if (WEB_ONLY[moduleName] && isWeb) return WEB_ONLY[moduleName];
-  if (EXPO_GO_ONLY[moduleName] && EXPO_GO) return EXPO_GO_ONLY[moduleName];
+  if (EXPO_GO_ONLY[moduleName] && (EXPO_GO || platform === "android")) return EXPO_GO_ONLY[moduleName];
   return null;
 }
 
