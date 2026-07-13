@@ -298,18 +298,6 @@ export const rankColor = (rank: number) =>
 /** เลขบนเหรียญ — 1–3 ขาว, ที่เหลือเทา. */
 export const rankTextColor = (rank: number) => (rank < 3 ? "#ffffff" : "#9ca3af");
 
-/** กรองตามช่วงเวลา — web scales the base (monthly) list by period and drops
- *  some customers on short periods, so the table reacts to the period tab. */
-export function customersForPeriod(period: Period, monthIdx: number): Customer[] {
-  const hash = period.length * 13 + monthIdx * 5;
-  const scale = period === "daily" ? 0.35 : period === "weekly" ? 0.7 : period === "yearly" ? 12 : 1;
-  return CUSTOMERS.map((c, i) => {
-    const drop = period === "daily" ? (i + hash) % 3 === 0 : period === "weekly" ? (i + hash) % 5 === 0 : false;
-    if (drop) return { ...c, orders: 0, total: 0 };
-    return { ...c, orders: Math.max(1, Math.round(c.orders * scale)), total: Math.max(1, Math.round(c.total * scale)) };
-  }).filter((c) => c.orders > 0);
-}
-
 /** กรองเฉพาะจุดที่เลือกบนกราฟ — web's focusedLabel: the table narrows to the
  *  customers that make up that bucket (rotated + scaled deterministically). */
 export function focusCustomers(list: Customer[], label: string, bucketCustomers: number): Customer[] {
@@ -329,9 +317,6 @@ export function focusCustomers(list: Customer[], label: string, bucketCustomers:
 export type TopProduct = { name: string; category: string; sold: number; revenue: number; rating: number; reviews: number };
 
 export const TOP_PRODUCTS: TopProduct[] = [
-  // Stress-test row — หลักแสนชิ้น / รายได้หลักล้าน, proves the card's stat row
-  // still fits (the value shrinks a step instead of truncating).
-  { name: "ชุดของขวัญสมุนไพรพรีเมียม (ขายส่ง)", category: "ชุดของขวัญ", sold: 128400, revenue: 12480500, rating: 4.9, reviews: 3120 },
   { name: "พิมเสนน้ำอโรมา ตราเมต้าเฮิร์บ", category: "ผลิตภัณฑ์สมุนไพร", sold: 16, revenue: 1122, rating: 4.8, reviews: 142 },
   { name: "สบู่สมุนไพรขมิ้น", category: "ของใช้ออร์แกนิก", sold: 12, revenue: 1800, rating: 4.6, reviews: 180 },
   { name: "ถุงหอมอโรมา MetaHerb Bloom", category: "เครื่องหอม & อโรม่า", sold: 11, revenue: 1069, rating: 4.7, reviews: 98 },
@@ -392,24 +377,6 @@ export function sortTopProducts(list: TopProduct[], sort: TopProductSort): TopPr
 
 /** รายได้เฉลี่ยต่อชิ้น = รายได้ ÷ ยอดขาย (web's เฉลี่ย/ชิ้น column). */
 export const avgPerUnit = (p: TopProduct) => (p.sold > 0 ? Math.round(p.revenue / p.sold) : 0);
-
-/** ยอดส่วนลดต่อรายการ — web's itemDiscount: deterministic 0–17% of revenue. */
-export function productDiscount(p: TopProduct): number {
-  const seed = Array.from(p.name).reduce((a, c) => a + c.charCodeAt(0), 0);
-  const pct = seed % 4 === 0 ? 0 : (seed % 18) / 100;
-  return Math.round(p.revenue * pct);
-}
-
-/** กรองตามช่วงเวลา — same scaling rule the customer table uses. */
-export function productsForPeriod(period: Period, monthIdx: number): TopProduct[] {
-  const hash = period.length * 11 + monthIdx * 7;
-  const scale = period === "daily" ? 0.35 : period === "weekly" ? 0.7 : period === "yearly" ? 12 : 1;
-  return TOP_PRODUCTS.map((p, i) => {
-    const drop = period === "daily" ? (i + hash) % 3 === 0 : period === "weekly" ? (i + hash) % 5 === 0 : false;
-    if (drop) return { ...p, sold: 0, revenue: 0 };
-    return { ...p, sold: Math.max(1, Math.round(p.sold * scale)), revenue: Math.max(1, Math.round(p.revenue * scale)) };
-  }).filter((p) => p.sold > 0);
-}
 
 /** กรองเฉพาะจุดที่เลือกบนกราฟ (web focusedLabel). */
 export function focusProducts(list: TopProduct[], label: string, bucketUnits: number): TopProduct[] {
