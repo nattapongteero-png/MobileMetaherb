@@ -10,7 +10,7 @@
 // over the scene, so the paired `bottomTabs.android.ts` hook reports the pill's
 // full footprint and screens pad their scroll content by it.
 import * as React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -103,6 +103,20 @@ function FloatingPillTabBar({
   const insets = useSafeAreaInsets();
   const floatBottom = floatBottomFor(insets.bottom);
 
+  const [rowWidth, setRowWidth] = React.useState(0);
+  const itemWidth = rowWidth > 0 ? rowWidth / state.routes.length : 0;
+  const lensX = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (itemWidth > 0) {
+      Animated.spring(lensX, {
+        toValue: state.index * itemWidth,
+        useNativeDriver: true,
+        friction: 10,
+        tension: 120,
+      }).start();
+    }
+  }, [state.index, itemWidth, lensX]);
+
   return (
     // Full-width overlay anchored to the bottom; the pill sits INSIDE it with
     // plain margins, so the side insets can't be overridden by the navigator.
@@ -134,7 +148,34 @@ function FloatingPillTabBar({
       }}
     >
       <FrostedGlass />
-      <View style={{ flex: 1, flexDirection: "row", borderRadius: BAR_RADIUS, overflow: "hidden" }}>
+      <View
+        onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+        style={{ flex: 1, flexDirection: "row", borderRadius: BAR_RADIUS, overflow: "hidden" }}
+      >
+        {/* iOS-26 selection: a raised white glass lens that SLIDES to the
+            focused tab (brighter than the bar + soft shadow = lifted look). */}
+        {itemWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: 7,
+              bottom: 7,
+              left: 5,
+              width: itemWidth - 10,
+              borderRadius: 23,
+              backgroundColor: "rgba(255,255,255,0.95)",
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: "rgba(0,0,0,0.06)",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.14,
+              shadowRadius: 7,
+              transform: [{ translateX: lensX }],
+            }}
+          />
+        ) : null}
         {state.routes.map((route: AnyProps, index: number) => {
           const { options } = descriptors[route.key];
           const focused = state.index === index;
@@ -158,18 +199,7 @@ function FloatingPillTabBar({
               android_ripple={{ color: "rgba(49,151,84,0.12)", borderless: true }}
               style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
             >
-              {/* iOS-26-style selection: the focused tab sits in a soft green capsule */}
-              <View
-                style={{
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                  paddingHorizontal: 16,
-                  paddingVertical: 5,
-                  borderRadius: 16,
-                  backgroundColor: focused ? "rgba(0,0,0,0.08)" : "transparent",
-                }}
-              >
+              <View style={{ alignItems: "center", justifyContent: "center", gap: 2 }}>
               {icon}
               <Text
                 numberOfLines={1}
