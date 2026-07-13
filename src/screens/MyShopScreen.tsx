@@ -46,7 +46,6 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   AlertCircle,
   AlertTriangle,
-  Coffee,
   MessageSquare,
   ArrowRightCircle,
   BarChart3,
@@ -280,7 +279,9 @@ const SHOP_MENU_GRID: { id: SectionId; label: string; Icon: typeof BarChart3 }[]
   { id: "report_products", label: "รายงานสินค้า", Icon: Package },
   { id: "report_market", label: "รายงานตลาด", Icon: Beaker },
   { id: "complaints", label: "ร้องเรียน", Icon: AlertTriangle },
-  { id: "cafe_queue", label: "คิวคาเฟ่", Icon: Coffee },
+  // cafe_queue ("คิวคาเฟ่") removed from the shop grid — META Caffe is run by
+  // Metaherb centrally, not by individual shops. Route + screen kept for the
+  // future standalone barista system.
   { id: "shop_chat", label: "ข้อความลูกค้า", Icon: MessageSquare },
 ];
 
