@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { BRAND_GREEN } from "../theme/tokens";
+import { isTablet } from "../theme/layout";
 
 // Capsule segmented control with a green pill that springs to the active tab —
 // the app-wide tab-switcher look (สาระความรู้ / หน้าร้านค้า owner + customer).
@@ -23,8 +24,13 @@ export function SegmentedTabs<T extends string>({
 }) {
   const GAP = 4;
   const compact = size === "compact";
+  // iPad: the phone-sized control looks tiny on the wide canvas, so bump the
+  // height + label (same isTablet() gate the rest of the app uses). Phones keep
+  // the original sizes untouched.
+  const tablet = isTablet();
   const PAD = compact ? 3 : 4;
-  const H = compact ? 32 : 44;
+  const H = compact ? (tablet ? 46 : 32) : (tablet ? 52 : 44);
+  const fontSize = compact ? (tablet ? 15 : 11.5) : (tablet ? 15 : 13);
   const pillH = H - PAD * 2;
   const index = Math.max(0, tabs.findIndex((t) => t.id === active));
   const pos = useRef(new Animated.Value(index)).current;
@@ -64,7 +70,7 @@ export function SegmentedTabs<T extends string>({
               className="active:opacity-90"
               style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}
             >
-              <Text numberOfLines={1} style={{ fontSize: compact ? 11.5 : 13, fontWeight: isActive ? "700" : "600", color: isActive ? "#fff" : "#6b7280" }}>
+              <Text numberOfLines={1} style={{ fontSize, fontWeight: isActive ? "700" : "600", color: isActive ? "#fff" : "#6b7280" }}>
                 {t.label}
               </Text>
               {t.count !== undefined ? (

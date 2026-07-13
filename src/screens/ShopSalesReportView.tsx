@@ -24,8 +24,12 @@ import {
   type Period,
   type ProductSort,
   type Point,
+  type SeriesKey,
 } from "../data/salesReport";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { isTablet } from "../theme/layout";
+import { showToast } from "../components/Toast";
+import { exportSalesReportPDF, exportSalesReportExcel, type ReportExportData } from "../utils/reportExport";
 
 // Same KPI illustrations as the web: coin / box / cost / coin-up.
 const COIN_INCOME = require("../../assets/coins/cion.png");
@@ -37,16 +41,21 @@ function Card({ children }: { children: ReactNode }) {
   return <View style={{ backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#ececec", padding: 16 }}>{children}</View>;
 }
 
-function KpiCard({ label, value, sub, accent, Icon, SubIcon, art }: { label: string; value: string; sub: string; accent: string; Icon: LucideIcon; SubIcon: LucideIcon; art: ImageSourcePropType }) {
+// Web scales the KPI art 64px → 110px at its sm breakpoint; iPad cards are the
+// wide ones here, so they get the big art (and a deeper bleed off the corner).
+const ART_SIZE = isTablet() ? 110 : 72;
+const ART_INSET = isTablet() ? -8 : -4;
+
+// The illustration IS the card's visual anchor — no corner icon (it would be a
+// second, redundant signal for the same metric).
+function KpiCard({ label, value, sub, accent, SubIcon, art }: { label: string; value: string; sub: string; accent: string; SubIcon: LucideIcon; art: ImageSourcePropType }) {
   return (
     <View style={{ flexBasis: "47%", flexGrow: 1, borderRadius: 16, overflow: "hidden", backgroundColor: accent + "0d", padding: 14 }}>
-      <Image source={art} style={{ position: "absolute", right: -4, bottom: -10, width: 66, height: 66, opacity: 0.55 }} resizeMode="contain" />
-      {/* Icon floats top-right so it doesn't affect the title/value/sub vertical rhythm */}
-      <View style={{ position: "absolute", top: 12, right: 12, width: 30, height: 30, borderRadius: 10, backgroundColor: accent + "1a", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={16} color={accent} strokeWidth={2} />
-      </View>
+      {/* iPad cards are ~2× wider, so the art scales with them (web does the
+          same: 64px → 110px at the sm breakpoint) */}
+      <Image source={art} style={{ position: "absolute", right: ART_INSET, bottom: ART_INSET - 6, width: ART_SIZE, height: ART_SIZE, opacity: 0.9 }} resizeMode="contain" />
       <View style={{ gap: 10 }}>
-        <Text numberOfLines={1} style={{ fontSize: 12, color: "#6b7280", paddingRight: 36 }}>{label}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 12, color: "#6b7280", paddingRight: 24 }}>{label}</Text>
         <Text numberOfLines={1} style={{ fontSize: 20, fontWeight: "700", color: accent, letterSpacing: -0.3 }}>{value}</Text>
         <View className="flex-row items-center" style={{ alignSelf: "flex-start", gap: 3, backgroundColor: accent + "15", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
           <SubIcon size={10} color={accent} strokeWidth={2.4} />
@@ -72,13 +81,18 @@ export function PeriodTabs({ period, onChange }: { period: Period; onChange: (p:
     Animated.spring(pos, { toValue: idx, useNativeDriver: true, friction: 9, tension: 90 }).start();
   }, [idx, pos]);
   const translateX = pos.interpolate({ inputRange: [0, PERIODS.length - 1], outputRange: [0, segW * (PERIODS.length - 1)] });
+  // iPad: match the enlarged SegmentedTabs so all the period/tab controls read
+  // at the same, iPad-appropriate size; phones keep the original 42/32/12.5.
+  const tablet = isTablet();
+  const H = tablet ? 50 : 42;
+  const pillH = tablet ? 40 : 32;
   return (
     <View
       onLayout={(e) => setSegW((e.nativeEvent.layout.width - 10) / PERIODS.length)}
-      style={{ height: 42, borderRadius: 999, backgroundColor: "#fff", padding: 4, borderWidth: 1, borderColor: "#ececec" }}
+      style={{ height: H, borderRadius: 999, backgroundColor: "#fff", padding: 4, borderWidth: 1, borderColor: "#ececec" }}
     >
       {segW > 0 ? (
-        <Animated.View style={{ position: "absolute", top: 4, left: 4, width: segW, height: 32, borderRadius: 999, backgroundColor: BRAND_GREEN, transform: [{ translateX }] }} />
+        <Animated.View style={{ position: "absolute", top: 4, left: 4, width: segW, height: pillH, borderRadius: 999, backgroundColor: BRAND_GREEN, transform: [{ translateX }] }} />
       ) : null}
       <View style={{ flex: 1, flexDirection: "row" }}>
         {PERIODS.map((p) => {
@@ -92,7 +106,7 @@ export function PeriodTabs({ period, onChange }: { period: Period; onChange: (p:
               }}
               style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
             >
-              <Text numberOfLines={1} style={{ fontSize: 12.5, fontWeight: on ? "700" : "600", color: on ? "#fff" : "#6b7280" }}>{p.label}</Text>
+              <Text numberOfLines={1} style={{ fontSize: tablet ? 14.5 : 12.5, fontWeight: on ? "700" : "600", color: on ? "#fff" : "#6b7280" }}>{p.label}</Text>
             </Pressable>
           );
         })}
@@ -107,10 +121,21 @@ export function PeriodTabs({ period, onChange }: { period: Period; onChange: (p:
 // tinted legend pills.
 const PIE_COLORS = ["#319754", "#46A165", "#7bc290", "#aedab8", "#f7931d", "#fbbf24"];
 
-function SalesDonut({ data }: { data: Point[] }) {
-  const pts = data.filter((p) => p.sales > 0);
-  const total = pts.reduce((s, p) => s + p.sales, 0) || 1;
-  const segs = pts.map((p, i) => ({ label: p.label, value: p.sales, color: PIE_COLORS[i % PIE_COLORS.length] }));
+export function SalesDonut({
+  data,
+  valueKey = "sales",
+  centerLabel = "ยอดขายรวม",
+  format = fmtBaht,
+}: {
+  data: Point[];
+  valueKey?: SeriesKey;      // which series the slices measure
+  centerLabel?: string;
+  format?: (n: number) => string;
+}) {
+  const val = (p: Point) => p[valueKey] as number;
+  const pts = data.filter((p) => val(p) > 0);
+  const total = pts.reduce((s, p) => s + val(p), 0) || 1;
+  const segs = pts.map((p, i) => ({ label: p.label, value: val(p), color: PIE_COLORS[i % PIE_COLORS.length] }));
 
   // Web ring: inner 72 / outer 120 → scaled down to a 176px box so the whole
   // block (donut + legend) matches the line/bar chart height — switching chart
@@ -209,8 +234,8 @@ function SalesDonut({ data }: { data: Point[] }) {
         </Svg>
         {/* Center — total sales (web: 11 gray label + 20 bold value) */}
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 10.5, color: "#9ca3af" }}>ยอดขายรวม</Text>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>{fmtBaht(total)}</Text>
+          <Text style={{ fontSize: 10.5, color: "#9ca3af" }}>{centerLabel}</Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>{format(total)}</Text>
         </View>
       {/* Tooltip — web pie style: dot + label, ฿value + share %.
           Lives inside the donut wrapper so it tracks the finger (gesture coords). */}
@@ -236,7 +261,7 @@ function SalesDonut({ data }: { data: Point[] }) {
             <Text style={{ fontSize: 12, fontWeight: "500", color: "#4b5563" }}>{active.label}</Text>
           </View>
           <View className="flex-row items-baseline justify-between" style={{ gap: 10 }}>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: active.color }}>฿{active.value.toLocaleString()}</Text>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: active.color }}>{format(active.value)}</Text>
             <Text style={{ fontSize: 11, color: "#9ca3af" }}>{((active.value / total) * 100).toFixed(1)}%</Text>
           </View>
         </View>
@@ -441,7 +466,7 @@ function SalesGroupBlock({ g, sort, wide, title }: { g: SalesGroup; sort: Produc
 }
 
 /** รายงานผลยอดขาย — period KPIs + chart (one card) + product-sales table. */
-export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Period; setPeriod: (p: Period) => void; dateSel: DateRange }) {
+export function ShopSalesReportView({ period, setPeriod, dateSel, exportRef }: { period: Period; setPeriod: (p: Period) => void; dateSel: DateRange; exportRef?: { current: ((kind: "excel" | "pdf") => void) | null } }) {
   const [chartType, setChartType] = useState<"line" | "bar" | "pie">("line");
   const [cat, setCat] = useState<"regular" | "market">("regular");
   const [sort, setSort] = useState<ProductSort>("sales_desc");
@@ -478,10 +503,42 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
         : period === "monthly" ? `${g.label} ${dateSel.start.year}`
         : undefined,
     }));
+    // "ล่าสุด" — groups arrive chronological (oldest→newest); reverse to put
+    // the most recent period date first, down to the oldest in range.
+    if (sort === "latest") return [...withTitle].reverse();
     const metric = (x: { g: SalesGroup }) =>
       sort === "qty_desc" ? x.g.units : sort === "margin_desc" ? x.g.margin : x.g.sales;
     return [...withTitle].sort((a, b) => (sort === "sales_asc" ? metric(a) - metric(b) : metric(b) - metric(a)));
   }, [groups, sort, period, dateSel]);
+  // Export (web-parity ส่งออก popover) — build the flat data once, then hand it
+  // to the PDF/CSV writers. Uses the visible sort so the file matches the screen.
+  const buildExportData = (): ReportExportData => ({
+    scope,
+    catLabel: cat === "regular" ? "สินค้าปกติ" : "Herbal Market",
+    groups: displayGroups.map(({ g, title }) => ({
+      title: title ?? g.label,
+      sales: g.sales,
+      profit: g.profit,
+      lines: sortLines(g.lines, sort).map((l) => ({
+        name: l.p.name, qty: l.qty, sales: l.sales, cost: l.cost, profit: l.profit, margin: l.margin,
+      })),
+    })),
+  });
+  const runExport = async (kind: "excel" | "pdf") => {
+    try {
+      showToast(`กำลังสร้างไฟล์ ${kind === "excel" ? "Excel" : "PDF"}…`, "info");
+      const data = buildExportData();
+      if (kind === "excel") await exportSalesReportExcel(data);
+      else await exportSalesReportPDF(data);
+    } catch (e) {
+      showToast("ส่งออกไม่สำเร็จ", "error");
+    }
+  };
+  // Expose the export action to the parent header (the ส่งออก button + its
+  // Excel/PDF morph menu live in the app bar next to the date). Reassigned each
+  // render so it always closes over the current sort/cat/period.
+  if (exportRef) exportRef.current = runExport;
+
   // Tablet gets real table columns; phones get the stacked two-deck rows.
   const isWide = useWindowDimensions().width >= 640;
   const sortLabel = SORT_OPTIONS.find((s) => s.id === sort)?.label ?? "";
@@ -492,6 +549,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
     sales_asc: { Icon: TrendingDown, color: "#f59e0b" },
     qty_desc: { Icon: Package, color: "#0ea5e9" },
     margin_desc: { Icon: Percent, color: "#6366f1" },
+    latest: { Icon: CalendarDays, color: "#ec4899" },
   };
   const sortVisual = SORT_VISUAL[sort];
   // Sort feedback — haptic + label fade + the rows animate into their new order.
@@ -531,17 +589,18 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Period tabs — capsule switcher (สาระความรู้ style) */}
+      {/* Period tabs — capsule switcher (ส่งออก button lives in the app-bar
+          header next to the date, wired via exportRef). */}
       <PeriodTabs period={period} onChange={setPeriod} />
 
       {/* KPI + chart — ONE card (web parity): the chart reads the same
           REPORT_DATA[period] as the KPIs, so changing the period/date updates both. */}
       <Card>
         <View className="flex-row" style={{ flexWrap: "wrap", gap: 10 }}>
-          <KpiCard label={`รายได้ ${scope}`} value={fmtBaht(kpi.sales)} sub={`เฉลี่ย ${fmtBaht(kpi.avgSales)}/ช่วง`} accent="#10b981" Icon={DollarSign} SubIcon={BarChart3} art={COIN_INCOME} />
-          <KpiCard label={`คำสั่งซื้อ ${scope}`} value={`${kpi.orders.toLocaleString()} ออเดอร์`} sub={`เฉลี่ย ฿${kpi.aov.toLocaleString()}/ออเดอร์`} accent="#0ea5e9" Icon={ShoppingCart} SubIcon={BarChart3} art={COIN_ORDERS} />
-          <KpiCard label={`ต้นทุน ${scope}`} value={fmtBaht(kpi.cost)} sub={`${kpi.costRatio}% ของรายได้`} accent="#6366f1" Icon={FileText} SubIcon={CheckCircle2} art={COIN_COST} />
-          <KpiCard label={`กำไร ${scope}`} value={fmtBaht(kpi.profit)} sub={`มาร์จิ้น ${kpi.margin.toFixed(1)}%`} accent="#f59e0b" Icon={TrendingUp} SubIcon={TrendingUp} art={COIN_PROFIT} />
+          <KpiCard label={`รายได้ ${scope}`} value={fmtBaht(kpi.sales)} sub={`เฉลี่ย ${fmtBaht(kpi.avgSales)}/ช่วง`} accent="#10b981" SubIcon={BarChart3} art={COIN_INCOME} />
+          <KpiCard label={`คำสั่งซื้อ ${scope}`} value={`${kpi.orders.toLocaleString()} ออเดอร์`} sub={`เฉลี่ย ฿${kpi.aov.toLocaleString()}/ออเดอร์`} accent="#0ea5e9" SubIcon={BarChart3} art={COIN_ORDERS} />
+          <KpiCard label={`ต้นทุน ${scope}`} value={fmtBaht(kpi.cost)} sub={`${kpi.costRatio}% ของรายได้`} accent="#6366f1" SubIcon={CheckCircle2} art={COIN_COST} />
+          <KpiCard label={`กำไร ${scope}`} value={fmtBaht(kpi.profit)} sub={`มาร์จิ้น ${kpi.margin.toFixed(1)}%`} accent="#f59e0b" SubIcon={TrendingUp} art={COIN_PROFIT} />
         </View>
 
         {/* Section heading + chart-type tabs on one row. Tabs reuse the app-wide
@@ -550,7 +609,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
           <Text style={{ fontSize: 15, fontWeight: "700", color: "#1a1a1a" }}>รายงานผลยอดขาย</Text>
           <SegmentedTabs
             size="compact"
-            style={{ width: 172 }}
+            style={{ width: isTablet() ? 250 : 172 }}
             tabs={[
               { id: "line" as const, label: "เส้น" },
               { id: "bar" as const, label: "แท่ง" },
@@ -582,7 +641,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
               would otherwise make the tab text look inset vs. the sort filter */}
           <SegmentedTabs
             size="compact"
-            style={{ width: 176, marginRight: -3 }}
+            style={{ width: isTablet() ? 270 : 176, marginRight: -3 }}
             tabs={[
               { id: "regular" as const, label: "สินค้าปกติ" },
               { id: "market" as const, label: "Herbal Market" },
@@ -603,7 +662,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
           ref={sortBtnRef}
           onPress={openSortMenu}
           className="flex-row items-center active:opacity-70"
-          style={{ gap: 5, paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999, backgroundColor: sortVisual.color + "14" }}
+          style={{ gap: isTablet() ? 8 : 6, paddingVertical: isTablet() ? 10 : 7, paddingHorizontal: isTablet() ? 16 : 12, borderRadius: 999, backgroundColor: sortVisual.color + "14" }}
         >
           <Animated.View
             style={{
@@ -614,10 +673,10 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
               ],
             }}
           >
-            <sortVisual.Icon size={13} color={sortVisual.color} strokeWidth={2.4} />
+            <sortVisual.Icon size={isTablet() ? 17 : 15} color={sortVisual.color} strokeWidth={2.4} />
           </Animated.View>
-          <Animated.Text style={{ fontSize: 11.5, fontWeight: "600", color: sortVisual.color, opacity: sortAnim }}>{sortLabel}</Animated.Text>
-          <ChevronDown size={12} color={sortVisual.color} strokeWidth={2.6} style={{ transform: [{ rotate: sortOpen ? "180deg" : "0deg" }] }} />
+          <Animated.Text style={{ fontSize: isTablet() ? 15 : 13, fontWeight: "700", color: sortVisual.color, opacity: sortAnim }}>{sortLabel}</Animated.Text>
+          <ChevronDown size={isTablet() ? 16 : 14} color={sortVisual.color} strokeWidth={2.6} style={{ transform: [{ rotate: sortOpen ? "180deg" : "0deg" }] }} />
         </Pressable>
         </View>
 
@@ -632,7 +691,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel }: { period: Pe
             anchorBottom={sortAnchor.bottom}
             right={sortAnchor.right}
             originSize={26}
-            menuHeight={208}
+            menuHeight={256}
           >
             {SORT_OPTIONS.map((opt) => {
               const v = SORT_VISUAL[opt.id];

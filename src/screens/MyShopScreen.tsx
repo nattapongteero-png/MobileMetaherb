@@ -4182,7 +4182,7 @@ function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; la
 
 // Flash product card — ported from Figma: green header (image + name + price/
 // discount/date pills) over a white footer (progress ring + sold/remaining/revenue).
-export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onMenu: (e: GestureResponderEvent) => void; dateText?: string }) {
+export function FlashProductCard({ p, onMenu, dateText, width }: { p: FlashProduct; onMenu: (e: GestureResponderEvent) => void; dateText?: string; width?: number | string }) {
   // Full date + time, web-style (e.g. "08 พ.ค. 69 00:00 - 09 พ.ค. 69 23:59").
   // Uses the product's own period; falls back to `dateText` (the event's period)
   // only when the product has no date yet (e.g. just added).
@@ -4202,7 +4202,7 @@ export function FlashProductCard({ p, onMenu, dateText }: { p: FlashProduct; onM
     setLabelW((prev) => Math.max(prev, w));
   };
   return (
-    <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ width: width as any, borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
     <LinearGradient colors={[st.color + "26", st.color + "12"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
     <View style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}>
       {/* Header — image + name + price/-% + 3-dot */}
@@ -4329,8 +4329,9 @@ export function FlashMonthPicker({ month, year, onChange }: {
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", paddingHorizontal: 28 }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
+          {/* Fixed dialog width so the sheet doesn't stretch full-screen on iPad */}
+          <Pressable onPress={() => {}} style={{ width: "100%", maxWidth: 400, backgroundColor: "#fff", borderRadius: 24, paddingTop: 18, paddingBottom: 16, paddingHorizontal: 16 }}>
             <View style={{ marginBottom: 12 }}>
               <Text style={{ textAlign: "center", fontSize: 16, fontWeight: "700", color: "#1a1a1a" }}>เลือกเดือน</Text>
               <Pressable onPress={() => setOpen(false)} hitSlop={10} className="active:opacity-60" style={{ position: "absolute", right: 2, top: 0 }}>
@@ -4754,6 +4755,9 @@ export function FlashSaleSection({ insetsBottom = 16, month = 7, year = 2569 }: 
     return () => clearTimeout(t);
   }, [scope, filter, month, year]);
   const shown = visible.slice(0, shownCount);
+  // iPad: flash cards flow 2-per-row from the same grid math the teammate's
+  // owner lists use; phones keep the single, full-width column untouched.
+  const flashCardWidth: number | string = isTablet() ? gridCardWidth(2, 32, 14) : "100%";
   const moreLeft = visible.length - shown.length;
   const loadMore = () => {
     if (loadingMore || moreLeft <= 0) return;
@@ -4851,7 +4855,9 @@ export function FlashSaleSection({ insetsBottom = 16, month = 7, year = 2569 }: 
             </Text>
           </View>
         ) : (
-          shown.map((p) => <FlashProductCard key={p.id} p={p} onMenu={(e) => openMenu(p, e)} />)
+          <View className="flex-row flex-wrap" style={{ gap: 14 }}>
+            {shown.map((p) => <FlashProductCard key={p.id} p={p} width={flashCardWidth} onMenu={(e) => openMenu(p, e)} />)}
+          </View>
         )}
 
         {/* Loading beat — skeleton cards where the next page will appear */}
