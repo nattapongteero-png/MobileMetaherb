@@ -1,4 +1,4 @@
-import { GLASS_BAR_TINT, GLASS_CHIP_GREEN, GLASS_CHIP_AMBER } from "../theme/tokens";
+import { GLASS_BAR_TINT, GLASS_CHIP_GREEN, GLASS_CHIP_AMBER, LIQUID_GLASS } from "../theme/tokens";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   View,
@@ -1128,7 +1128,7 @@ export function HerbalMarketDetailScreen() {
           <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
             <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
               {/* Android glass shim = white circle → X must be dark there. */}
-              <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
+              <X size={20} color={!LIQUID_GLASS ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
             </GlassIconButton>
           </View>
         </View>

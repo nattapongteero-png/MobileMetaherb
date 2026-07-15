@@ -10,7 +10,7 @@
 // over the scene, so the paired `bottomTabs.android.ts` hook reports the pill's
 // full footprint and screens pad their scroll content by it.
 import * as React from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -39,8 +39,11 @@ const BAR_HEIGHT = 60;
 const BAR_RADIUS = 30;
 const SIDE_MARGIN = 16;
 /** How high the pill floats above the very bottom — always a clear gap above
- *  the gesture area, so it reads as floating on every device (iOS-26 feel). */
-export const floatBottomFor = (insetBottom: number) => Math.max(insetBottom, 12);
+ *  the gesture area, so it reads as floating on every device (iOS-26 feel).
+ *  iOS (<26 fallback) reports a 34pt home-indicator inset, which floats the
+ *  pill visibly too high — hug lower there, like the real iOS-26 bar. */
+export const floatBottomFor = (insetBottom: number) =>
+  Platform.OS === "ios" ? Math.max(insetBottom - 20, 10) : Math.max(insetBottom, 12);
 
 /** `tabBarIcon: () => ({ sfSymbol })` → a filled Ionicons glyph in the tab's tint. */
 function toJsIcon(original: unknown) {

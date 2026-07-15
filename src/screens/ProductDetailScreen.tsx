@@ -48,7 +48,7 @@ import { useShopName } from "../context/SellerContext";
 import { GROUP_BY_ID, GALLERY_OVERRIDE } from "../data/productVariants";
 import { ShopAvatar } from "../components/ShopAvatar";
 import type { Product } from "../types/Product";
-import { STAR_YELLOW, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { STAR_YELLOW, BRAND_GREEN_DARK, LIQUID_GLASS, TEXT_MUTED } from "../theme/tokens";
 import { appWidth, isTablet, gridColumns, gridCardWidth } from "../theme/layout";
 
 const SCREEN_WIDTH =
@@ -1346,7 +1346,7 @@ export function ProductDetailScreen({ route }: Props) {
           <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
             <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
               {/* Android glass shim = white circle → X must be dark there. */}
-              <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
+              <X size={20} color={!LIQUID_GLASS ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
             </GlassIconButton>
           </View>
         </View>

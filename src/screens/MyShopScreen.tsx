@@ -1,4 +1,4 @@
-import { GLASS_BAR_TINT } from "../theme/tokens";
+import { GLASS_BAR_TINT, LIQUID_GLASS } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 import { modalTopPad } from "../theme/layout";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -332,10 +332,10 @@ function MetaManagerCard({ onPress }: { onPress: () => void }) {
             glassEffectStyle="regular"
             colorScheme="light"
             isInteractive
-            style={{ alignSelf: "flex-start", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingLeft: 16, paddingRight: 13, paddingVertical: 9, ...(Platform.OS === "android" && { backgroundColor: "#fff" }) }}
+            style={{ alignSelf: "flex-start", marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingLeft: 16, paddingRight: 13, paddingVertical: 9, ...(!LIQUID_GLASS && { backgroundColor: "#fff" }) }}
           >
-            <Text style={{ fontSize: 13.5, fontWeight: "700", color: Platform.OS === "android" ? "#c2410c" : "#fff" }}>เริ่มแชท</Text>
-            <ArrowRightCircle size={16} color={Platform.OS === "android" ? "#c2410c" : "#fff"} strokeWidth={2.4} />
+            <Text style={{ fontSize: 13.5, fontWeight: "700", color: !LIQUID_GLASS ? "#c2410c" : "#fff" }}>เริ่มแชท</Text>
+            <ArrowRightCircle size={16} color={!LIQUID_GLASS ? "#c2410c" : "#fff"} strokeWidth={2.4} />
           </GlassView>
         </View>
         <Image key={playKey} source={META_CHAR} style={{ width: 110, height: 116 }} resizeMode="contain" />
