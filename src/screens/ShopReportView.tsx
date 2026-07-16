@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, ScrollView, Modal, Dimensions, Animated, LayoutAnimation, Image, type ImageSourcePropType } from "react-native";
+import { View, Text, Pressable, ScrollView, Modal, Animated, LayoutAnimation, Image, type ImageSourcePropType } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,7 +10,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   UserPlus, Repeat, Users, Store, Package, Boxes, AlertTriangle, Star,
   Eye, ShoppingCart, TrendingUp, TrendingDown, Ticket, Download, ChevronDown,
-  FileSpreadsheet, FileText, Check, CalendarDays, Clock, Heart, X, Link, type LucideIcon,
+  FileSpreadsheet, FileText, Check, CalendarDays, Clock, Heart, X, Link, ChevronRight, type LucideIcon,
 } from "lucide-react-native";
 import { AppleMenu } from "../components/AppleMenu";
 import { SalesChart } from "../components/SalesChart";
@@ -22,6 +22,7 @@ import { isTablet } from "../theme/layout";
 import { showToast } from "../components/Toast";
 import { SalesDatePicker, salesDateLabel, type DateRange } from "../components/SalesDatePicker";
 import type { RootStackParamList } from "../navigation/RootStack";
+import { menuAnchor } from "../theme/menuAnchor";
 import {
   REPORT_DATA, sumField, fmtBaht,
   sortCustomers, customerStats, rankColor, rankTextColor, focusCustomers,
@@ -37,7 +38,7 @@ import {
 import { useReportCustomers, useReportProducts, useReportKpis } from "../data/reportSources";
 import { CHANNEL_LOGO, CHANNEL_LOGO_VIEWBOX } from "../data/channelLogos";
 import { exportCustomerReportPDF, exportCustomerReportExcel, type CustomerExportData } from "../utils/reportExport";
-import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, cardShadow } from "../theme/tokens";
 
 export type ReportKind = "customers" | "products" | "market";
 
@@ -180,7 +181,7 @@ function CustomerCard({ c, rank }: { c: Customer; rank: number }) {
   // same way (colour = the card's one status signal).
   const tint = rank < 3 ? medal : "#94a3b8";
   return (
-    <View style={{ borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ borderRadius: 24, ...cardShadow() }}>
       <LinearGradient colors={[tint + "26", tint + "12"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
         <View style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}>
           {/* Header — อันดับ (ทอง/เงิน/ทองแดง 3 อันดับแรก, web rankBg) + ชื่อ/อีเมล + ยอดรวม.
@@ -362,7 +363,7 @@ function CustomerTotals({ list, all, scope }: { list: Customer[]; all: Customer[
   // green arc = the slice of them that are repeat purchases. The dots reuse
   // those exact two colours, so the chart needs no separate legend.
   return (
-    <View style={{ borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ borderRadius: 24, backgroundColor: "#fff", ...cardShadow() }}>
       <LinearGradient colors={[BRAND_GREEN_DARK, BRAND_GREEN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
         <Image source={SUMMARY_ART} style={{ position: "absolute", right: -14, bottom: -20, width: 130, height: 130, opacity: 0.95 }} resizeMode="contain" />
         <View style={{ gap: 2 }}>
@@ -422,7 +423,7 @@ function ProductCard({ p, rank, mode }: { p: TopProduct; rank: number; mode: Pro
   // No tinted peek strip: everything it could carry (หมวดหมู่, รีวิว) already
   // sits in the card body, so it was pure repetition.
   return (
-    <View style={{ backgroundColor: "white", borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ backgroundColor: "white", borderRadius: 24, ...cardShadow() }}>
         <View style={{ padding: 14, gap: 12 }}>
           {/* Header — อันดับ + ชื่อ/หมวดหมู่ + รายได้ (Top) / คะแนน (Rating) */}
           <View className="flex-row items-center" style={{ gap: 12 }}>
@@ -495,7 +496,7 @@ function ProductCardSkeleton() {
     <View style={{ width: w as any, height: h, borderRadius: 6, backgroundColor: "#eef1ef" }} />
   );
   return (
-    <View style={{ backgroundColor: "white", borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ backgroundColor: "white", borderRadius: 24, ...cardShadow() }}>
       <View style={{ padding: 14, gap: 12 }}>
         <View className="flex-row items-center" style={{ gap: 12 }}>
           <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#eef1ef" }} />
@@ -551,7 +552,7 @@ function ChannelCard({ ch }: { ch: Channel }) {
   // Web columns, nothing more: ช่องทาง (โลโก้ + ชื่อ) · ผู้เข้าชม · ออเดอร์ ·
   // Conv. Rate · รายได้ · ROAS. No rank, no type tag.
   return (
-    <View style={{ borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ borderRadius: 24, backgroundColor: "#fff", ...cardShadow() }}>
       {/* Head wears the platform's real brand gradient (TikTok ดำ→ฟ้านีออน, IG ม่วง→แดง …) */}
       <LinearGradient colors={channelGradient(ch)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
         {/* Same head rhythm as the summary card: small label (ประเภทช่องทาง) →
@@ -611,7 +612,7 @@ function ChannelTotals({ list, all, scope }: { list: Channel[]; all: Channel[]; 
   const conv = visits > 0 ? (orders / visits) * 100 : 0;
   const roas = cost > 0 ? revenue / cost : null;
   return (
-    <View style={{ borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ borderRadius: 24, backgroundColor: "#fff", ...cardShadow() }}>
       <LinearGradient colors={[BRAND_GREEN_DARK, BRAND_GREEN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
         <Image source={MARKET_ART} style={{ position: "absolute", right: -14, bottom: -20, width: 130, height: 130, opacity: 0.95 }} resizeMode="contain" />
         <View style={{ gap: 2 }}>
@@ -703,7 +704,7 @@ function ProductTotals({ list, all, scope, mode, onMode }: {
             const isRating = pg.key === "rating";
             return (
               <View key={pg.key} style={{ paddingVertical: 12 }}>
-              <View style={{ width: cardW, borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+              <View style={{ width: cardW, borderRadius: 24, backgroundColor: "#fff", ...cardShadow() }}>
                 <LinearGradient colors={isRating ? [RATING_GOLD_DARK, RATING_GOLD] : [BRAND_GREEN_DARK, BRAND_GREEN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24, padding: 14, gap: 8, overflow: "hidden" }}>
                   <Image source={isRating ? RATING_ART : PRODUCT_ART} style={{ position: "absolute", right: -14, bottom: -20, width: 130, height: 130, opacity: 0.95 }} resizeMode="contain" />
                   <View style={{ gap: 2 }}>
@@ -742,7 +743,7 @@ function ProductTotals({ list, all, scope, mode, onMode }: {
                     ) : (
                       <>
                         {/* วงเขียว = รายได้ของสินค้าที่แสดง เทียบรายได้ทั้งหมดของร้าน (ทั้งคู่เป็นค่าจริง) */}
-                        <CStat dot={BRAND_GREEN} label={`ส่วนแบ่งรายได้ (${sharePct}%)`} value={revenue.toLocaleString()} unit="฿" />
+                        <CStat dot={BRAND_GREEN} label={`ส่วนแบ่ง (${sharePct}%)`} value={revenue.toLocaleString()} unit="฿" />
                         <CStat label="ยอดขาย" value={sold.toLocaleString()} unit="ชิ้น" />
                         <CStat label="เฉลี่ย/ชิ้น" value={avg.toLocaleString()} unit="฿" />
                       </>
@@ -941,10 +942,7 @@ export function ShopReportView({ kind, period, setPeriod, dateSel, exportRef }: 
   const [sortAnchor, setSortAnchor] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 12 });
   const openSortMenu = () => {
     sortBtnRef.current?.measureInWindow((x, y, w, h) => {
-      const { width: ww, height: wh } = Dimensions.get("window");
-      const right = Math.max(12, ww - (x + w));
-      if (y > wh * 0.55) setSortAnchor({ bottom: wh - y + 6, right });
-      else setSortAnchor({ top: y + h + 6, right });
+      setSortAnchor(menuAnchor(x, y, w, h));
       setSortMounted(true);
       setSortOpen(true);
     });
@@ -1151,26 +1149,12 @@ export function ShopReportScreen() {
   // an Excel/PDF morph menu (same AppleMenu pattern as the sort picker).
   const exportRef = useRef<((kind: "excel" | "pdf") => void) | null>(null);
   const tablet = isTablet();
-  const exportBtnRef = useRef<View>(null);
+  // Export chooser — a centered modal (same shell as the date picker), so it
+  // reads identically on iOS and Android and its two big targets are easy to
+  // hit. Replaces the corner morph menu, which mis-anchored on Android.
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportMounted, setExportMounted] = useState(false);
-  const [exportAnchor, setExportAnchor] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 12 });
-  const openExportMenu = () => {
-    exportBtnRef.current?.measureInWindow((x, y, w, h) => {
-      const { width: ww, height: wh } = Dimensions.get("window");
-      const right = Math.max(12, ww - (x + w));
-      if (y > wh * 0.55) setExportAnchor({ bottom: wh - y + 6, right });
-      else setExportAnchor({ top: y + h + 6, right });
-      setExportMounted(true);
-      setExportOpen(true);
-    });
-  };
-  const closeExport = () => {
-    setExportOpen(false);
-    setTimeout(() => setExportMounted(false), 200);
-  };
   const pickExport = (kind: "excel" | "pdf") => {
-    closeExport();
+    setExportOpen(false);
     exportRef.current?.(kind);
   };
   return (
@@ -1185,7 +1169,7 @@ export function ShopReportScreen() {
             <SalesDatePicker period={period} sel={dateSel} onChange={setDateSel} />
             {kind === "sales" || kind === "customers" ? (
               /* Liquid Glass capsule — same material/size as the date button */
-              <Pressable ref={exportBtnRef} onPress={openExportMenu} hitSlop={8}>
+              <Pressable onPress={() => setExportOpen(true)} hitSlop={8}>
                 <GlassView
                   glassEffectStyle="regular"
                   colorScheme="light"
@@ -1216,35 +1200,34 @@ export function ShopReportScreen() {
         </View>
       </ScrollView>
 
-      {/* Export morph menu — same AppleMenu pattern as the sort picker: the
-          card scales out of the ส่งออก button. Excel / PDF rows (web parity). */}
-      <Modal visible={exportMounted} transparent animationType="none" onRequestClose={closeExport} statusBarTranslucent>
-        <AppleMenu
-          visible={exportOpen}
-          onClose={closeExport}
-          anchorTop={exportAnchor.top}
-          anchorBottom={exportAnchor.bottom}
-          right={exportAnchor.right}
-          originSize={tablet ? 50 : 44}
-          menuHeight={112}
-        >
-          {([
-            { kind: "excel" as const, label: "Excel (.csv)", Icon: FileSpreadsheet, color: "#0f7a3a" },
-            { kind: "pdf" as const, label: "PDF (.pdf)", Icon: FileText, color: "#dc2626" },
-          ]).map((o) => (
-            <Pressable
-              key={o.kind}
-              onPress={() => pickExport(o.kind)}
-              className="flex-row items-center active:opacity-60"
-              style={{ height: 48, paddingHorizontal: 18, gap: 12 }}
-            >
-              <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: o.color + "1a", alignItems: "center", justifyContent: "center" }}>
-                <o.Icon size={15} color={o.color} strokeWidth={2.3} />
-              </View>
-              <Text style={{ flex: 1, fontSize: 15, color: "#1a1a1a", fontWeight: "500" }}>{o.label}</Text>
-            </Pressable>
-          ))}
-        </AppleMenu>
+      {/* Export chooser — centered card (date-picker shell). Two roomy rows,
+          well separated, so the target is easy to hit on either platform. */}
+      <Modal visible={exportOpen} transparent animationType="fade" onRequestClose={() => setExportOpen(false)} statusBarTranslucent navigationBarTranslucent>
+        <Pressable onPress={() => setExportOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
+          <Pressable onPress={() => {}} style={{ width: "100%", maxWidth: 340, backgroundColor: "#fff", borderRadius: 24, padding: 18, gap: 10 }}>
+            <Text style={{ fontSize: 17, fontWeight: "800", color: "#1a1a1a", textAlign: "center", marginBottom: 4 }}>ส่งออกรายงาน</Text>
+            {([
+              { kind: "excel" as const, title: "Excel (.csv)", sub: "เปิดใน Excel / Google Sheets", Icon: FileSpreadsheet, color: "#0f7a3a" },
+              { kind: "pdf" as const, title: "PDF (.pdf)", sub: "พร้อมพิมพ์ / แชร์ไฟล์", Icon: FileText, color: "#dc2626" },
+            ]).map((o) => (
+              <Pressable
+                key={o.kind}
+                onPress={() => pickExport(o.kind)}
+                className="flex-row items-center active:opacity-80"
+                style={{ height: 62, borderRadius: 16, borderWidth: 1, borderColor: "#ececec", backgroundColor: "#fafafa", paddingHorizontal: 14, gap: 12 }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: o.color + "1a", alignItems: "center", justifyContent: "center" }}>
+                  <o.Icon size={20} color={o.color} strokeWidth={2.3} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 15.5, fontWeight: "700", color: "#1a1a1a" }}>{o.title}</Text>
+                  <Text numberOfLines={1} style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 1 }}>{o.sub}</Text>
+                </View>
+                <ChevronRight size={18} color="#c4c4c4" strokeWidth={2.4} />
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

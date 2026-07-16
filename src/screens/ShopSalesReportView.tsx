@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, Animated, Image, LayoutAnimation, Dimensions, Modal, useWindowDimensions, type ImageSourcePropType } from "react-native";
+import { View, Text, Pressable, Animated, Image, LayoutAnimation, Modal, ScrollView, useWindowDimensions, type ImageSourcePropType } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { DollarSign, ShoppingCart, FileText, TrendingUp, TrendingDown, BarChart3, Package, Percent, CheckCircle2, ChevronDown, Check, CalendarDays, type LucideIcon } from "lucide-react-native";
@@ -8,7 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { SalesChart, LegendPill, CHART_BLOCK_H } from "../components/SalesChart";
 import { SegmentedTabs } from "../components/SegmentedTabs";
-import { salesDateLabel, weekRangeLabel, type DateRange } from "../components/SalesDatePicker";
+import { salesDateLabel, weekRangeLabel, daysInMonth, ordDate, TH_SHORT, type DateRange, type DateSel } from "../components/SalesDatePicker";
 import {
   PERIODS,
   REPORT_DATA,
@@ -17,7 +17,7 @@ import {
   REGULAR_PRODUCTS,
   MARKET_PRODUCTS,
   SORT_OPTIONS,
-  groupedSales,
+  groupedSalesFromBuckets,
   sortLines,
   type SalesGroup,
   type SaleLine,
@@ -26,8 +26,9 @@ import {
   type Point,
   type SeriesKey,
 } from "../data/salesReport";
-import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, cardShadow } from "../theme/tokens";
 import { isTablet } from "../theme/layout";
+import { menuAnchor } from "../theme/menuAnchor";
 import { showToast } from "../components/Toast";
 import { exportSalesReportPDF, exportSalesReportExcel, type ReportExportData } from "../utils/reportExport";
 
@@ -269,12 +270,26 @@ export function SalesDonut({
       </View>
       </GestureDetector>
 
-      {/* Legend — tinted pills, series-colored text (web style) */}
-      <View className="flex-row" style={{ flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
-        {segs.map((s, i) => (
-          <LegendPill key={i} color={s.color} label={s.label} />
-        ))}
-      </View>
+      {/* Legend — tinted pills laid out in exactly TWO rows. A long bucket list
+          (e.g. a 30-day range) extends the rows to the right, so the user swipes
+          SIDEWAYS instead of the pills spilling past the fixed card height.
+          Even indices ride the top row, odd the bottom, so columns read
+          chronologically left→right. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={segs.length > 6}
+        style={{ alignSelf: "stretch", flexGrow: 0 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 10 }}
+      >
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {segs.filter((_, i) => i % 2 === 0).map((s) => <LegendPill key={s.label} color={s.color} label={s.label} />)}
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {segs.filter((_, i) => i % 2 === 1).map((s) => <LegendPill key={s.label} color={s.color} label={s.label} />)}
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -284,6 +299,23 @@ export function SalesDonut({
 // Deductions (ส่วนลด / GP) use the web table's warm negative tone — not the
 // urgency red, which Guidelines reserve for flash-sale/discount CTAs.
 const NEG = "#c2410c";
+
+// Money for the group-header summary — keeps everyday numbers exact (they fit),
+// and only abbreviates the big ones so the four stats never wrap and the card
+// height never changes: หลักแสน → พัน, หลักล้าน+ → ล้าน.
+function compactBaht(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "\u2212" : "";
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    const s = m >= 100 ? m.toFixed(0) : m >= 10 ? m.toFixed(1) : m.toFixed(2);
+    return `${sign}\u0e3f${s} \u0e25\u0e49\u0e32\u0e19`;
+  }
+  if (abs >= 100_000) {
+    return `${sign}\u0e3f${Math.round(abs / 1000).toLocaleString()} \u0e1e\u0e31\u0e19`;
+  }
+  return `${sign}\u0e3f${abs.toLocaleString()}`;
+}
 
 // Money summary stat — the PRIMARY content of a collapsed group card, so the
 // value uses the Guidelines price class (14+/600–700), label stays meta (10–11).
@@ -417,7 +449,7 @@ function SalesGroupBlock({ g, sort, wide, title }: { g: SalesGroup; sort: Produc
     <Pressable
       onPress={toggle}
       className="active:opacity-95"
-      style={{ backgroundColor: "white", borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}
+      style={{ backgroundColor: "white", borderRadius: 24, ...cardShadow() }}
     >
       {/* White card is the BASE layer; the green header (info + money summary)
           sits on top of it, white peeking below with the sale lines. */}
@@ -432,10 +464,10 @@ function SalesGroupBlock({ g, sort, wide, title }: { g: SalesGroup; sort: Produc
 
         {/* Money summary — white-on-green, inside the header */}
         <View className="flex-row" style={{ flexWrap: "wrap", columnGap: 18, rowGap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}>
-          <MiniStat onDark label="ยอดขาย" value={fmtBaht(g.sales)} />
-          <MiniStat onDark label="GP" value={`−${fmtBaht(g.gp)}`} />
-          <MiniStat onDark label="สุทธิ" value={fmtBaht(g.net)} />
-          <MiniStat onDark label="กำไร" value={`${fmtBaht(g.profit)} (${g.margin.toFixed(1)}%)`} />
+          <MiniStat onDark label="ยอดขาย" value={compactBaht(g.sales)} />
+          <MiniStat onDark label="GP" value={`−${compactBaht(g.gp)}`} />
+          <MiniStat onDark label="สุทธิ" value={compactBaht(g.net)} />
+          <MiniStat onDark label="กำไร" value={`${compactBaht(g.profit)} (${g.margin.toFixed(1)}%)`} />
         </View>
 
       </LinearGradient>
@@ -465,6 +497,81 @@ function SalesGroupBlock({ g, sort, wide, title }: { g: SalesGroup; sort: Produc
   );
 }
 
+// ── Date-range → report buckets ──────────────────────────────────────────────
+// Cards + chart are driven by a Point[] "bucket" list. A SINGLE point keeps the
+// period's fixed breakdown (a day → its hours, a year → its months). A RANGE fans
+// out to one bucket PER UNIT the user spanned — 16–20 ก.ค. → five DAY cards, not
+// the 04:00 / 08:00 hour cards. Buckets are synthesised deterministically so
+// every range renders stable mock data.
+const DAY_TOPS = ["ขมิ้นชันแคปซูล", "ฟ้าทะลายโจร", "น้ำผึ้งดอกลำไย", "ชาเก๊กฮวยออร์แกนิก", "ใบบัวบกแคปซูล", "น้ำมันมะพร้าวสกัดเย็น"];
+
+function makeDayPoint(day: number, month: number, year: number): Point {
+  // Deterministic per-date seed → stable sales/orders/… for that calendar day.
+  const seed = (day * 131 + month * 37 + (year % 100) * 7) % 997;
+  const sales = 2400 + ((seed * 53) % 2600);           // ฿2,400–5,000
+  const orders = Math.max(1, Math.round(sales / 250));
+  const units = Math.max(1, Math.round(sales / 95));
+  return {
+    label: `${day} ${TH_SHORT[month]}`,
+    sales,
+    orders,
+    visits: 45 + ((seed * 17) % 90),
+    newCust: seed % 5,
+    repeat: (seed >> 2) % 4,
+    units,
+    topProduct: DAY_TOPS[seed % DAY_TOPS.length],
+  };
+}
+
+/** One bucket per calendar day in [a, b] inclusive (capped for safety). */
+function dayBuckets(a: DateSel, b: DateSel): Point[] {
+  const out: Point[] = [];
+  let d = { ...a };
+  while (ordDate(d) <= ordDate(b) && out.length < 366) {
+    out.push(makeDayPoint(d.day, d.month, d.year));
+    const dim = daysInMonth(d.month, d.year);
+    if (d.day < dim) d = { ...d, day: d.day + 1 };
+    else if (d.month < 11) d = { day: 1, month: d.month + 1, year: d.year };
+    else d = { day: 1, month: 0, year: d.year + 1 };
+  }
+  return out;
+}
+
+/** One bucket per month in [a, b] inclusive — reuses the monthly breakdown. */
+function monthBuckets(a: DateSel, b: DateSel): Point[] {
+  const months = REPORT_DATA.monthly;
+  const crossYear = a.year !== b.year;
+  const out: Point[] = [];
+  let y = a.year, m = a.month;
+  while ((y < b.year || (y === b.year && m <= b.month)) && out.length < 60) {
+    const base = months[m] ?? months[0];
+    out.push({ ...base, label: crossYear ? `${TH_SHORT[m]} ${String(y).slice(-2)}` : TH_SHORT[m] });
+    if (m < 11) m += 1; else { m = 0; y += 1; }
+  }
+  return out;
+}
+
+/** One bucket per year in [a, b] inclusive — reuses the yearly breakdown. */
+function yearBuckets(a: DateSel, b: DateSel): Point[] {
+  const years = REPORT_DATA.yearly;
+  const out: Point[] = [];
+  for (let y = a.year; y <= b.year && out.length < 20; y++) {
+    const base = years.find((p) => p.label === String(y)) ?? years[years.length - 1];
+    out.push({ ...base, label: String(y) });
+  }
+  return out;
+}
+
+/** Range-aware buckets — single point keeps the period breakdown, a multi-unit
+ *  range fans out to one bucket per day / month / year. */
+function reportBuckets(period: Period, r: DateRange): Point[] {
+  if (ordDate(r.start) === ordDate(r.end)) return REPORT_DATA[period];  // single point
+  if (period === "daily") return dayBuckets(r.start, r.end);
+  if (period === "monthly") return monthBuckets(r.start, r.end);
+  if (period === "yearly") return yearBuckets(r.start, r.end);
+  return REPORT_DATA[period];  // weekly never ranges
+}
+
 /** รายงานผลยอดขาย — period KPIs + chart (one card) + product-sales table. */
 export function ShopSalesReportView({ period, setPeriod, dateSel, exportRef }: { period: Period; setPeriod: (p: Period) => void; dateSel: DateRange; exportRef?: { current: ((kind: "excel" | "pdf") => void) | null } }) {
   const [chartType, setChartType] = useState<"line" | "bar" | "pie">("line");
@@ -486,21 +593,25 @@ export function ShopSalesReportView({ period, setPeriod, dateSel, exportRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartType]);
 
-  const data = REPORT_DATA[period];
+  // Buckets follow the SELECTED DATE RANGE, not just the period tab: a single
+  // day → its hours, but 16–20 ก.ค. → one card per day. Drives cards, chart & KPI.
+  const data = useMemo(() => reportBuckets(period, dateSel), [period, dateSel]);
   const kpi = useMemo(() => computeKpi(data), [data]);
   const scope = salesDateLabel(period, dateSel);
-  // Groups follow the period tab: day → hours, month → weeks, year → months …
-  const groups = useMemo(() => groupedSales(period, cat === "regular" ? REGULAR_PRODUCTS : MARKET_PRODUCTS), [period, cat]);
+  const groups = useMemo(() => groupedSalesFromBuckets(data, cat === "regular" ? REGULAR_PRODUCTS : MARKET_PRODUCTS), [data, cat]);
   const lineCount = groups.reduce((s, g) => s + g.lines.length, 0);
   // The sort filter also orders the GROUP CARDS by their totals — otherwise
   // changing it has no visible effect while cards are collapsed. Titles are
   // stamped from the CHRONOLOGICAL index first (สัปดาห์ที่ 1 stays week 1).
+  const isRange = ordDate(dateSel.start) !== ordDate(dateSel.end);
   const displayGroups = useMemo(() => {
     const withTitle = groups.map((g, i) => ({
       g,
       title:
         period === "weekly" ? `สัปดาห์ที่ ${i + 1} (${weekRangeLabel(i, dateSel.start)})`
-        : period === "monthly" ? `${g.label} ${dateSel.start.year}`
+        // Month cards: single-point (12-month view) gets the year appended; a
+        // month RANGE already carries any needed year in g.label — leave it be.
+        : period === "monthly" && !isRange ? `${g.label} ${dateSel.start.year}`
         : undefined,
     }));
     // "ล่าสุด" — groups arrive chronological (oldest→newest); reverse to put
@@ -564,10 +675,7 @@ export function ShopSalesReportView({ period, setPeriod, dateSel, exportRef }: {
   const [sortAnchor, setSortAnchor] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 12 });
   const openSortMenu = () => {
     sortBtnRef.current?.measureInWindow((x, y, w, h) => {
-      const { width: ww, height: wh } = Dimensions.get("window");
-      const right = Math.max(12, ww - (x + w));
-      if (y > wh * 0.55) setSortAnchor({ bottom: wh - y + 6, right });
-      else setSortAnchor({ top: y + h + 6, right });
+      setSortAnchor(menuAnchor(x, y, w, h));
       setSortMounted(true);
       setSortOpen(true);
     });

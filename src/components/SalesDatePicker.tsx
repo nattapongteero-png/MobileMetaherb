@@ -12,7 +12,7 @@ export type DateSel = { day: number; month: number; year: number };
 /** Report scope — เริ่มต้น/สิ้นสุด. start === end means a single day/month/year. */
 export type DateRange = { start: DateSel; end: DateSel };
 
-const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+export const TH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const TH_FULL = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const YEARS = [2564, 2565, 2566, 2567, 2568, 2569];
 
@@ -45,7 +45,10 @@ export function weekRangeLabel(weekIdx: number, s: DateSel): string {
   return `${start}–${Math.min(start + 6, dim)} ${TH_SHORT[s.month]}`;
 }
 
-const daysInMonth = (month: number, beYear: number) => new Date(beYear - 543, month + 1, 0).getDate();
+export const daysInMonth = (month: number, beYear: number) => new Date(beYear - 543, month + 1, 0).getDate();
+
+/** Orderable scalar for a DateSel — exported for range iteration. */
+export const ordDate = (s: DateSel) => s.year * 10000 + s.month * 100 + s.day;
 
 // Endpoint pill caption — what one end of the range reads as, per period.
 function fmtPoint(period: Period, s: DateSel): string {

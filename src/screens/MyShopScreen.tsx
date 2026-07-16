@@ -1,4 +1,4 @@
-import { GLASS_BAR_TINT } from "../theme/tokens";
+import { GLASS_BAR_TINT, cardShadow, tintedCardShadow } from "../theme/tokens";
 import { glassTint } from "../theme/tokens";
 import { modalTopPad } from "../theme/layout";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -115,7 +115,8 @@ import { BottomSheet } from "../components/BottomSheet";
 import { Skeleton } from "../components/Skeleton";
 import { StickyFilterList } from "../components/StickyFilterList";
 import { SegmentedTabs } from "../components/SegmentedTabs";
-import { AppleMenu, AppleMenuItem, cardMenuAnchor, type CardMenuAnchor } from "../components/AppleMenu";
+import { AppleMenu, AppleMenuItem, type CardMenuAnchor } from "../components/AppleMenu";
+import { pointMenuAnchor } from "../theme/menuAnchor";
 import { useAllPromotions, computedStatus as promoStatus } from "../data/promotions";
 import { showToast } from "../components/Toast";
 import { GlassDatePicker } from "../components/GlassDatePicker";
@@ -4110,7 +4111,7 @@ export function FlashProductCard({ p, onMenu, dateText, width }: { p: FlashProdu
     setLabelW((prev) => Math.max(prev, w));
   };
   return (
-    <View style={{ width: width as any, borderRadius: 24, boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3 }}>
+    <View style={{ width: width as any, borderRadius: 24, ...cardShadow() }}>
     <LinearGradient colors={[st.color + "26", st.color + "12"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ borderRadius: 24 }}>
     <View style={{ backgroundColor: "white", borderRadius: 24, padding: 14, gap: 12 }}>
       {/* Header — image + name + price/-% + 3-dot */}
@@ -4435,7 +4436,13 @@ export function FlashSummaryCard({ products, events = FLASH_EVENTS, focusKey, on
             const cardOpacity = scrollX.interpolate({ inputRange: range, outputRange: [0.78, 1, 0.78], extrapolate: "clamp" });
             return (
               <View key={pg.key} style={{ paddingVertical: 24, zIndex: pi === activeIdx ? 2 : 1 }}>
-              <Animated.View style={{ width: cardW, borderRadius: 24, backgroundColor: "#fff", boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)", elevation: 3, opacity: pg.status === "none" ? 1 : cardOpacity, transform: [{ perspective: 900 }, { translateX: nudgeX }, { rotateY }, { scale }] }}>
+              {/* Android's elevation shadow doesn't follow a rotateY (cover-flow)
+                  transform — it pokes out from the side of the tilted neighbors.
+                  So elevate ONLY the focused card (rotateY≈0); neighbors carry no
+                  elevation and read clean. iOS is untouched: cardShadow ignores
+                  the elevation arg there and keeps its boxShadow on every card,
+                  which DOES rotate with the view. */}
+              <Animated.View style={{ width: cardW, borderRadius: 24, backgroundColor: "#fff", ...cardShadow(pi === activeIdx ? 3 : 0), opacity: pg.status === "none" ? 1 : cardOpacity, transform: [{ perspective: 900 }, { translateX: nudgeX }, { rotateY }, { scale }] }}>
                 {/* Same spacing rhythm as the original summary card: padding 14,
                     gap 8 between blocks, tight gap 2 inside the label+value pair */}
                 {/* Shop-RUN flash (ร้านจัดเอง) = brand green; the APP's rounds
@@ -4496,22 +4503,39 @@ export function FlashSummaryCard({ products, events = FLASH_EVENTS, focusKey, on
                      expo-blur's UIVisualEffectView (needs the dev client built
                      on/after 2026-07-08 — older clients lack ExpoBlur and
                      crash). Joining happens on the list-head CTA. */
-                  <View
-                    pointerEvents="none"
-                    style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, overflow: "hidden" }}
-                  >
-                    <BlurView
-                      intensity={16}
-                      tint="default"
-                      style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+                  <>
+                    {/* Obscure layer, clipped to the card. iOS gets a real
+                        backdrop blur (UIVisualEffectView). Android's live blur
+                        (Dimezis) samples the dark pill in front and paints a dark
+                        halo around it — so Android uses a flat frosted-white scrim
+                        instead: no live sampling, no halo, still hides the figures. */}
+                    <View
+                      pointerEvents="none"
+                      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, overflow: "hidden" }}
                     >
-                      {/* Dark pill lifts the label off the busy blurred red —
-                         plain white text was sinking into it. */}
-                      <View style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" }}>
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>ยังไม่เข้าร่วม</Text>
-                      </View>
-                    </BlurView>
-                  </View>
+                      <BlurView
+                        intensity={16}
+                        tint="default"
+                        // Real backdrop blur on both platforms — Android needs the
+                        // Dimezis method or it's a flat scrim. iOS ignores it.
+                        experimentalBlurMethod="dimezisBlurView"
+                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+                      />
+                    </View>
+                    {/* Label over the card. iOS: a glassy dark pill. Android:
+                        Dimezis blur casts a dark halo around ANY box laid over it,
+                        so there is NO box — just bold white text with a shadow, so
+                        nothing can halo while the label stays readable on the blur. */}
+                    <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+                      {Platform.OS === "android" ? (
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: "#fff", textShadowColor: "rgba(0,0,0,0.85)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>ยังไม่เข้าร่วม</Text>
+                      ) : (
+                        <View style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" }}>
+                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>ยังไม่เข้าร่วม</Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
                 ) : null}
               </Animated.View>
               </View>
@@ -4623,11 +4647,8 @@ export function FlashSaleSection({ insetsBottom = 16, month = 7, year = 2569 }: 
   // pattern as the coupon/promotion detail pages), not a bottom sheet.
   const openMenu = (p: FlashProduct, e: GestureResponderEvent) => {
     const { pageX, pageY } = e.nativeEvent;
-    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
-      const anchor = cardMenuAnchor(pageX, pageY, rx, ry, rw, rh);
-      setMenuAnchor(anchor);
-      setMenuFor(p);
-    });
+    setMenuAnchor(pointMenuAnchor(pageX, pageY));
+    setMenuFor(p);
   };
   const filters: { id: "all" | FlashStatus; label: string; Icon: typeof Package }[] = [
     { id: "all", label: "ทั้งหมด", Icon: Package },
@@ -4704,7 +4725,7 @@ export function FlashSaleSection({ insetsBottom = 16, month = 7, year = 2569 }: 
               <Pressable
                 onPress={() => setTermsFor(scopeEvent)}
                 className="active:opacity-85"
-                style={{ borderRadius: 24, boxShadow: "0px 6px 14px rgba(230,46,5,0.32)", elevation: 4 }}
+                style={{ borderRadius: 24, ...tintedCardShadow("0px 6px 14px rgba(230,46,5,0.32)") }}
               >
                 <LinearGradient
                   colors={["#e62e05", "rgba(230,46,5,0.82)"]}
@@ -4840,7 +4861,21 @@ export function FlashCardMenu({ product, anchor, onClose, onRemove, onEdit, onAd
 }) {
   const p = product;
   const joined = !!p && (!!p.eventId || p.discount > 0 || !!p.discountText);
+  // Host the morph menu in a full-screen translucent Modal so its overlay shares
+  // the SCREEN coordinate space that pointMenuAnchor measures against (an inline
+  // overlay filling this section mis-placed the upward "flip" menu). Keep the
+  // Modal mounted through the 160ms close so the collapse animation still plays.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    if (product) { setMounted(true); return; }
+    if (!mounted) return;
+    const t = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
+  if (!mounted) return null;
   return (
+    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
     <AppleMenu
       visible={!!p && !!anchor}
       onClose={onClose}
@@ -4863,6 +4898,7 @@ export function FlashCardMenu({ product, anchor, onClose, onRemove, onEdit, onAd
         </>
       ) : null}
     </AppleMenu>
+    </Modal>
   );
 }
 
@@ -4951,10 +4987,8 @@ export function ProductsManageSection({ type, setType, showSearch = true, insets
   // (same AppleMenu pattern as the Flash Sale cards).
   const openMenu = (p: PMProduct, e: GestureResponderEvent) => {
     const { pageX, pageY } = e.nativeEvent;
-    rootRef.current?.measureInWindow((rx, ry, rw, rh) => {
-      setMenuAnchor(cardMenuAnchor(pageX, pageY, rx, ry, rw, rh));
-      setMenuFor(p);
-    });
+    setMenuAnchor(pointMenuAnchor(pageX, pageY));
+    setMenuFor(p);
   };
 
   // Brief skeleton-load whenever the tab changes (or on first mount).
@@ -5304,7 +5338,19 @@ export function PMCardMenu({
   onDelete: (p: PMProduct) => void;
 }) {
   const p = product;
+  // Full-screen translucent Modal host — same reason as FlashCardMenu: the
+  // menu's overlay must share the screen coordinate space pointMenuAnchor uses.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    if (product) { setMounted(true); return; }
+    if (!mounted) return;
+    const t = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
+  if (!mounted) return null;
   return (
+    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
     <AppleMenu
       visible={!!p && !!anchor}
       onClose={onClose}
@@ -5334,6 +5380,7 @@ export function PMCardMenu({
         </>
       ) : null}
     </AppleMenu>
+    </Modal>
   );
 }
 
