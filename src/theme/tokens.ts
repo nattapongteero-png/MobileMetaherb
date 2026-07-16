@@ -31,18 +31,26 @@ export const SURFACE_GRAY = "#f5f5f5";
 export const BORDER_GRAY = "#e5e7eb";
 export const DIVIDER_GRAY = "#f0f0f0";
 
-// Floating action bars (the height-68 Liquid Glass pills): Android has no real
-// glass material, so they render opaque white there; iOS keeps the native glass.
+// Liquid Glass (UIGlassEffect) exists only on native iOS 26+; the web build of
+// expo-glass-effect also renders working glass. Android AND older iOS get the
+// same opaque "pill" fallback — fake glass lets content bleed through there.
 import { Platform, type ViewStyle } from "react-native";
-export const GLASS_BAR_TINT = Platform.OS === "android" ? "#ffffff" : undefined;
-// Circular glass chip buttons inside floating bars: opaque pastels on Android
-// (translucent tints let scrolled content bleed through); real tints on iOS.
-export const GLASS_CHIP_GREEN = Platform.OS === "android" ? "#eaf4ee" : "rgba(49,151,84,0.1)";
-export const GLASS_CHIP_AMBER = Platform.OS === "android" ? "#fbf1e2" : "rgba(219,139,10,0.1)";
-/** Per-site glass tint: the real translucent tint on iOS, an opaque (or near-
- *  opaque) stand-in on Android, where fake glass lets content bleed through. */
+export const LIQUID_GLASS =
+  Platform.OS === "web" ||
+  (Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26);
+
+// Floating action bars (the height-68 Liquid Glass pills): opaque white
+// wherever real glass is unavailable.
+export const GLASS_BAR_TINT = LIQUID_GLASS ? undefined : "#ffffff";
+// Circular glass chip buttons inside floating bars: real translucent tints
+// under Liquid Glass, opaque pastels elsewhere.
+export const GLASS_CHIP_GREEN = LIQUID_GLASS ? "rgba(49,151,84,0.1)" : "#eaf4ee";
+export const GLASS_CHIP_AMBER = LIQUID_GLASS ? "rgba(219,139,10,0.1)" : "#fbf1e2";
+/** Per-site glass tint: the real translucent tint under Liquid Glass, an
+ *  opaque (or near-opaque) stand-in everywhere else. Param names kept from
+ *  when the split was per-OS. */
 export const glassTint = (ios: string, android: string) =>
-  Platform.OS === "android" ? android : ios;
+  LIQUID_GLASS ? ios : android;
 
 /**
  * Card drop shadow — the report/flash cards' two-layer soft shadow.

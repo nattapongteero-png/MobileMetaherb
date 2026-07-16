@@ -41,7 +41,7 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { BottomFade } from "../components/BottomFade";
-import { BRAND_GREEN, TEXT_SECONDARY } from "../theme/tokens";
+import { BRAND_GREEN, LIQUID_GLASS, TEXT_SECONDARY } from "../theme/tokens";
 import { useActiveCouponCount } from "../data/coupons";
 import { useOrders } from "../context/OrderContext";
 import { useChat } from "../context/ChatContext";
@@ -236,10 +236,10 @@ function CafeFeatureCard({ onPress }: { onPress: () => void }) {
             glassEffectStyle="regular"
             colorScheme="light"
             isInteractive
-            style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingLeft: 14, paddingRight: 10, paddingVertical: 8, ...(Platform.OS === "android" && { backgroundColor: "#fff" }) }}
+            style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingLeft: 14, paddingRight: 10, paddingVertical: 8, ...(!LIQUID_GLASS && { backgroundColor: "#fff" }) }}
           >
-            <Text style={{ fontSize: 12, fontWeight: "700", color: Platform.OS === "android" ? "#0b3d2e" : "#fff" }}>สั่งเลย</Text>
-            <ChevronRight size={15} color={Platform.OS === "android" ? "#0b3d2e" : "#fff"} strokeWidth={2.6} />
+            <Text style={{ fontSize: 12, fontWeight: "700", color: !LIQUID_GLASS ? "#0b3d2e" : "#fff" }}>สั่งเลย</Text>
+            <ChevronRight size={15} color={!LIQUID_GLASS ? "#0b3d2e" : "#fff"} strokeWidth={2.6} />
           </GlassView>
         </LinearGradient>
       </Pressable>

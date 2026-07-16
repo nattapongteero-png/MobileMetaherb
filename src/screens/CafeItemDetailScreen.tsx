@@ -1,4 +1,4 @@
-import { GLASS_BAR_TINT } from "../theme/tokens";
+import { GLASS_BAR_TINT, LIQUID_GLASS } from "../theme/tokens";
 /**
  * META Caffe — menu item detail / customisation page.
  * Laid out like ProductDetailScreen: full-bleed square hero with a floating glass
@@ -227,7 +227,7 @@ export function CafeItemDetailScreen() {
         <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
           <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
             {/* Android glass shim = white circle → X must be dark there. */}
-            <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
+            <X size={20} color={!LIQUID_GLASS ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
           </GlassIconButton>
         </View>
       </Modal>

@@ -1,4 +1,4 @@
-import { GLASS_BAR_TINT, GLASS_CHIP_GREEN } from "../theme/tokens";
+import { GLASS_BAR_TINT, GLASS_CHIP_GREEN, LIQUID_GLASS } from "../theme/tokens";
 import { useMemo, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, Image, Animated, Dimensions, Modal, Platform, Alert } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1133,7 +1133,7 @@ export function TrialDetailScreen() {
           <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
             <GlassIconButton onPress={() => setViewerOpen(false)} accessibilityLabel="ปิด">
               {/* Android glass shim = white circle → X must be dark there. */}
-              <X size={20} color={Platform.OS === "android" ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
+              <X size={20} color={!LIQUID_GLASS ? "#1a1a1a" : "#ffffff"} strokeWidth={2.6} />
             </GlassIconButton>
           </View>
         </View>

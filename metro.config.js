@@ -39,12 +39,23 @@ const EXPO_GO_ONLY = {
   "expo-glass-effect": p("src/shims/glassEffect.tsx"),
 };
 
+// Native iOS dev builds serve ONE bundle to every iOS version, but Liquid
+// Glass / the native tab bar only exist on iOS 26+. These selector modules
+// pick real-vs-Android-pill at RUNTIME (theme/tokens LIQUID_GLASS); they reach
+// the real packages via subpath requires, which this bare-name alias skips.
+const IOS_RUNTIME_SELECT = {
+  "expo-glass-effect": p("src/shims/glassEffectIOS.tsx"),
+  "@bottom-tabs/react-navigation": p("src/shims/bottomTabsNavigationIOS.tsx"),
+  "react-native-bottom-tabs": p("src/shims/bottomTabsIOS.ts"),
+};
+
 function resolveShim(moduleName, platform) {
   const isWeb = platform === "web";
   if (BOTTOM_TABS[moduleName] && (isWeb || EXPO_GO)) return BOTTOM_TABS[moduleName];
   if (BOTTOM_TABS_ANDROID[moduleName] && platform === "android") return BOTTOM_TABS_ANDROID[moduleName];
   if (WEB_ONLY[moduleName] && isWeb) return WEB_ONLY[moduleName];
   if (EXPO_GO_ONLY[moduleName] && (EXPO_GO || platform === "android")) return EXPO_GO_ONLY[moduleName];
+  if (IOS_RUNTIME_SELECT[moduleName] && platform === "ios" && !EXPO_GO) return IOS_RUNTIME_SELECT[moduleName];
   return null;
 }
 

@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 import type { CafeCartLine } from "../data/cafeCart";
 import type { CafePayMethodId, CafeFavorite } from "../data/cafePayment";
 import { startOrderLiveActivity, endOrderLiveActivity, reconcileOrderLiveActivities } from "../services/cafeLiveActivity";
+import { startOrderLiveNotification, endOrderLiveNotification } from "../services/cafeLiveNotification";
 import { scheduleCafeReadyNotification, cancelCafeReadyNotification } from "../services/cafeNotify";
 import { useStore } from "../store/db";
 import {
@@ -112,15 +113,19 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
     setLines([]);
     const first = order.items[0];
     const itemsLabel = first ? (order.items.length > 1 ? `${first.name} +${order.items.length - 1}` : first.name) : "ออเดอร์กาแฟ";
-    // iOS Live Activity (Dynamic Island) countdown — no-op elsewhere.
-    startOrderLiveActivity({
+    const live = {
       orderId: order.orderId,
       queueNo: order.queueNo,
       queueAhead: order.queueAhead,
       itemsLabel,
       startedAt: order.readyAt - order.waitMinutes * 60000,
       readyAt: order.readyAt,
-    });
+    };
+    // iOS Live Activity (Dynamic Island) countdown — no-op elsewhere.
+    startOrderLiveActivity(live);
+    // Android stand-in: sticky "preparing" card pinned until the ready push
+    // (same identifier) replaces it. No-op elsewhere.
+    startOrderLiveNotification(live);
     // Local "ready" push at readyAt (fires even if the app is closed).
     void scheduleCafeReadyNotification({ orderId: order.orderId, readyAt: order.readyAt, queueNo: order.queueNo, itemsLabel });
   };
@@ -128,6 +133,7 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
   const completeOrder: Ctx["completeOrder"] = (orderId) => {
     if (!completeCafeOrder(orderId)) return;
     endOrderLiveActivity(orderId);
+    endOrderLiveNotification(orderId);
     // Picked up — cancel the pending "ready" push if it hasn't fired yet.
     void cancelCafeReadyNotification(orderId);
   };
