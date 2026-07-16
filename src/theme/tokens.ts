@@ -34,7 +34,7 @@ export const DIVIDER_GRAY = "#f0f0f0";
 // Liquid Glass (UIGlassEffect) exists only on native iOS 26+; the web build of
 // expo-glass-effect also renders working glass. Android AND older iOS get the
 // same opaque "pill" fallback — fake glass lets content bleed through there.
-import { Platform } from "react-native";
+import { Platform, type ViewStyle } from "react-native";
 export const LIQUID_GLASS =
   Platform.OS === "web" ||
   (Platform.OS === "ios" && parseInt(String(Platform.Version), 10) >= 26);
@@ -51,3 +51,30 @@ export const GLASS_CHIP_AMBER = LIQUID_GLASS ? "rgba(219,139,10,0.1)" : "#fbf1e2
  *  when the split was per-OS. */
 export const glassTint = (ios: string, android: string) =>
   LIQUID_GLASS ? ios : android;
+
+/**
+ * Card drop shadow — the report/flash cards' two-layer soft shadow.
+ *
+ * iOS renders the CSS `boxShadow` string faithfully. Android's boxShadow is
+ * buggy under `transform` (the summary carousel's rotateY/scale threw the
+ * shadow off the card) AND the cards also carried `elevation`, so Android drew
+ * the shadow twice. So: keep the exact boxShadow on iOS, and give Android the
+ * native `elevation` alone — same split the teammate's Android glass sweep used.
+ */
+export const cardShadow = (elevation = 3): ViewStyle =>
+  Platform.OS === "ios"
+    ? ({ boxShadow: "0px 2px 4px rgba(0,0,0,0.15), 0px 6px 12px rgba(0,0,0,0.08)" } as ViewStyle)
+    // Android draws the elevation shadow from the view's OWN rounded outline, so
+    // the shadow-casting view needs an opaque background (a transparent wrapper
+    // casts a square shadow that misses the card). Every cardShadow consumer is
+    // a white card, so backing it with white is safe and gives a correct shadow.
+    : { elevation, backgroundColor: "#fff" };
+
+/**
+ * Colored shadow (join CTA). iOS renders the colored boxShadow. Android's
+ * elevation can't do a coloured shadow and draws a hard, square-ish light halo
+ * on a prominent button — worse than none — so the button stays flat there,
+ * matching how the teammate's Android sweep treats coloured CTAs.
+ */
+export const tintedCardShadow = (boxShadow: string): ViewStyle =>
+  Platform.OS === "ios" ? ({ boxShadow } as ViewStyle) : {};

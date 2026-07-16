@@ -179,8 +179,11 @@ export type SalesGroup = {
   margin: number;
 };
 
-export function groupedSales(period: Period, list: SalesProduct[]): SalesGroup[] {
-  const buckets = REPORT_DATA[period].filter((b) => b.sales > 0);
+/** Build sale-line groups from an EXPLICIT bucket list (one card per bucket) —
+ * lets callers drive the buckets off the selected date range (per-day / per-month
+ * / per-year) instead of the fixed period breakdown. */
+export function groupedSalesFromBuckets(rawBuckets: Point[], list: SalesProduct[]): SalesGroup[] {
+  const buckets = rawBuckets.filter((b) => b.sales > 0);
   return buckets.map((b, gi) => {
     const count = Math.min(list.length, 3 + ((gi + list.length) % 3));
     const lines: SaleLine[] = [];
@@ -212,6 +215,11 @@ export function groupedSales(period: Period, list: SalesProduct[]): SalesGroup[]
       margin: sales > 0 ? (profit / sales) * 100 : 0,
     };
   });
+}
+
+/** Default breakdown for a period tab (day → hours, month → weeks, …). */
+export function groupedSales(period: Period, list: SalesProduct[]): SalesGroup[] {
+  return groupedSalesFromBuckets(REPORT_DATA[period], list);
 }
 
 /** เรียงในกลุ่ม — same sort keys as the flat table, applied per group. */

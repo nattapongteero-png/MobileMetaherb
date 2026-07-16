@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import Svg, { Rect, Line, Circle, Path, Text as SvgText } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
@@ -75,7 +75,15 @@ export function SalesChart({ data, type, series = DEFAULT_SERIES, onSelect }: { 
   const n = data.length;
   const pMax = Math.max(1, ...data.map((d) => d[p.key] as number));
   const sMax = Math.max(1, ...data.map((d) => d[sec.key] as number));
-  const step = n > 0 ? plotW / n : plotW;
+  // When points get denser than MIN_STEP they'd squish into an unreadable smear
+  // (a 30-day range in ~330px). Past that, switch to a horizontally scrollable
+  // chart — fixed step per point on a wider canvas — with the Y axes pinned.
+  const MIN_STEP = 54;
+  const fitStep = n > 0 ? plotW / n : plotW;
+  const scrollable = w > 0 && n > 0 && fitStep < MIN_STEP;
+  const step = scrollable ? MIN_STEP : fitStep;
+  const innerW = scrollable ? padL + padR + step * n : w;
+  const showAxisText = !scrollable; // pinned overlays draw the axes in scroll mode
   const cx = (i: number) => padL + step * i + step / 2;
   const yP = (v: number) => padT + plotH - (v / pMax) * plotH;
   const yS = (v: number) => padT + plotH - (v / sMax) * plotH;
@@ -123,24 +131,39 @@ export function SalesChart({ data, type, series = DEFAULT_SERIES, onSelect }: { 
 
   // Tooltip placement — follows the point, clamped inside the chart width.
   const TIP_W = 172;
-  const tipLeft = activeIdx != null ? Math.max(2, Math.min(w - TIP_W - 2, cx(activeIdx) - TIP_W / 2)) : 0;
+  const tipLeft = activeIdx != null ? Math.max(2, Math.min((scrollable ? innerW : w) - TIP_W - 2, cx(activeIdx) - TIP_W / 2)) : 0;
 
-  return (
-    // Fixed block height (shared with SalesDonut) so switching chart tabs
-    // never shifts the layout below the card.
-    <View style={{ height: CHART_BLOCK_H }}>
-      <GestureDetector gesture={gesture}>
-      <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+  // Pinned Y-axis gutter — in scroll mode the axis ticks are drawn here (fixed,
+  // white background) so the ฿ / order scale stays readable while the plot scrolls.
+  const AxisGutter = ({ side }: { side: "left" | "right" }) => (
+    <View pointerEvents="none" style={{ position: "absolute", top: 0, [side]: 0, width: side === "left" ? padL : padR, height: H, backgroundColor: "#fff" }}>
+      <Svg width={side === "left" ? padL : padR} height={H}>
+        {fracs.map((f, i) => {
+          const gy = padT + plotH - f * plotH;
+          return side === "left"
+            ? <SvgText key={i} x={padL - 6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="end">{fmtLeft(f * pMax)}</SvgText>
+            : <SvgText key={i} x={6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="start">{Math.round(f * sMax)}</SvgText>;
+        })}
+      </Svg>
+    </View>
+  );
+
+  const chartContent = (
+    <View style={{ width: innerW }}>
         {w > 0 ? (
-          <Svg width={w} height={H}>
+          <Svg width={innerW} height={H}>
             {/* Grid + dual axis labels (web: #eef2f6 dashed, ticks #94a3b8) */}
             {fracs.map((f, i) => {
               const gy = padT + plotH - f * plotH;
               return (
                 <Fragment key={`g${i}`}>
-                  <Line x1={padL} y1={gy} x2={w - padR} y2={gy} stroke="#eef2f6" strokeWidth={1} strokeDasharray="4 6" />
-                  <SvgText x={padL - 6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="end">{fmtLeft(f * pMax)}</SvgText>
-                  <SvgText x={w - padR + 6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="start">{Math.round(f * sMax)}</SvgText>
+                  <Line x1={padL} y1={gy} x2={innerW - padR} y2={gy} stroke="#eef2f6" strokeWidth={1} strokeDasharray="4 6" />
+                  {showAxisText ? (
+                    <>
+                      <SvgText x={padL - 6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="end">{fmtLeft(f * pMax)}</SvgText>
+                      <SvgText x={innerW - padR + 6} y={gy + 3} fontSize={9} fill="#94a3b8" textAnchor="start">{Math.round(f * sMax)}</SvgText>
+                    </>
+                  ) : null}
                 </Fragment>
               );
             })}
@@ -229,7 +252,24 @@ export function SalesChart({ data, type, series = DEFAULT_SERIES, onSelect }: { 
           </View>
         ) : null}
       </View>
-      </GestureDetector>
+  );
+
+  return (
+    // Fixed block height (shared with SalesDonut) so switching chart tabs
+    // never shifts the layout below the card.
+    <View style={{ height: CHART_BLOCK_H }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {scrollable ? (
+        // Dense data → horizontal scroll, with both Y axes pinned over the edges.
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator scrollEventThrottle={16}>
+            <GestureDetector gesture={gesture}>{chartContent}</GestureDetector>
+          </ScrollView>
+          {AxisGutter({ side: "left" })}
+          {AxisGutter({ side: "right" })}
+        </View>
+      ) : (
+        <GestureDetector gesture={gesture}>{chartContent}</GestureDetector>
+      )}
 
       <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
         <LegendPill color={p.color} label={p.label} />

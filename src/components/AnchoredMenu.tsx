@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
-import { View, Pressable, Modal, StyleSheet, Dimensions } from "react-native";
+import { View, Pressable, Modal, StyleSheet } from "react-native";
+import { menuAnchor } from "../theme/menuAnchor";
 
 export type Anchor = { x: number; width: number; top?: number; bottom?: number };
 
@@ -16,9 +17,10 @@ export function useAnchoredMenu() {
 
   const openMenu = () => {
     ref.current?.measureInWindow((x, y, w, h) => {
-      const wh = Dimensions.get("window").height;
-      if (y > wh * 0.55) setAnchor({ x, width: w, bottom: wh - y + 6 });
-      else setAnchor({ x, width: w, top: y + h + 6 });
+      // Same screen-based anchor the report menus use — window height on Android
+      // excludes the nav bar and made the upward menu overlap its trigger.
+      const a = menuAnchor(x, y, w, h);
+      setAnchor({ x, width: w, top: a.top, bottom: a.bottom });
       setOpen(true);
     });
   };
