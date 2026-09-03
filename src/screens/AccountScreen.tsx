@@ -35,6 +35,7 @@ import {
   Sparkles,
   Bell,
   Crown,
+  Coffee,
   Camera,
   PackageCheck,
   CircleCheckBig,
@@ -303,7 +304,8 @@ export function AccountScreen() {
       | "BrandRegister"
       | "NotificationTest"
       | "MyShop"
-      | "Cafe",
+      | "Cafe"
+      | "CafeAdmin",
   ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
   };
@@ -554,6 +556,9 @@ export function AccountScreen() {
                 <MenuList
                   items={[
                     { label: "แดชบอร์ดร้านค้า", Icon: Store, onPress: () => go("MyShop") },
+                    // META Caffe is run centrally by Metaherb — its back office
+                    // (ตาราง 17) lives outside the seller console.
+                    { label: "หลังบ้าน Meta Cafe", Icon: Coffee, onPress: () => go("CafeAdmin") },
                     ...(isTrialBrand ? [{ label: "จัดการแบรนด์ทดสอบ", Icon: FlaskConical, onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดแบรนด์ทดสอบ กำลังพัฒนา") }] : []),
                   ]}
                 />

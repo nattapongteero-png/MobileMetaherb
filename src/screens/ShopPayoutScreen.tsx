@@ -28,13 +28,13 @@ import type { RootStackParamList } from "../navigation/RootStack";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // View-only by default; the pencil opens a native page-sheet to edit (same pattern as ShopAccount).
-const INPUT = { minHeight: 50, backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: "#374151" } as const;
+export const PAYOUT_INPUT = { minHeight: 50, backgroundColor: "#f5f5f5", borderRadius: 999, paddingHorizontal: 18, paddingVertical: 12, fontSize: 15, color: "#374151" } as const;
 
-function FieldLabel({ children }: { children: string }) {
+export function FieldLabel({ children }: { children: string }) {
   return <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{children}</Text>;
 }
 
-function Section({ title, right, children }: { title?: string; right?: ReactNode; children: ReactNode }) {
+export function Section({ title, right, children }: { title?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <View className="bg-white" style={{ marginTop: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
       {title ? (
@@ -48,7 +48,7 @@ function Section({ title, right, children }: { title?: string; right?: ReactNode
   );
 }
 
-function EditIconButton({ onPress }: { onPress: () => void }) {
+export function EditIconButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} accessibilityLabel="แก้ไข" className="items-center justify-center active:opacity-60" style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#f3f3f3" }}>
       <Pencil size={16} color={TEXT_SECONDARY} strokeWidth={2.2} />
@@ -56,7 +56,7 @@ function EditIconButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-function ViewRow({ label, value }: { label: string; value: string }) {
+export function ViewRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ gap: 3 }}>
       <FieldLabel>{label}</FieldLabel>
@@ -65,7 +65,7 @@ function ViewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
+export function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClose: () => void; onSave: () => void; canSave: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     // Android: clear the status bar (iOS modal card already starts below it)
@@ -82,7 +82,7 @@ function SheetHeader({ title, onClose, onSave, canSave }: { title: string; onClo
 }
 
 // Bank badge — real logo on white (from data/bankAccounts), or the colored fallback badge.
-function BankBadge({ code, size }: { code: string; size: number }) {
+export function BankBadge({ code, size }: { code: string; size: number }) {
   const b = bankByCode(code);
   const logo = bankLogo(code);
   return (
@@ -113,7 +113,7 @@ function CardChip() {
 }
 
 // Bankbook / passbook visual — bank-color gradient card (mirrors the web owner console).
-function BankCard({ code, accountNo, accountName, verified = true }: { code: string; accountNo: string; accountName: string; verified?: boolean }) {
+export function BankCard({ code, accountNo, accountName, verified = true }: { code: string; accountNo: string; accountName: string; verified?: boolean }) {
   const b = bankByCode(code);
   const logo = bankLogo(code);
   return (
@@ -244,7 +244,7 @@ export function ShopPayoutScreen() {
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
             <View style={{ gap: 6 }}>
               <FieldLabel>ธนาคาร</FieldLabel>
-              <Pressable onPress={() => setBankOpen(true)} className="flex-row items-center active:opacity-80" style={[INPUT, { gap: 10 }]}>
+              <Pressable onPress={() => setBankOpen(true)} className="flex-row items-center active:opacity-80" style={[PAYOUT_INPUT, { gap: 10 }]}>
                 <BankBadge code={dBankCode} size={28} />
                 <Text style={{ flex: 1, fontSize: 15, color: "#374151" }}>{`${dBank.name} (${dBank.code})`}</Text>
                 <ChevronDown size={18} color="#9ca3af" />
@@ -252,15 +252,15 @@ export function ShopPayoutScreen() {
             </View>
             <View style={{ gap: 6 }}>
               <FieldLabel>ชื่อบัญชี</FieldLabel>
-              <TextInput value={dName} onChangeText={setDName} placeholder="ชื่อตามสมุดบัญชี" placeholderTextColor="#a3a3a3" style={INPUT} />
+              <TextInput value={dName} onChangeText={setDName} placeholder="ชื่อตามสมุดบัญชี" placeholderTextColor="#a3a3a3" style={PAYOUT_INPUT} />
             </View>
             <View style={{ gap: 6 }}>
               <FieldLabel>เลขที่บัญชี</FieldLabel>
-              <TextInput value={dNo} onChangeText={(t) => setDNo(t.replace(/[^0-9]/g, ""))} placeholder="ระบุเลขบัญชี" placeholderTextColor="#a3a3a3" keyboardType="number-pad" maxLength={15} style={INPUT} />
+              <TextInput value={dNo} onChangeText={(t) => setDNo(t.replace(/[^0-9]/g, ""))} placeholder="ระบุเลขบัญชี" placeholderTextColor="#a3a3a3" keyboardType="number-pad" maxLength={15} style={PAYOUT_INPUT} />
             </View>
             <View style={{ gap: 6 }}>
               <FieldLabel>สาขา</FieldLabel>
-              <TextInput value={dBranch} onChangeText={setDBranch} placeholder="เช่น สำนักงานใหญ่" placeholderTextColor="#a3a3a3" style={INPUT} />
+              <TextInput value={dBranch} onChangeText={setDBranch} placeholder="เช่น สำนักงานใหญ่" placeholderTextColor="#a3a3a3" style={PAYOUT_INPUT} />
             </View>
           </ScrollView>
 

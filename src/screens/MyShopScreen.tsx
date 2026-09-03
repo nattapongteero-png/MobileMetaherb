@@ -4044,7 +4044,7 @@ const FS_MUTED = "rgba(0,0,0,0.6)"; // stat labels / units
 const FS_DOT_GRAY = "#cdcdcd";     // "remaining" dot
 
 // Sold ring — white arc = sold/total over a translucent track (on the dark-green footer).
-function FlashRing({ pct, size, color = FLASH_ORANGE }: { pct: number; size: number; color?: string }) {
+export function FlashRing({ pct, size, color = FLASH_ORANGE }: { pct: number; size: number; color?: string }) {
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -4072,7 +4072,7 @@ function FSHeaderPill({ children, color }: { children: ReactNode; color: string 
 }
 
 // One stat column (label + value + unit). `light` = white text for dark/colored bg.
-function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; label: string; value: string; unit: string; onLayout?: (e: LayoutChangeEvent) => void; light?: boolean }) {
+export function FSStat({ dot, label, value, unit, onLayout, light }: { dot?: string; label: string; value: string; unit: string; onLayout?: (e: LayoutChangeEvent) => void; light?: boolean }) {
   const muted = light ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.5)";
   const strong = light ? "#ffffff" : "#0a0a0a";
   return (

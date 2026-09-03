@@ -16,6 +16,8 @@ import { seedPromotions } from "./promotions";
 import { seedComplaints } from "./complaints";
 import { seedTrials } from "./trials";
 import { seedCafeOrders } from "./cafe";
+import "./cafeMembers";
+import "./cafeAdmin"; // register the café back-office store for hydration
 import { seedChat } from "./chat";
 import { seedPrefs } from "./prefs";
 import { sessionStore, DEMO_USER } from "./session";
@@ -28,6 +30,7 @@ import { SEED_FLASH } from "../data/flashSeed";
 import { SHOP_COMPLAINTS } from "../data/shopComplaints";
 import { TRIAL_REGISTRATIONS } from "../data/trialRegistrations";
 import { INITIAL_CAFE_HISTORY } from "../data/cafePayment";
+import { CAFE_SALES_SEED } from "../data/cafeSalesSeed";
 import { SEED_MESSAGES, SEED_THREADS } from "../data/chatSeed";
 import { INITIAL_ADDRESSES } from "../data/addresses";
 import { ALL_PRODUCTS } from "../data/catalog";
@@ -47,7 +50,8 @@ seedCoupons(SEED_COUPONS, SEED_WALLET);
 seedPromotions(SEED_PROMOTIONS, SEED_FLASH);
 seedComplaints(SHOP_COMPLAINTS);
 seedTrials(TRIAL_REGISTRATIONS);
-seedCafeOrders(INITIAL_CAFE_HISTORY);
+// The customer's own past orders + a year of counter sales behind the report.
+seedCafeOrders([...INITIAL_CAFE_HISTORY, ...CAFE_SALES_SEED]);
 seedChat(SEED_THREADS, SEED_MESSAGES);
 seedPrefs({
   // A few liked products so the wishlist isn't empty on a fresh install.
@@ -78,7 +82,7 @@ const SEED_VERSION_KEY = "mh.seedVersion";
  * mockup with a live-looking dashboard that is the right trade; within a day,
  * orders they place, coupons they collect and addresses they type all persist.
  */
-const SEED_SCHEMA = "5";
+const SEED_SCHEMA = "6";
 const seedDay = new Date(SEED_TODAY).toISOString().slice(0, 10);
 export const SEED_VERSION = `${SEED_SCHEMA}@${seedDay}`;
 

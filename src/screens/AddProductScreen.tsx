@@ -169,7 +169,7 @@ function MultiChip({ options, values, onToggle }: { options: string[]; values: s
 }
 
 // Settings card — gradient + icon circle + toggle + decorative image (web parity).
-export function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, image }: { Icon: typeof Package; label: string; subtitle: string; value: boolean; onValueChange: (v: boolean) => void; accent: string; image?: number }) {
+export function SettingCard({ Icon, label, subtitle, value, onValueChange, accent, image }: { Icon: typeof Package; label: string; subtitle?: string; value: boolean; onValueChange: (v: boolean) => void; accent: string; image?: number }) {
   return (
     <View style={{ borderRadius: 20, padding: 18, overflow: "hidden", borderWidth: 1, borderColor: value ? accent + "33" : "#f0f0f0", backgroundColor: value ? undefined : "#fafafa" }}>
       {value ? (
@@ -188,10 +188,12 @@ export function SettingCard({ Icon, label, subtitle, value, onValueChange, accen
         </View>
         <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#e9e9ea", true: "#34c759" }} thumbColor="#fff" ios_backgroundColor="#e9e9ea" />
       </View>
-      <View className="flex-row items-start" style={{ gap: 5, marginTop: 10, paddingRight: 78 }}>
-        <AlertCircle size={13} color="#bdbdbd" strokeWidth={2.2} style={{ marginTop: 1 }} />
-        <Text style={{ flex: 1, fontSize: 12, color: GRAY, lineHeight: 17 }}>{subtitle}</Text>
-      </View>
+      {subtitle ? (
+        <View className="flex-row items-start" style={{ gap: 5, marginTop: 10, paddingRight: 78 }}>
+          <AlertCircle size={13} color="#bdbdbd" strokeWidth={2.2} style={{ marginTop: 1 }} />
+          <Text style={{ flex: 1, fontSize: 12, color: GRAY, lineHeight: 17 }}>{subtitle}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
