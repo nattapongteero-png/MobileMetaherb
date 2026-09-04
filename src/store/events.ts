@@ -32,6 +32,8 @@ export type AppEventType =
   | "cafe_order_placed"
   | "cafe_order_ready"
   | "cafe_order_rated"
+  | "cafe_order_late"
+  | "cafe_points_redeemed"
   | "chat_message";
 
 /** Who should see this in their notification feed. */

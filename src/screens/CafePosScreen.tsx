@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, useWindowDimensions, Share, Modal } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, useWindowDimensions, Share, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import QRCode from "react-native-qrcode-svg";
-import { Banknote, Check, ChevronLeft, Coffee, Gift, ListOrdered, Minus, PauseCircle, Plus, QrCode, ReceiptText, Search, Share2, Trash2, UserRound, X, Zap } from "lucide-react-native";
+import { Banknote, Check, ChevronLeft, Coffee, Gift, ListOrdered, Minus, PauseCircle, Plus, QrCode, ReceiptText, Search, Share2, Trash2, UserRound, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassActionBar, PrimaryAction } from "../components/GlassActionBar";
@@ -23,8 +23,11 @@ import { activeCafeMenu, resolveOptionGroups, type AdminCafeItem } from "../data
 import { CAFE_SUBS } from "../data/cafeMenu";
 import { METAHERB_SHOP } from "../data/shopOrders";
 import { promptPayPayload, MERCHANT_PROMPTPAY, MERCHANT_NAME } from "../utils/promptpay";
+import { MemberCard, matchesMember } from "./CafeMembersScreen";
+import { FieldLabel, PAYOUT_INPUT } from "./ShopPayoutScreen";
 import {
   cafeMemberStore,
+  cafeMembers,
   cafePointRule,
   memberByPhone,
   memberById,
@@ -299,6 +302,8 @@ export function CafePosScreen() {
   const pointRule = cafePointRule(memberState);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [memberOpen, setMemberOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [memberQuery, setMemberQuery] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [memberName, setMemberName] = useState("");
   const [redeeming, setRedeeming] = useState(false);
@@ -324,13 +329,45 @@ export function CafePosScreen() {
   }, [count]);
 
   /** เจอเบอร์ = ผูกสมาชิก, ไม่เจอ = สมัครให้เลยตรงเคาน์เตอร์. */
+  // Search results — capped, because the sheet is a picker, not a directory.
+  const memberHits = cafeMembers(memberState)
+    .filter((m) => matchesMember(m, memberQuery))
+    .slice(0, 8);
+
+  const closeMemberSheet = () => {
+    setMemberOpen(false);
+    setMemberQuery("");
+  };
+
+  const openAddMember = () => {
+    // Carry a typed phone number over, so nothing is retyped.
+    setPhoneInput(memberQuery.replace(/[^0-9]/g, "").slice(0, 10));
+    setMemberName("");
+    // Close the picker sheet: the page takes over the whole checkout surface.
+    setMemberOpen(false);
+    setAddMemberOpen(true);
+  };
+
+  /** Cancelling the page hands the counter back to the picker it came from. */
+  const cancelAddMember = () => {
+    setAddMemberOpen(false);
+    setMemberOpen(true);
+  };
+
+  const pickMember = (m: { id: string; name: string }) => {
+    setMemberId(m.id);
+    closeMemberSheet();
+    showToast(`สมาชิก ${m.name}`, "info");
+  };
+
   const attachMember = () => {
     const phone = phoneInput.replace(/[^0-9]/g, "");
     if (phone.length !== 10) { showToast("กรอกเบอร์ 10 หลัก", "error"); return; }
     const found = memberByPhone(phone, memberState);
     const m = found ?? addCafeMember({ phone, name: memberName.trim() || `คุณ ${phone.slice(-4)}` });
     setMemberId(m.id);
-    setMemberOpen(false);
+    setAddMemberOpen(false);
+    closeMemberSheet();
     setPhoneInput("");
     setMemberName("");
     showToast(found ? `สมาชิก ${m.name} · ${usablePoints(m, pointRule)} แต้ม` : `สมัครสมาชิกให้แล้ว · ${m.name}`, "info");
@@ -464,10 +501,11 @@ export function CafePosScreen() {
       readyAt: now + waitMinutes * 60000,
     });
     // Redeem first (it consumes the full card), then earn from this purchase —
-    // the order matters, otherwise today's cups could pay for today's free one.
+    // the order matters, otherwise today's visit could pay for today's free one.
+    // One bill = one point, however many cups are on it.
     if (memberId) {
       if (redeeming && discount > 0) redeemPoints(memberId, `POS-${now}`);
-      earnPoints(memberId, cups, `POS-${now}`);
+      earnPoints(memberId, `POS-${now}`);
     }
     setMemberId(null);
     setRedeeming(false);
@@ -689,41 +727,6 @@ export function CafePosScreen() {
         </ScrollView>
       </BottomSheet>
 
-      {/* กรอกเบอร์สมาชิก — found = attach, not found = sign them up on the spot */}
-      <BottomSheet visible={memberOpen} onClose={() => setMemberOpen(false)} title="สมาชิก" centerTitle>
-        <View style={{ paddingHorizontal: 16, gap: 14, paddingBottom: 8 }}>
-          <View>
-            <Text style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 7 }}>เบอร์โทรศัพท์</Text>
-            <TextInput
-              value={phoneInput}
-              onChangeText={(t) => setPhoneInput(t.replace(/[^0-9]/g, ""))}
-              placeholder="08xxxxxxxx"
-              placeholderTextColor="#a3a3a3"
-              keyboardType="number-pad"
-              maxLength={10}
-              autoFocus
-              style={{ backgroundColor: "#fafafa", borderRadius: 999, paddingHorizontal: 18, height: 48, fontSize: 15, color: "#0a0a0a" }}
-            />
-          </View>
-          {phoneInput.length === 10 && !memberByPhone(phoneInput, memberState) ? (
-            <View>
-              <Text style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 7 }}>ชื่อ (สมาชิกใหม่)</Text>
-              <TextInput
-                value={memberName}
-                onChangeText={setMemberName}
-                placeholder="ชื่อที่ใช้เรียกลูกค้า"
-                placeholderTextColor="#a3a3a3"
-                style={{ backgroundColor: "#fafafa", borderRadius: 999, paddingHorizontal: 18, height: 48, fontSize: 15, color: "#0a0a0a" }}
-              />
-            </View>
-          ) : null}
-          <PrimaryAction
-            label={phoneInput.length === 10 && memberByPhone(phoneInput, memberState) ? "ใช้สมาชิกนี้" : "สมัครและใช้เลย"}
-            onPress={attachMember}
-            disabled={phoneInput.length !== 10}
-          />
-        </View>
-      </BottomSheet>
 
       {/* Checkout — a full screen, not a sheet. Taking money is a mode the
           cashier is IN: it wants the whole display (the QR and the cash pad are
@@ -816,7 +819,7 @@ export function CafePosScreen() {
                   {member ? member.name : "สมาชิก"}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>
-                  {member ? `${memberPoints} แต้ม · แตะเพื่อเอาออก` : "กรอกเบอร์เพื่อสะสมแต้ม"}
+                  {member ? `มี ${memberPoints} แต้ม · แตะเพื่อเอาสมาชิกออกจากบิล` : "กรอกเบอร์ลูกค้าเพื่อสะสมแต้ม (บิลนี้ได้ 1 แต้ม)"}
                 </Text>
               </View>
               {!member ? <Plus size={18} color={BRAND_GREEN} strokeWidth={2.6} /> : <X size={17} color="#9ca3af" strokeWidth={2.4} />}
@@ -831,8 +834,8 @@ export function CafePosScreen() {
               >
                 <Gift size={18} color={BRAND_GREEN} strokeWidth={2.2} />
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#1c1c1e" }}>แลกฟรี 1 แก้ว</Text>
-                  <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>ใช้ {pointRule.redeemAt} แต้ม · ลด ฿{redeemValue.toLocaleString()}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#1c1c1e" }}>ใช้แต้มแลกฟรี 1 แก้ว</Text>
+                  <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>ตัด {pointRule.redeemAt} แต้ม · ลดให้ ฿{redeemValue.toLocaleString()}</Text>
                 </View>
                 <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: redeeming ? BRAND_GREEN : "#cbd0cb", backgroundColor: redeeming ? BRAND_GREEN : "transparent", alignItems: "center", justifyContent: "center" }}>
                   {redeeming ? <Check size={13} color="#fff" strokeWidth={3} /> : null}
@@ -890,7 +893,6 @@ export function CafePosScreen() {
             label={`รับชำระ ฿${total.toLocaleString()}`}
             onPress={startPayment}
             disabled={count === 0}
-            icon={<Zap size={16} color="#fff" fill="#fff" />}
           />
         </GlassActionBar>
         </>
@@ -950,7 +952,6 @@ export function CafePosScreen() {
                 label="ยืนยันรับเงิน"
                 onPress={() => settle(Number(cashIn) || total)}
                 disabled={!cashEnough}
-                icon={<Check size={16} color="#fff" strokeWidth={3} />}
               />
             </GlassActionBar>
           </>
@@ -977,7 +978,7 @@ export function CafePosScreen() {
               <BarCircle onPress={() => setStage("bill")} label="ย้อนกลับ" tint="rgba(118,118,128,0.12)">
                 <ChevronLeft size={22} color="#6b7280" strokeWidth={2.4} />
               </BarCircle>
-              <PrimaryAction label="ลูกค้าชำระแล้ว" onPress={() => settle()} icon={<Check size={16} color="#fff" strokeWidth={3} />} />
+              <PrimaryAction label="ลูกค้าชำระแล้ว" onPress={() => settle()} />
             </GlassActionBar>
           </>
         ) : stage === "receipt" ? (
@@ -1096,7 +1097,7 @@ export function CafePosScreen() {
               <BarCircle onPress={() => { nextSale(); nav.navigate("CafeQueue"); }} label="ดูคิวออเดอร์" tint="rgba(0,122,255,0.12)">
                 <ListOrdered size={21} color="#007aff" strokeWidth={2.2} />
               </BarCircle>
-              <PrimaryAction label="ขายรายการถัดไป" onPress={nextSale} icon={<Plus size={16} color="#fff" strokeWidth={3} />} />
+              <PrimaryAction label="ขายรายการถัดไป" onPress={nextSale} />
             </GlassActionBar>
           </>
         )}
@@ -1107,6 +1108,117 @@ export function CafePosScreen() {
         <HeaderFade />
         </View>
         </View>
+      {/* สมาชิก — search first: the counter usually has a member already, so the
+          list does the work and registering is the exception, parked top-right.
+          Rendered INSIDE the checkout modal, which is fullScreen and would
+          otherwise cover a sheet that is only its sibling. */}
+      <BottomSheet
+        visible={memberOpen}
+        onClose={closeMemberSheet}
+        title="สมาชิก"
+        centerTitle
+        // The list should run to the bottom of the sheet; a centerTitle sheet
+        // hugs its content unless told to fill.
+        fill
+        rightSlot={
+          <GlassIconButton onPress={openAddMember} size={44} accessibilityLabel="เพิ่มสมาชิกใหม่">
+            <Plus size={22} color={BRAND_GREEN} strokeWidth={2.8} />
+          </GlassIconButton>
+        }
+      >
+        <View style={{ flex: 1, paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}>
+              <View className="flex-row items-center" style={{ backgroundColor: "#fafafa", borderRadius: 999, height: 48, paddingHorizontal: 16, gap: 8 }}>
+                  <Search size={16} color="#9ca3af" strokeWidth={2.4} />
+                  <TextInput
+                    value={memberQuery}
+                    onChangeText={setMemberQuery}
+                    placeholder="ค้นหาเบอร์โทร หรือชื่อสมาชิก"
+                    placeholderTextColor="#a3a3a3"
+                    keyboardType="numbers-and-punctuation"
+                    autoFocus
+                    style={{ flex: 1, fontSize: 15, color: "#0a0a0a", padding: 0 }}
+                  />
+                  {memberQuery ? (
+                    <Pressable onPress={() => setMemberQuery("")} hitSlop={8} className="active:opacity-60">
+                      <X size={15} color="#9ca3af" strokeWidth={2.4} />
+                    </Pressable>
+                  ) : null}
+              </View>
+
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 10, paddingBottom: insets.bottom + 12 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {memberHits.length === 0 ? (
+                  <Text style={{ fontSize: 13, color: TEXT_MUTED, textAlign: "center", paddingVertical: 24 }}>
+                    {memberQuery ? "ไม่พบสมาชิกที่ค้นหา — กด + มุมขวาบนเพื่อสมัครใหม่" : "พิมพ์เบอร์หรือชื่อเพื่อค้นหา"}
+                  </Text>
+                ) : (
+                  memberHits.map((m) => (
+                    <MemberCard
+                      key={m.id}
+                      member={m}
+                      points={usablePoints(m, pointRule)}
+                      redeemAt={pointRule.redeemAt}
+                      onPress={() => pickMember(m)}
+                    />
+                  ))
+                )}
+              </ScrollView>
+        </View>
+      </BottomSheet>
+
+      {/* เพิ่มสมาชิก — a page, drawn as an overlay rather than a Modal: this
+          subtree is already inside the fullScreen checkout Modal, and a Modal
+          nested in a Modal never presents on iOS — which is why the form kept
+          opening into nothing. An absolute layer always draws. */}
+      {addMemberOpen ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ ...StyleSheet.absoluteFillObject, backgroundColor: "#fff", paddingTop: insets.top, zIndex: 20 }}
+        >
+          {/* Close on the left, title centred — the save moved to the floating
+              bar below, where every other page in the app puts its action. */}
+          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+            <GlassIconButton onPress={cancelAddMember} size={44} accessibilityLabel="ปิด">
+              <X size={22} color="#1a1a1a" strokeWidth={2.6} />
+            </GlassIconButton>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>เพิ่มสมาชิก</Text>
+            <View style={{ width: 44 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+            <View style={{ gap: 6 }}>
+              <FieldLabel>เบอร์โทรศัพท์</FieldLabel>
+              <TextInput
+                value={phoneInput}
+                onChangeText={(t) => setPhoneInput(t.replace(/[^0-9]/g, ""))}
+                placeholder="08xxxxxxxx"
+                placeholderTextColor="#a3a3a3"
+                keyboardType="number-pad"
+                maxLength={10}
+                autoFocus
+                style={PAYOUT_INPUT}
+              />
+            </View>
+            <View style={{ gap: 6 }}>
+              <FieldLabel>ชื่อลูกค้า</FieldLabel>
+              <TextInput
+                value={memberName}
+                onChangeText={setMemberName}
+                placeholder="ชื่อเล่นที่ใช้เรียกหน้าร้าน"
+                placeholderTextColor="#a3a3a3"
+                style={PAYOUT_INPUT}
+              />
+            </View>
+          </ScrollView>
+
+          <GlassActionBar>
+            <PrimaryAction
+              label="บันทึกและเรียกใช้"
+              onPress={attachMember}
+              disabled={phoneInput.replace(/\D/g, "").length !== 10}
+            />
+          </GlassActionBar>
+        </KeyboardAvoidingView>
+      ) : null}
+
       </Modal>
     </View>
   );

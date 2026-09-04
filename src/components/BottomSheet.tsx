@@ -45,6 +45,9 @@ type Props = {
   /** Hide the drag handle + header entirely so children can render a full-bleed
    *  hero at the very top (children own the top rounded corners + close button). */
   noHeader?: boolean;
+  /** Action for the header's right side (centerTitle style) — e.g. an add
+   *  button on a picker sheet. Replaces the spacer that balances the close X. */
+  rightSlot?: ReactNode;
 };
 
 /**
@@ -68,6 +71,7 @@ export function BottomSheet({
   fill,
   fillContent,
   noHeader,
+  rightSlot,
 }: Props) {
   const insets = useSafeAreaInsets();
   const winHeight = useWindowDimensions().height;
@@ -270,7 +274,7 @@ export function BottomSheet({
                   <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{title}</Text>
                   {centerSubtitle ? <View style={{ marginTop: 8 }}>{centerSubtitle}</View> : null}
                 </View>
-                <View style={{ width: 44 }} />
+                <View style={{ width: 44, alignItems: "flex-end" }}>{rightSlot}</View>
               </View>
             ) : (
               <View

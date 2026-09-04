@@ -9,7 +9,7 @@
  * Pure TS. Line items are text-only, so the whole record is JSON-safe.
  */
 import { createStore } from "./db";
-import { emit } from "./events";
+import { emit, eventsStore } from "./events";
 
 export type CafeOrderStatus = "preparing" | "ready" | "picked_up";
 
@@ -158,4 +158,34 @@ export function rateCafeOrder(orderId: string, service: number, taste: number, c
 /** Test helper. */
 export function __resetCafe(): void {
   cafeStore.reset([]);
+}
+
+/**
+ * Orders still being made after the wait the customer was promised.
+ *
+ * The counter has no way to notice this on its own — the queue card looks the
+ * same at 3 minutes and at 13 — so the feed says it once per order. Idempotent:
+ * an order that already raised the flag never raises it twice.
+ */
+export function flagLateCafeOrders(now = Date.now()): number {
+  const flagged = new Set(
+    eventsStore.get().filter((e) => e.type === "cafe_order_late").map((e) => e.orderId),
+  );
+  let raised = 0;
+  for (const o of cafeStore.get()) {
+    if (o.status !== "preparing" || now <= o.readyAt || flagged.has(o.orderId)) continue;
+    const lateMin = Math.max(1, Math.round((now - o.readyAt) / 60000));
+    emit({
+      type: "cafe_order_late",
+      audience: ["shop"],
+      at: now,
+      userId: o.userId,
+      shopName: o.shopName,
+      orderId: o.orderId,
+      title: "ออเดอร์เกินเวลาที่บอกลูกค้า",
+      body: `คิว #${o.queueNo} · ช้ากว่ากำหนด ${lateMin} นาที`,
+    });
+    raised += 1;
+  }
+  return raised;
 }

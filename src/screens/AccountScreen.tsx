@@ -50,6 +50,7 @@ import { useSeller } from "../context/SellerContext";
 import type { OrderStatus } from "../data/orders";
 import { useStore } from "../store/db";
 import { sessionStore, signOut } from "../store/session";
+import { cafeMemberStore, cafePointRule, memberByPhone, usablePoints } from "../store/cafeMembers";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { isTablet } from "../theme/layout";
 
@@ -254,6 +255,11 @@ export function AccountScreen() {
   const scrollY = useSharedValue(0);
   // One identity, shared with AccountInfoScreen and every order's recipient.
   const { user } = useStore(sessionStore);
+  // The café's own stamp card, matched to this account by phone number.
+  const cafeState = useStore(cafeMemberStore);
+  const cafeRule = cafePointRule(cafeState);
+  const cafeMember = user?.phone ? memberByPhone(user.phone, cafeState) : undefined;
+  const cafePoints = cafeMember ? usablePoints(cafeMember, cafeRule) : 0;
   const ACTIVE_COUPONS = useActiveCouponCount();
 
   // "ออกจากระบบ" used to just navigate to Login, leaving the session intact —
@@ -305,6 +311,7 @@ export function AccountScreen() {
       | "NotificationTest"
       | "MyShop"
       | "Cafe"
+      | "CafeStampCard"
       | "CafeAdmin",
   ) => {
     ((nav.getParent() ?? nav) as Nav).navigate(route);
@@ -422,7 +429,9 @@ export function AccountScreen() {
                 </View>
               </View>
 
-              {/* Stats — points + ready-to-use coupons (coupon side taps to list) */}
+              {/* Stats — Metaherb points, coupons, and the café stamp card. The
+                  café one is labelled separately because it is the shop's own
+                  currency, not Metaherb points. */}
               <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.18)", marginTop: 14 }} />
               <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
                 <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -433,11 +442,21 @@ export function AccountScreen() {
                   </View>
                 </View>
                 <View style={{ width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.18)" }} />
-                <Pressable onPress={() => go("Coupons")} className="active:opacity-70" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16 }}>
+                <Pressable onPress={() => go("Coupons")} className="active:opacity-70" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 14 }}>
                   <Ticket size={17} color="#ffd27a" strokeWidth={2.2} />
                   <View>
                     <Text style={{ fontSize: 15, fontWeight: "800", color: "#ffffff", lineHeight: 18 }}>{ACTIVE_COUPONS}</Text>
                     <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>{/* trailing space: Android drops the last tall Thai cluster at paint */}{Platform.OS === "android" ? "คูปองพร้อมใช้ " : "คูปองพร้อมใช้"}</Text>
+                  </View>
+                </Pressable>
+                <View style={{ width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.18)" }} />
+                <Pressable onPress={() => go("CafeStampCard")} className="active:opacity-70" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 14 }}>
+                  <Coffee size={17} color="#ffd27a" strokeWidth={2.2} />
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#ffffff", lineHeight: 18 }}>
+                      {cafeMember ? `${cafePoints}/${cafeRule.redeemAt}` : "—"}
+                    </Text>
+                    <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>แต้มคาเฟ่</Text>
                   </View>
                 </Pressable>
               </View>

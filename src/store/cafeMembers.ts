@@ -1,10 +1,11 @@
 /**
  * สมาชิก & แต้ม Meta Cafe (17.7) — a stamp card, kept deliberately simple.
  *
- * The rule is one point per cup, not per baht: a café's cups cost roughly the
- * same, and "ครบ 10 แก้ว ฟรี 1" is a promise a customer can hold in their head.
- * Points-per-baht would force everyone to do arithmetic at the counter and
- * would need re-tuning every time a price moves.
+ * The rule is one point per visit — per bill, not per cup and not per baht.
+ * Per-cup let one person buy three coffees for their table and walk away with
+ * three stamps, which rewards group orders instead of coming back; the point of
+ * a stamp card is the return trip. Points-per-baht would force arithmetic at the
+ * counter and need re-tuning every time a price moves.
  *
  * Members are identified by phone number — it works for a walk-in who has never
  * installed the app, which a QR in the customer app cannot.
@@ -16,6 +17,8 @@
  * Pure TS — no react-native — so it stays Vitest-runnable.
  */
 import { createStore } from "./db";
+import { emit } from "./events";
+import { METAHERB_SHOP } from "../data/shopOrders";
 
 export type CafeMember = {
   id: string;
@@ -41,8 +44,8 @@ export type CafePointTxn = {
 };
 
 export type CafePointRule = {
-  /** แต้มที่ได้ต่อ 1 แก้ว. */
-  earnPerCup: number;
+  /** แต้มที่ได้ต่อการซื้อ 1 ครั้ง (1 บิล) — ไม่ว่าบิลนั้นจะมีกี่แก้ว. */
+  earnPerVisit: number;
   /** ครบกี่แต้มถึงแลกได้. */
   redeemAt: number;
   /** แลกได้เมนูราคาไม่เกินกี่บาท. */
@@ -54,7 +57,7 @@ export type CafePointRule = {
 };
 
 export const DEFAULT_CAFE_POINT_RULE: CafePointRule = {
-  earnPerCup: 1,
+  earnPerVisit: 1,
   redeemAt: 10,
   maxRedeemPrice: 80,
   expiryMonths: 12,
@@ -79,8 +82,20 @@ export function seedCafeMembers(members: CafeMember[], txns: CafePointTxn[] = []
 const digits = (s: string) => s.replace(/\D/g, "");
 
 export const cafeMembers = (s: CafeMemberState = cafeMemberStore.get()): CafeMember[] => s.members ?? [];
-export const cafePointRule = (s: CafeMemberState = cafeMemberStore.get()): CafePointRule =>
-  s.rule ?? DEFAULT_CAFE_POINT_RULE;
+/**
+ * Always a complete rule. A rule persisted by an older build can be missing
+ * fields — `earnPerCup` was the per-cup ancestor of `earnPerVisit` — and a
+ * missing number would surface in the UI as "undefined/ครั้ง", so the defaults
+ * fill every gap and the legacy key is carried over.
+ */
+export function cafePointRule(s: CafeMemberState = cafeMemberStore.get()): CafePointRule {
+  const saved = (s.rule ?? {}) as Partial<CafePointRule> & { earnPerCup?: number };
+  return {
+    ...DEFAULT_CAFE_POINT_RULE,
+    ...saved,
+    earnPerVisit: saved.earnPerVisit ?? saved.earnPerCup ?? DEFAULT_CAFE_POINT_RULE.earnPerVisit,
+  };
+}
 
 /** Cashiers type the phone with or without dashes; both must find the member. */
 export const memberByPhone = (phone: string, s: CafeMemberState = cafeMemberStore.get()): CafeMember | undefined =>
@@ -144,11 +159,14 @@ export function setCafePointRule(patch: Partial<CafePointRule>): void {
   cafeMemberStore.set((s) => ({ ...s, rule: { ...cafePointRule(s), ...patch } }));
 }
 
-/** Add the points a purchase earned. `cups` = how many drinks were on the bill. */
-export function earnPoints(memberId: string, cups: number, orderId?: string, now = Date.now()): number {
+/**
+ * Add the points one purchase earned. A bill is a bill: three cups on the same
+ * receipt still count as one visit, so the size of the order never inflates it.
+ */
+export function earnPoints(memberId: string, orderId?: string, now = Date.now()): number {
   const rule = cafePointRule();
-  if (!rule.enabled || cups <= 0) return 0;
-  const gained = cups * rule.earnPerCup;
+  if (!rule.enabled) return 0;
+  const gained = rule.earnPerVisit;
   cafeMemberStore.set((s) => {
     const m = memberById(memberId, s);
     if (!m) return s;
@@ -177,6 +195,17 @@ export function redeemPoints(memberId: string, orderId?: string, now = Date.now(
     ),
     txns: [{ id: nextId("txn"), memberId, delta: -rule.redeemAt, reason: "redeem", orderId, at: now }, ...(s.txns ?? [])],
   }));
+  // The shop is giving a drink away — the one point movement worth telling the
+  // counter about, and the number the owner asks about at closing.
+  emit({
+    type: "cafe_points_redeemed",
+    audience: ["shop"],
+    at: now,
+    shopName: METAHERB_SHOP,
+    orderId,
+    title: "ลูกค้าแลกฟรี 1 แก้ว",
+    body: `${m.name || "สมาชิก"} · ใช้ ${rule.redeemAt} แต้ม`,
+  });
   return true;
 }
 

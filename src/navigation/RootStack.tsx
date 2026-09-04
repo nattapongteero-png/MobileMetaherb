@@ -60,6 +60,11 @@ import { CafeOptionsScreen } from "../screens/CafeOptionsScreen";
 import { CafeOptionEditScreen } from "../screens/CafeOptionEditScreen";
 import { CafeAreaScreen } from "../screens/CafeAreaScreen";
 import { CafeMembersScreen } from "../screens/CafeMembersScreen";
+import { CafeMemberDetailScreen } from "../screens/CafeMemberDetailScreen";
+import { CafeMemberAddScreen } from "../screens/CafeMemberAddScreen";
+import { CafePointsScreen } from "../screens/CafePointsScreen";
+import { CafeStampCardScreen } from "../screens/CafeStampCardScreen";
+import { CafeNotificationScreen } from "../screens/CafeNotificationScreen";
 import { ShopChatListScreen } from "../screens/ShopChatListScreen";
 import { CouponCollectScreen } from "../screens/CouponCollectScreen";
 import { HerbalMarketScreen } from "../screens/HerbalMarketScreen";
@@ -213,6 +218,11 @@ export type RootStackParamList = {
   CafeOptionEdit: { groupId?: string } | undefined;
   CafeArea: undefined;
   CafeMembers: undefined;
+  CafeMemberDetail: { memberId: string };
+  CafeMemberAdd: undefined;
+  CafePoints: undefined;
+  CafeStampCard: undefined;
+  CafeNotification: undefined;
   ShopChatList: undefined;
   CouponCollect: undefined;
   // Pushed from Home "ดูทั้งหมด" (no longer bottom-tab screens).
@@ -507,6 +517,11 @@ export function RootStack() {
       <Stack.Screen name="CafeOptionEdit" component={CafeOptionEditScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="CafeArea" component={CafeAreaScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="CafeMembers" component={CafeMembersScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeMemberDetail" component={CafeMemberDetailScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeMemberAdd" component={CafeMemberAddScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafePoints" component={CafePointsScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeStampCard" component={CafeStampCardScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="CafeNotification" component={CafeNotificationScreen} options={{ headerShown: false, animation: "slide_from_right" }} />
       <Stack.Screen name="ShopChatList" component={ShopChatListScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="ComplaintStatus" component={ComplaintStatusScreen} options={{ headerShown: true, title: "สถานะการร้องเรียน", animation: "slide_from_right" }} />
       <Stack.Screen name="CouponCollect" component={CouponCollectScreen} options={{ animation: "slide_from_right" }} />

@@ -1,66 +1,69 @@
 import { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, TextInput, Modal, KeyboardAvoidingView, Platform, Switch, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Gift, Phone, Search, Stamp, UserPlus, X } from "lucide-react-native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { CalendarDays, Phone, Search, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { HeaderFade } from "../components/HeaderFade";
-import { GlassIconButton } from "../components/GlassIconButton";
 import { EmptyState } from "../components/EmptyState";
-import { showToast } from "../components/Toast";
+import { StampRing } from "../components/StampRing";
 import { PMAddFab } from "./MyShopScreen";
-import { Section, ViewRow, FieldLabel, EditIconButton, SheetHeader, PAYOUT_INPUT } from "./ShopPayoutScreen";
 import { BRAND_GREEN, DIVIDER_GRAY, TEXT_MUTED } from "../theme/tokens";
 import { useStore } from "../store/db";
+import type { RootStackParamList } from "../navigation/RootStack";
 import {
   cafeMemberStore,
   cafeMembers,
   cafePointRule,
-  setCafePointRule,
-  addCafeMember,
   usablePoints,
-  memberTxns,
   type CafeMember,
 } from "../store/cafeMembers";
 
-const fmtPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}` : p);
+/** Name or phone, dashes and spaces ignored — the counter types either. */
+export const matchesMember = (m: { name: string; phone: string }, query: string): boolean => {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return m.phone.includes(q.replace(/\D/g, "")) || m.name.toLowerCase().includes(q);
+};
 
-/** One member — name, phone, and how far along the card is. */
-function MemberCard({ member, points, redeemAt, onPress }: {
+const fmtJoined = (t: number) =>
+  new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+
+/** 081-234-5678 — the shape a cashier reads a number back in. */
+export const fmtMemberPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}` : p);
+
+/**
+ * One member — PMCard's layout language (คลังตัวเลือก / จัดการเมนู): flat white
+ * card, header row (avatar tile + name + status chip), divider, then the stamp
+ * card's progress as the footer.
+ */
+export function MemberCard({ member, points, redeemAt, onPress }: {
   member: CafeMember;
   points: number;
   redeemAt: number;
   onPress: () => void;
 }) {
-  const full = points >= redeemAt;
-  const pct = Math.min(1, redeemAt > 0 ? points / redeemAt : 0);
   return (
-    <Pressable onPress={onPress} className="active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", padding: 14, gap: 12 }}>
-      <View className="flex-row items-center" style={{ gap: 12 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 16, fontWeight: "800", color: BRAND_GREEN }}>{member.name.trim().charAt(0) || "?"}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
-          <Text style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 1 }}>{fmtPhone(member.phone)}</Text>
-        </View>
-        {full ? (
-          <View className="flex-row items-center" style={{ gap: 4, backgroundColor: "rgba(49,151,84,0.1)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 }}>
-            <Gift size={13} color={BRAND_GREEN} strokeWidth={2.4} />
-            <Text style={{ fontSize: 11.5, fontWeight: "700", color: BRAND_GREEN }}>แลกได้</Text>
+    <Pressable onPress={onPress} className="flex-row items-center active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", paddingLeft: 14, paddingVertical: 14, paddingRight: 6, gap: 12, overflow: "hidden" }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>{fmtMemberPhone(member.phone)}</Text>
+          <View className="flex-row items-center" style={{ gap: 5, marginTop: 8 }}>
+            <CalendarDays size={12} color="#9ca3af" strokeWidth={2.2} />
+            <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED }}>
+              เป็นสมาชิกตั้งแต่ {fmtJoined(member.joinedAt)}
+            </Text>
           </View>
-        ) : null}
+        </View>
       </View>
 
-      {/* Progress — a stamp card reads as "how many more", not as a number */}
-      <View style={{ gap: 6 }}>
-        <View style={{ height: 8, borderRadius: 4, backgroundColor: "#f0f0f0", overflow: "hidden" }}>
-          <View style={{ width: `${pct * 100}%`, height: "100%", borderRadius: 4, backgroundColor: BRAND_GREEN }} />
-        </View>
-        <Text style={{ fontSize: 12, color: TEXT_MUTED }}>
-          {points} / {redeemAt} แต้ม{full ? "" : ` · อีก ${redeemAt - points} แก้ว`}
-        </Text>
+      {/* Flush to the card's bottom-right: the negative margins cancel the
+          card's own padding, and the card's overflow crops the ring. */}
+      <View style={{ alignSelf: "flex-end", marginBottom: -14, marginRight: -6 }}>
+        <StampRing size={138} points={points} redeemAt={redeemAt} />
       </View>
     </Pressable>
   );
@@ -75,61 +78,28 @@ function MemberCard({ member, points, redeemAt, onPress }: {
  * a phone number at checkout.
  */
 export function CafeMembersScreen() {
-  const nav = useNavigation();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const state = useStore(cafeMemberStore);
   const rule = cafePointRule(state);
   const members = cafeMembers(state);
 
+  // How many members could walk in and claim a free cup today.
+  const readyCount = members.filter((m) => usablePoints(m, rule) >= rule.redeemAt).length;
+
   const [query, setQuery] = useState("");
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return members;
-    return members.filter((m) => m.phone.includes(q.replace(/\D/g, "")) || m.name.toLowerCase().includes(q));
+    return members.filter((m) => matchesMember(m, q));
   }, [members, query]);
-
-  // ── add member ──
-  const [addOpen, setAddOpen] = useState(false);
-  const [dPhone, setDPhone] = useState("");
-  const [dName, setDName] = useState("");
-  const openAdd = () => { setDPhone(""); setDName(""); setAddOpen(true); };
-  const saveAdd = () => {
-    const m = addCafeMember({ phone: dPhone, name: dName });
-    setAddOpen(false);
-    showToast(`เพิ่มสมาชิก ${m.name || fmtPhone(m.phone)} แล้ว`);
-  };
-
-  // ── rule ──
-  const [ruleOpen, setRuleOpen] = useState(false);
-  const [rEarn, setREarn] = useState(String(rule.earnPerCup));
-  const [rRedeem, setRRedeem] = useState(String(rule.redeemAt));
-  const [rMax, setRMax] = useState(String(rule.maxRedeemPrice));
-  const [rExpiry, setRExpiry] = useState(String(rule.expiryMonths));
-  const openRule = () => {
-    setREarn(String(rule.earnPerCup)); setRRedeem(String(rule.redeemAt));
-    setRMax(String(rule.maxRedeemPrice)); setRExpiry(String(rule.expiryMonths));
-    setRuleOpen(true);
-  };
-  const saveRule = () => {
-    setCafePointRule({
-      earnPerCup: Math.max(1, Number(rEarn) || 1),
-      redeemAt: Math.max(1, Number(rRedeem) || 1),
-      maxRedeemPrice: Math.max(0, Number(rMax) || 0),
-      expiryMonths: Math.max(0, Number(rExpiry) || 0),
-    });
-    setRuleOpen(false);
-    showToast("บันทึกกติกาแต้มแล้ว");
-  };
-
-  // ── member detail ──
-  const [detail, setDetail] = useState<CafeMember | null>(null);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader
-        title="สมาชิก & แต้ม"
-        subtitle={`${members.length} สมาชิก · ครบ ${rule.redeemAt} แต้มแลกฟรี 1 แก้ว`}
+        title="สมาชิก"
+        subtitle={members.length === 0 ? "ยังไม่มีสมาชิก" : `${members.length} คน · แลกฟรีได้แล้ว ${readyCount} คน`}
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}
         bottomSlot={
@@ -161,37 +131,12 @@ export function CafeMembersScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* กติกา — decides what every card below means */}
-          <Section title="กติกาแต้ม" right={<EditIconButton onPress={openRule} />}>
-            <View className="flex-row items-center" style={{ gap: 12, marginBottom: 16 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                <Stamp size={20} color={BRAND_GREEN} strokeWidth={2.2} />
-              </View>
-              <Text style={{ flex: 1, fontSize: 14.5, fontWeight: "600", color: "#0a0a0a" }}>
-                ซื้อ {rule.redeemAt} แก้ว ฟรี 1 แก้ว
-              </Text>
-              <Switch
-                value={rule.enabled}
-                onValueChange={(v) => setCafePointRule({ enabled: v })}
-                trackColor={{ true: BRAND_GREEN, false: "#d4d4d4" }}
-                style={{ alignSelf: "center" }}
-                {...(Platform.OS === "web" ? { activeThumbColor: "#fff" } : {})}
-              />
-            </View>
-            <View style={{ gap: 14 }}>
-              <ViewRow label="ได้แต้มต่อ 1 แก้ว" value={`${rule.earnPerCup} แต้ม`} />
-              <ViewRow label="แลกฟรีเมื่อครบ" value={`${rule.redeemAt} แต้ม`} />
-              <ViewRow label="แลกได้เมนูราคาไม่เกิน" value={`฿${rule.maxRedeemPrice.toLocaleString()}`} />
-              <ViewRow label="แต้มหมดอายุเมื่อไม่มาใช้บริการ" value={rule.expiryMonths > 0 ? `${rule.expiryMonths} เดือน` : "ไม่หมดอายุ"} />
-            </View>
-          </Section>
-
-          <View style={{ padding: 16, gap: 12 }}>
+          <View style={{ padding: 16, paddingTop: 30, gap: 12 }}>
             {visible.length === 0 ? (
               <EmptyState
                 icon={<Phone size={34} color="#9ca3af" />}
                 title={query ? "ไม่พบสมาชิกที่ค้นหา" : "ยังไม่มีสมาชิก"}
-                subtitle={query ? "ลองค้นด้วยเบอร์โทรอีกครั้ง" : "สมาชิกจะถูกเพิ่มอัตโนมัติเมื่อคิดเงินแล้วกรอกเบอร์ที่ POS"}
+                subtitle={query ? "ลองพิมพ์เบอร์ใหม่" : "กด + เพื่อเพิ่มสมาชิก"}
                 iconBgSize={64}
               />
             ) : (
@@ -201,7 +146,7 @@ export function CafeMembersScreen() {
                   member={m}
                   points={usablePoints(m, rule)}
                   redeemAt={rule.redeemAt}
-                  onPress={() => setDetail(m)}
+                  onPress={() => nav.navigate("CafeMemberDetail", { memberId: m.id })}
                 />
               ))
             )}
@@ -210,91 +155,8 @@ export function CafeMembersScreen() {
         <HeaderFade />
       </View>
 
-      <PMAddFab bottom={18} onPress={openAdd} />
+      <PMAddFab bottom={18} onPress={() => nav.navigate("CafeMemberAdd")} />
 
-      {/* เพิ่มสมาชิก */}
-      <Modal visible={addOpen} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setAddOpen(false)}>
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <SheetHeader title="เพิ่มสมาชิก" onClose={() => setAddOpen(false)} onSave={saveAdd} canSave={dPhone.replace(/\D/g, "").length === 10} />
-          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
-            <View style={{ gap: 6 }}>
-              <FieldLabel>เบอร์โทรศัพท์</FieldLabel>
-              <TextInput value={dPhone} onChangeText={(t) => setDPhone(t.replace(/[^0-9]/g, ""))} placeholder="08xxxxxxxx" placeholderTextColor="#a3a3a3" keyboardType="number-pad" maxLength={10} style={PAYOUT_INPUT} />
-            </View>
-            <View style={{ gap: 6 }}>
-              <FieldLabel>ชื่อ</FieldLabel>
-              <TextInput value={dName} onChangeText={setDName} placeholder="ชื่อที่ใช้เรียกลูกค้า" placeholderTextColor="#a3a3a3" style={PAYOUT_INPUT} />
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* แก้ไขกติกา */}
-      <Modal visible={ruleOpen} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setRuleOpen(false)}>
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <SheetHeader title="แก้ไขกติกาแต้ม" onClose={() => setRuleOpen(false)} onSave={saveRule} canSave />
-          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
-            <View style={{ gap: 6 }}>
-              <FieldLabel>ได้แต้มต่อ 1 แก้ว</FieldLabel>
-              <TextInput value={rEarn} onChangeText={(t) => setREarn(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" maxLength={2} style={PAYOUT_INPUT} />
-            </View>
-            <View style={{ gap: 6 }}>
-              <FieldLabel>แลกฟรีเมื่อครบกี่แต้ม</FieldLabel>
-              <TextInput value={rRedeem} onChangeText={(t) => setRRedeem(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" maxLength={3} style={PAYOUT_INPUT} />
-            </View>
-            <View style={{ gap: 6 }}>
-              <FieldLabel>แลกได้เมนูราคาไม่เกิน (บาท)</FieldLabel>
-              <TextInput value={rMax} onChangeText={(t) => setRMax(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" maxLength={4} style={PAYOUT_INPUT} />
-            </View>
-            <View style={{ gap: 6 }}>
-              <FieldLabel>แต้มหมดอายุเมื่อไม่มาใช้บริการ (เดือน · 0 = ไม่หมดอายุ)</FieldLabel>
-              <TextInput value={rExpiry} onChangeText={(t) => setRExpiry(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" maxLength={2} style={PAYOUT_INPUT} />
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ประวัติแต้มรายคน */}
-      <Modal visible={detail !== null} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setDetail(null)}>
-        <View style={{ flex: 1, backgroundColor: "white" }}>
-          <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 16 + insets.top / 2, paddingBottom: 12 }}>
-            <GlassIconButton onPress={() => setDetail(null)} size={44} accessibilityLabel="ปิด">
-              <X size={22} color="#1a1a1a" strokeWidth={2.6} />
-            </GlassIconButton>
-            <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a1a" }}>{detail?.name || "สมาชิก"}</Text>
-            <View style={{ width: 44 }} />
-          </View>
-          {detail ? (
-            <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: insets.bottom + 24 }}>
-              <View style={{ alignItems: "center", gap: 4, backgroundColor: "#fafafa", borderRadius: 18, paddingVertical: 22 }}>
-                <Text style={{ fontSize: 36, fontWeight: "800", color: BRAND_GREEN }}>{usablePoints(detail, rule)}</Text>
-                <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>แต้มคงเหลือ · {fmtPhone(detail.phone)}</Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>ประวัติแต้ม</Text>
-              {memberTxns(detail.id).length === 0 ? (
-                <Text style={{ fontSize: 13, color: TEXT_MUTED }}>ยังไม่มีรายการ</Text>
-              ) : (
-                memberTxns(detail.id).map((t) => (
-                  <View key={t.id} className="flex-row items-center" style={{ gap: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#f0f0f0" }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#0a0a0a" }}>
-                        {t.reason === "earn" ? "สะสมแต้ม" : t.reason === "redeem" ? "แลกฟรี 1 แก้ว" : "ปรับแต้ม"}
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 1 }}>
-                        {new Date(t.at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
-                        {t.orderId ? ` · ${t.orderId}` : ""}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 15, fontWeight: "800", color: t.delta >= 0 ? BRAND_GREEN : "#dc2626" }}>
-                      {t.delta >= 0 ? `+${t.delta}` : t.delta}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          ) : null}
-        </View>
-      </Modal>
     </View>
   );
 }

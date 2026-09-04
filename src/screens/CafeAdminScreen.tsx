@@ -17,6 +17,7 @@ import {
   CreditCard,
   ListOrdered,
   MapPin,
+  Stamp,
   Calculator,
   ListPlus,
   Users,
@@ -30,13 +31,12 @@ import { SalesDatePicker, type DateRange } from "../components/SalesDatePicker";
 import { PERIODS, type Period } from "../data/salesReport";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { CountBadge } from "../components/CountBadge";
-import { BottomSheet } from "../components/BottomSheet";
 import { showToast } from "../components/Toast";
-import { BRAND_GREEN, BRAND_GREEN_DARK, DIVIDER_GRAY, TEXT_MUTED, TEXT_SECONDARY, cardShadow } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, TEXT_SECONDARY, cardShadow } from "../theme/tokens";
 import { useStore } from "../store/db";
-import { cafeStore, cafeQueue } from "../store/cafe";
+import { cafeStore, cafeQueue, flagLateCafeOrders } from "../store/cafe";
 import { cafeAdminStore, cafeHours, type CafeDayId } from "../store/cafeAdmin";
-import { eventsStore, eventsFor, isRead, markAllEventsRead, timeAgo } from "../store/events";
+import { eventsStore, eventsFor, isRead } from "../store/events";
 import { METAHERB_SHOP } from "../data/shopOrders";
 import type { RootStackParamList } from "../navigation/RootStack";
 
@@ -55,7 +55,8 @@ const GRID: GridItem[] = [
   { id: "pay", label: "ช่องทางชำระเงิน", Icon: CreditCard, route: "CafePaySettings" }, // 17.4
   { id: "hours", label: "เวลาเปิด-ปิดร้าน", Icon: Clock, route: "CafeHours" },        // เวลาขาย + เวลารับสินค้า (web parity)
   { id: "banner", label: "แบนเนอร์หน้าร้าน", Icon: Images, route: "CafeBanners" },    // web parity: อัพโหลด Banner
-  { id: "member", label: "สมาชิก & แต้ม", Icon: Users, route: "CafeMembers" },        // 17.7
+  { id: "member", label: "สมาชิก", Icon: Users, route: "CafeMembers" },              // 17.7
+  { id: "points", label: "แต้มสะสม", Icon: Stamp, route: "CafePoints" },             // 17.7 — กติกา + ภาพรวมโปรแกรม
   { id: "area", label: "พื้นที่ขาย", Icon: MapPin, route: "CafeArea" },              // 17.9
 ];
 
@@ -200,19 +201,20 @@ export function CafeAdminScreen() {
   const [gridW, setGridW] = useState(0);
   const [gridPage, setGridPage] = useState(0);
 
-  // Café events for the shop audience — the notification feed (17.10), shown
-  // behind the header bell (badge = unread).
-  const [notifOpen, setNotifOpen] = useState(false);
+  // Café events for the shop audience — the badge behind the header bell.
+  // The feed itself (17.10) is a full page, CafeNotification, so it reads the
+  // same as every other notification screen in the app.
+  // Raise late-order flags before counting, so the badge is honest even if the
+  // feed has never been opened.
+  useEffect(() => {
+    flagLateCafeOrders();
+    const t = setInterval(() => flagLateCafeOrders(), 60_000);
+    return () => clearInterval(t);
+  }, []);
   const cafeEvents = eventsFor("shop", { shopName: METAHERB_SHOP })
     .filter((e) => e.type.startsWith("cafe_"))
     .slice(0, 20);
   const unreadCafe = cafeEvents.filter((e) => !isRead(e, "shop")).length;
-  const closeNotifications = () => {
-    setNotifOpen(false);
-    // Closing the feed reads it — unread rows stay bold while it's open,
-    // and the bell badge clears once the admin has seen them.
-    markAllEventsRead("shop", { shopName: METAHERB_SHOP });
-  };
 
   const openGridItem = (item: GridItem) => {
     if (item.dev || !item.route) {
@@ -232,7 +234,7 @@ export function CafeAdminScreen() {
         showSearch={false}
         rightSlot={
           <View>
-            <GlassIconButton onPress={() => setNotifOpen(true)} accessibilityLabel="แจ้งเตือน">
+            <GlassIconButton onPress={() => nav.navigate("CafeNotification")} accessibilityLabel="แจ้งเตือน">
               <Bell size={20} color="#1a1a1a" strokeWidth={2.2} />
             </GlassIconButton>
             {unreadCafe > 0 ? (
@@ -378,38 +380,6 @@ export function CafeAdminScreen() {
       <HeaderFade />
       </View>
 
-      {/* แจ้งเตือน (17.10) — behind the header bell; real events from the shared
-          log, never fiction. One white card per event, boldness = unread. */}
-      <BottomSheet visible={notifOpen} onClose={closeNotifications} title="แจ้งเตือน" centerTitle>
-        <View style={{ paddingHorizontal: 16 }}>
-          {cafeEvents.length === 0 ? (
-            <View style={{ alignItems: "center", paddingVertical: 36, gap: 10 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                <Bell size={28} color={BRAND_GREEN_DARK} strokeWidth={2} />
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: TEXT_MUTED }}>ยังไม่มีแจ้งเตือน</Text>
-              <Text style={{ fontSize: 12.5, color: "#a3a3a3", textAlign: "center", lineHeight: 18 }}>
-                ออเดอร์ใหม่และรีวิวจากลูกค้าจะขึ้นที่นี่ทันที
-              </Text>
-            </View>
-          ) : (
-            <View style={{ gap: 10, marginBottom: 8 }}>
-              {cafeEvents.map((e) => (
-                <View key={e.id} className="flex-row items-center" style={{ gap: 12, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: DIVIDER_GRAY, paddingHorizontal: 14, paddingVertical: 12 }}>
-                  <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                    <Coffee size={18} color={BRAND_GREEN_DARK} strokeWidth={2.2} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontSize: 13.5, fontWeight: e.readShop ? "500" : "700", color: "#0a0a0a" }}>{e.title}</Text>
-                    <Text numberOfLines={1} style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 1 }}>{e.body}</Text>
-                  </View>
-                  <Text style={{ fontSize: 11, color: TEXT_MUTED }}>{timeAgo(e.at)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      </BottomSheet>
     </View>
   );
 }
