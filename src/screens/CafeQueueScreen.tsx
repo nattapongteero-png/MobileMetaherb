@@ -8,6 +8,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { EmptyState } from "../components/EmptyState";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { QUEUE_PREP, QUEUE_WAIT } from "./CafeAdminScreen";
 import { useStore } from "../store/db";
 import { cafeQueue, cafeStore, completeCafeOrder, markCafeReady, type CafeOrder } from "../store/cafe";
 import { METAHERB_SHOP } from "../data/shopOrders";
@@ -53,10 +54,12 @@ function QueueCard({ order }: { order: CafeOrder }) {
         <View
           style={{
             width: 54, height: 54, borderRadius: 16, alignItems: "center", justifyContent: "center",
-            backgroundColor: ready ? "rgba(49,151,84,0.12)" : "rgba(217,119,6,0.12)",
+            backgroundColor: ready ? "rgba(139,92,246,0.12)" : "rgba(0,122,255,0.12)",
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: "800", color: ready ? BRAND_GREEN : "#d97706" }}>#{order.queueNo}</Text>
+          {/* One colour per status across the console: กำลังทำ = น้ำเงิน,
+              รอลูกค้ารับ = ม่วง (see the queue ring on CafeAdmin). */}
+          <Text style={{ fontSize: 18, fontWeight: "800", color: ready ? QUEUE_WAIT : QUEUE_PREP }}>#{order.queueNo}</Text>
         </View>
 
         <View style={{ flex: 1 }}>

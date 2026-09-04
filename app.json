@@ -12,7 +12,8 @@
       "infoPlist": {
         "NSSupportsLiveActivities": true,
         "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone.",
+        "NSLocationWhenInUseUsageDescription": "ใช้ตำแหน่งของคุณเพื่อปักหมุดจุดร้านในหน้าตั้งค่าพื้นที่ขาย"
       },
       "icon": {
         "light": "./assets/app-icon.png",

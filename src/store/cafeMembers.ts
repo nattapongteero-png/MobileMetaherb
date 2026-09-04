@@ -1,0 +1,215 @@
+/**
+ * สมาชิก & แต้ม Meta Cafe (17.7) — a stamp card, kept deliberately simple.
+ *
+ * The rule is one point per visit — per bill, not per cup and not per baht.
+ * Per-cup let one person buy three coffees for their table and walk away with
+ * three stamps, which rewards group orders instead of coming back; the point of
+ * a stamp card is the return trip. Points-per-baht would force arithmetic at the
+ * counter and need re-tuning every time a price moves.
+ *
+ * Members are identified by phone number — it works for a walk-in who has never
+ * installed the app, which a QR in the customer app cannot.
+ *
+ * This is the CAFÉ's own membership. It has no link to a Metaherb account; the
+ * phone number is the only key, so a customer who happens to use both is
+ * matched by phone if the app ever wants to.
+ *
+ * Pure TS — no react-native — so it stays Vitest-runnable.
+ */
+import { createStore } from "./db";
+import { emit } from "./events";
+import { METAHERB_SHOP } from "../data/shopOrders";
+
+export type CafeMember = {
+  id: string;
+  /** เบอร์โทร (ตัวเลขล้วน) — the key a cashier types at the counter. */
+  phone: string;
+  name: string;
+  points: number;
+  joinedAt: number;
+  /** Last time they bought something — points expire from here, not from join. */
+  lastVisitAt: number;
+};
+
+/** One movement of points, always tied to why it happened. */
+export type CafePointTxn = {
+  id: string;
+  memberId: string;
+  /** + earned, − redeemed. */
+  delta: number;
+  reason: "earn" | "redeem" | "adjust";
+  /** The café order it came from, so a dispute can be traced back. */
+  orderId?: string;
+  at: number;
+};
+
+export type CafePointRule = {
+  /** แต้มที่ได้ต่อการซื้อ 1 ครั้ง (1 บิล) — ไม่ว่าบิลนั้นจะมีกี่แก้ว. */
+  earnPerVisit: number;
+  /** ครบกี่แต้มถึงแลกได้. */
+  redeemAt: number;
+  /** แลกได้เมนูราคาไม่เกินกี่บาท. */
+  maxRedeemPrice: number;
+  /** แต้มหมดอายุถ้าไม่มาใช้บริการกี่เดือน — without this the shop carries an
+   *  unbounded liability forever. */
+  expiryMonths: number;
+  enabled: boolean;
+};
+
+export const DEFAULT_CAFE_POINT_RULE: CafePointRule = {
+  earnPerVisit: 1,
+  redeemAt: 10,
+  maxRedeemPrice: 80,
+  expiryMonths: 12,
+  enabled: true,
+};
+
+export type CafeMemberState = {
+  members: CafeMember[];
+  txns: CafePointTxn[];
+  rule: CafePointRule;
+};
+
+const INITIAL: CafeMemberState = { members: [], txns: [], rule: DEFAULT_CAFE_POINT_RULE };
+
+export const cafeMemberStore = createStore<CafeMemberState>(INITIAL, { persistKey: "mh.cafeMembers" });
+
+export function seedCafeMembers(members: CafeMember[], txns: CafePointTxn[] = []): void {
+  cafeMemberStore.reset({ ...cafeMemberStore.get(), members, txns });
+}
+
+// ── reads ──────────────────────────────────────────────────────
+const digits = (s: string) => s.replace(/\D/g, "");
+
+export const cafeMembers = (s: CafeMemberState = cafeMemberStore.get()): CafeMember[] => s.members ?? [];
+/**
+ * Always a complete rule. A rule persisted by an older build can be missing
+ * fields — `earnPerCup` was the per-cup ancestor of `earnPerVisit` — and a
+ * missing number would surface in the UI as "undefined/ครั้ง", so the defaults
+ * fill every gap and the legacy key is carried over.
+ */
+export function cafePointRule(s: CafeMemberState = cafeMemberStore.get()): CafePointRule {
+  const saved = (s.rule ?? {}) as Partial<CafePointRule> & { earnPerCup?: number };
+  return {
+    ...DEFAULT_CAFE_POINT_RULE,
+    ...saved,
+    earnPerVisit: saved.earnPerVisit ?? saved.earnPerCup ?? DEFAULT_CAFE_POINT_RULE.earnPerVisit,
+  };
+}
+
+/** Cashiers type the phone with or without dashes; both must find the member. */
+export const memberByPhone = (phone: string, s: CafeMemberState = cafeMemberStore.get()): CafeMember | undefined =>
+  cafeMembers(s).find((m) => digits(m.phone) === digits(phone));
+
+export const memberById = (id: string, s: CafeMemberState = cafeMemberStore.get()): CafeMember | undefined =>
+  cafeMembers(s).find((m) => m.id === id);
+
+/** Newest first — the member detail view reads top-down. */
+export const memberTxns = (memberId: string, s: CafeMemberState = cafeMemberStore.get()): CafePointTxn[] =>
+  (s.txns ?? []).filter((t) => t.memberId === memberId).sort((a, b) => b.at - a.at);
+
+/**
+ * Points the member can actually spend right now: everything expires at once
+ * after `expiryMonths` of no visits, which is the rule shops actually print on
+ * the card ("แต้มหมดอายุเมื่อไม่ใช้บริการ 12 เดือน").
+ */
+export function usablePoints(
+  m: CafeMember,
+  rule: CafePointRule = cafePointRule(),
+  now = Date.now(),
+): number {
+  if (rule.expiryMonths <= 0) return m.points;
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - rule.expiryMonths);
+  return m.lastVisitAt >= cutoff.getTime() ? m.points : 0;
+}
+
+export const canRedeem = (m: CafeMember, rule: CafePointRule = cafePointRule(), now = Date.now()): boolean =>
+  rule.enabled && usablePoints(m, rule, now) >= rule.redeemAt;
+
+// ── writes ─────────────────────────────────────────────────────
+let seq = 0;
+const nextId = (p: string) => `${p}-${Date.now()}-${++seq}`;
+
+export function addCafeMember(input: { phone: string; name: string }, now = Date.now()): CafeMember {
+  const existing = memberByPhone(input.phone);
+  if (existing) return existing; // one member per phone; re-registering is a no-op
+  const member: CafeMember = {
+    id: nextId("mem"),
+    phone: digits(input.phone),
+    name: input.name.trim(),
+    points: 0,
+    joinedAt: now,
+    lastVisitAt: now,
+  };
+  cafeMemberStore.set((s) => ({ ...s, members: [member, ...cafeMembers(s)] }));
+  return member;
+}
+
+export function editCafeMember(id: string, patch: Partial<Pick<CafeMember, "name" | "phone">>): void {
+  cafeMemberStore.set((s) => ({
+    ...s,
+    members: cafeMembers(s).map((m) =>
+      m.id === id ? { ...m, ...patch, phone: patch.phone ? digits(patch.phone) : m.phone } : m,
+    ),
+  }));
+}
+
+export function setCafePointRule(patch: Partial<CafePointRule>): void {
+  cafeMemberStore.set((s) => ({ ...s, rule: { ...cafePointRule(s), ...patch } }));
+}
+
+/**
+ * Add the points one purchase earned. A bill is a bill: three cups on the same
+ * receipt still count as one visit, so the size of the order never inflates it.
+ */
+export function earnPoints(memberId: string, orderId?: string, now = Date.now()): number {
+  const rule = cafePointRule();
+  if (!rule.enabled) return 0;
+  const gained = rule.earnPerVisit;
+  cafeMemberStore.set((s) => {
+    const m = memberById(memberId, s);
+    if (!m) return s;
+    // Points that had already expired don't come back to life on the next visit.
+    const base = usablePoints(m, cafePointRule(s), now);
+    return {
+      ...s,
+      members: cafeMembers(s).map((x) =>
+        x.id === memberId ? { ...x, points: base + gained, lastVisitAt: now } : x,
+      ),
+      txns: [{ id: nextId("txn"), memberId, delta: gained, reason: "earn", orderId, at: now }, ...(s.txns ?? [])],
+    };
+  });
+  return gained;
+}
+
+/** Spend a full card. Returns false (and changes nothing) when short. */
+export function redeemPoints(memberId: string, orderId?: string, now = Date.now()): boolean {
+  const rule = cafePointRule();
+  const m = memberById(memberId);
+  if (!m || !canRedeem(m, rule, now)) return false;
+  cafeMemberStore.set((s) => ({
+    ...s,
+    members: cafeMembers(s).map((x) =>
+      x.id === memberId ? { ...x, points: usablePoints(x, cafePointRule(s), now) - rule.redeemAt, lastVisitAt: now } : x,
+    ),
+    txns: [{ id: nextId("txn"), memberId, delta: -rule.redeemAt, reason: "redeem", orderId, at: now }, ...(s.txns ?? [])],
+  }));
+  // The shop is giving a drink away — the one point movement worth telling the
+  // counter about, and the number the owner asks about at closing.
+  emit({
+    type: "cafe_points_redeemed",
+    audience: ["shop"],
+    at: now,
+    shopName: METAHERB_SHOP,
+    orderId,
+    title: "ลูกค้าแลกฟรี 1 แก้ว",
+    body: `${m.name || "สมาชิก"} · ใช้ ${rule.redeemAt} แต้ม`,
+  });
+  return true;
+}
+
+/** Test helper. */
+export function __resetCafeMembers(): void {
+  cafeMemberStore.reset(INITIAL);
+}

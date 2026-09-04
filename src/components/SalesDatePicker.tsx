@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { View, Text, Pressable, Modal } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Calendar, ChevronDown, X } from "lucide-react-native";
@@ -62,7 +62,14 @@ function fmtPoint(period: Period, s: DateSel): string {
  *  wheels edit whichever pill is active. Leaving สิ้นสุด = เริ่มต้น picks a
  *  single point. Columns adapt to the period: daily = วัน/เดือน/ปี,
  *  weekly & monthly = เดือน/ปี, yearly = ปี. Commits only on ตกลง. */
-export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel: DateRange; onChange: (r: DateRange) => void }) {
+export function SalesDatePicker({ period, sel, onChange, renderTrigger }: {
+  period: Period;
+  sel: DateRange;
+  onChange: (r: DateRange) => void;
+  /** Draw your own button (e.g. on a coloured card) — gets the scope label and
+   *  the opener. Omit for the standard Liquid Glass capsule. */
+  renderTrigger?: (label: string, open: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<"start" | "end">("start");
   const [pStart, setPStart] = useState<DateSel>(sel.start);
@@ -136,6 +143,7 @@ export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel
     <>
       {/* Trigger — Liquid Glass capsule, same look as the Flash Sale month
           picker (Calendar + label + chevron); tablet-sized to match. */}
+      {renderTrigger ? renderTrigger(salesDateLabel(period, sel), openModal) : (
       <Pressable onPress={openModal} hitSlop={8}>
         <GlassView
           glassEffectStyle="regular"
@@ -148,6 +156,7 @@ export function SalesDatePicker({ period, sel, onChange }: { period: Period; sel
           <ChevronDown size={isTablet() ? 16 : 15} color="#1a1a1a" strokeWidth={2.4} />
         </GlassView>
       </Pressable>
+      )}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
         <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}>
