@@ -211,7 +211,9 @@ export type RootStackParamList = {
   CafeAdmin: undefined;
   CafeMenuManage: undefined;
   CafeMenuEdit: { itemId?: string } | undefined;
-  CafePos: undefined;
+  /** Opened from a member's page to spend their card: the member is attached
+   *  and the redeem armed as soon as the first item lands on the bill. */
+  CafePos: { memberId?: string; redeem?: boolean } | undefined;
   CafePosItem: { itemId: string };
   CafePaySettings: undefined;
   CafeHours: undefined;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, Share, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import QRCode from "react-native-qrcode-svg";
@@ -331,6 +331,17 @@ export function CafePosScreen() {
   const [redeeming, setRedeeming] = useState(false);
   const member = memberId ? memberById(memberId, memberState) : undefined;
   const memberPoints = member ? usablePoints(member, pointRule) : 0;
+  const canUsePoints = member != null && memberPoints >= pointRule.redeemAt;
+
+  // Arriving from a member's page ("แลกให้ลูกค้า"): the member and their redeem
+  // ride in on the route. They cannot be applied on mount — the bill is empty,
+  // and a member is only kept while there is a bill to attach them to — so they
+  // are held here and spent on the first item. One-shot: once the cashier has
+  // the bill, the counter's own controls own the state.
+  const route = useRoute<RouteProp<RootStackParamList, "CafePos">>();
+  const armed = useRef(
+    route.params?.memberId ? { memberId: route.params.memberId, redeem: route.params.redeem === true } : null,
+  );
 
   const gross = billTotal(bill, byId);
   /** ราคาแก้วที่แพงที่สุดในบิลที่ยังอยู่ในเพดานแลก. */
@@ -340,14 +351,23 @@ export function CafePosScreen() {
       .filter((p) => p > 0 && p <= pointRule.maxRedeemPrice);
     return prices.length ? Math.max(...prices) : 0;
   }, [bill, byId, pointRule.maxRedeemPrice]);
-  const discount = redeeming && redeemValue > 0 ? redeemValue : 0;
+  // Gated on the card actually being spendable, not just on the box being
+  // ticked: the tick survives swapping or dropping the member (the redeem row
+  // hides, but the flag stays), and without this the bill would keep the
+  // discount while checkout quietly failed to take the points for it.
+  const discount = redeeming && canUsePoints && redeemValue > 0 ? redeemValue : 0;
   const total = Math.max(0, gross - discount);
   const count = billCount(bill);
   const cups = bill.reduce((n, l) => n + l.qty, 0);
 
   // A member can only be kept while there is a bill to attach them to.
   useEffect(() => {
-    if (count === 0) { setMemberId(null); setRedeeming(false); }
+    if (count === 0) { setMemberId(null); setRedeeming(false); return; }
+    const a = armed.current;
+    if (!a) return;
+    armed.current = null;
+    setMemberId(a.memberId);
+    if (a.redeem) setRedeeming(true);
   }, [count]);
 
   /** เจอเบอร์ = ผูกสมาชิก, ไม่เจอ = สมัครให้เลยตรงเคาน์เตอร์. */
@@ -848,7 +868,7 @@ export function CafePosScreen() {
             </Pressable>
 
             {/* Redeem is offered only when it can actually be honoured */}
-            {member && memberPoints >= pointRule.redeemAt && redeemValue > 0 ? (
+            {canUsePoints && redeemValue > 0 ? (
               <Pressable
                 onPress={() => setRedeeming((v) => !v)}
                 className="flex-row items-center active:opacity-70"

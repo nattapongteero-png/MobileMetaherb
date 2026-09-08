@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Animated, PanResponder, Platform } from "react-
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChevronsRight, Coffee, Gift, Stamp } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { HeaderFade } from "../components/HeaderFade";
@@ -13,7 +14,6 @@ import { showToast } from "../components/Toast";
 import {
   cafeMemberStore,
   canRedeem,
-  redeemPoints,
   cafePointRule,
   memberById,
   memberTxns,
@@ -131,7 +131,7 @@ function SwipeRedeem({ enabled, label, onDone }: { enabled: boolean; label: stri
  * and the free cups with the swipe that spends the next one.
  */
 export function CafeMemberDetailScreen() {
-  const nav = useNavigation();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const ringSize = Math.min(useAppWidth() - PAGE_PAD - RING_INSET * 2, RING_MAX);
   const { memberId } = useRoute<RouteProp<RootStackParamList, "CafeMemberDetail">>().params;
@@ -143,12 +143,17 @@ export function CafeMemberDetailScreen() {
   const txns = member ? memberTxns(member.id, state) : [];
   const redeemCount = txns.filter((t) => t.reason === "redeem").length;
   const redeemable = member != null && canRedeem(member, rule);
+  // Spending a card happens at the till, not here. A free cup only exists once
+  // there is a bill to take it off — redeeming from this page burnt the points
+  // with nothing to show for it and no order to trace the dispute back to. So
+  // the swipe hands the member to the POS with the redeem already armed: the
+  // cashier rings up what the customer actually asked for, and the discount
+  // lands on that bill. (The customer's own card screen is read-only for the
+  // same reason.)
   const onRedeem = () => {
     if (!member) return;
-    // The store refuses when the card is short, so the toast can never claim a
-    // free cup that was not actually taken off the balance.
-    if (redeemPoints(member.id)) showToast(`แลกฟรี 1 แก้ว · ตัด ${rule.redeemAt} แต้ม`);
-    else showToast("แต้มไม่พอแลก", "info");
+    showToast("เลือกเมนูที่ลูกค้าต้องการ แล้วส่วนลดจะขึ้นเอง", "info");
+    nav.navigate("CafePos", { memberId: member.id, redeem: true });
   };
 
   return (
@@ -217,7 +222,7 @@ export function CafeMemberDetailScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "800", color: "#0a0a0a" }}>{redeemCount} แก้ว</Text>
               </View>
 
-              <SwipeRedeem enabled={redeemable} label={redeemable ? "เลื่อนเพื่อใช้" : "แต้มไม่พอ"} onDone={onRedeem} />
+              <SwipeRedeem enabled={redeemable} label={redeemable ? "เลื่อนเพื่อแลกที่ POS" : "แต้มไม่พอ"} onDone={onRedeem} />
             </View>
           </View>
 
