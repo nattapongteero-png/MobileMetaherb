@@ -63,6 +63,11 @@ type Sale = {
   total: number;
   payLabel: string;
   change: number;
+  /** What the stamp card took off this bill, and what it cost in points. The
+   *  lines are kept at full price, so without this the receipt does not add up
+   *  and nothing on it says the cup was free. */
+  redeemDiscount: number;
+  redeemPoints: number;
   /** Kept because the bill is emptied on settle — the receipt reads from here. */
   items: { name: string; qty: number; summary: string; total: number }[];
   received?: number;
@@ -537,6 +542,7 @@ export function CafePosScreen() {
         total: lineTotal(l, byId),
       })),
       total,
+      ...(discount > 0 ? { redeemDiscount: discount, redeemPoints: pointRule.redeemAt } : null),
       queueNo,
       queueAhead: preparingAhead,
       waitMinutes,
@@ -557,6 +563,8 @@ export function CafePosScreen() {
       total,
       payLabel,
       change: received != null ? received - total : 0,
+      redeemDiscount: discount,
+      redeemPoints: discount > 0 ? pointRule.redeemAt : 0,
       items: bill.map((l) => ({
         name: byId[l.itemId]?.name ?? l.itemId,
         qty: l.qty,
@@ -583,6 +591,7 @@ export function CafePosScreen() {
       "",
       ...lines,
       "",
+      r.redeemDiscount > 0 ? `แลกฟรี 1 แก้ว (ใช้ ${r.redeemPoints} แต้ม)  −฿${r.redeemDiscount.toLocaleString()}` : "",
       `รวม ฿${r.total.toLocaleString()}`,
       `ชำระโดย ${r.payLabel}`,
       r.change > 0 ? `รับเงิน ฿${(r.received ?? 0).toLocaleString()} · เงินทอน ฿${r.change.toLocaleString()}` : "",
@@ -1064,6 +1073,22 @@ export function CafePosScreen() {
                 ))}
 
                 <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#dcdcdc" }} />
+
+                {/* The lines stay at full price, so the free cup has to be its
+                    own row — otherwise the receipt simply does not add up. */}
+                {sale && sale.redeemDiscount > 0 ? (
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center" style={{ gap: 6 }}>
+                      <Gift size={14} color={BRAND_GREEN} strokeWidth={2.4} />
+                      <Text style={{ fontSize: 12.5, color: BRAND_GREEN, fontWeight: "600" }}>
+                        แลกฟรี 1 แก้ว · ใช้ {sale.redeemPoints} แต้ม
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: BRAND_GREEN }}>
+                      −฿{sale.redeemDiscount.toLocaleString()}
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View className="flex-row items-center justify-between">
                   <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>รวม</Text>

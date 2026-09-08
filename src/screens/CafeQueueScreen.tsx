@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { Coffee, Check, HandPlatter, Clock } from "lucide-react-native";
+import { Check, Clock, Coffee, Gift, HandPlatter } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { EmptyState } from "../components/EmptyState";
 import { showToast } from "../components/Toast";
@@ -73,7 +73,17 @@ function QueueCard({ order }: { order: CafeOrder }) {
           </View>
         </View>
 
-        <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }}>฿{order.total.toLocaleString()}</Text>
+        <View style={{ alignItems: "flex-end", gap: 3 }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a" }}>฿{order.total.toLocaleString()}</Text>
+          {/* A redeemed bill is one the barista is handing a free cup on, so it
+              is worth seeing here rather than only on the receipt. */}
+          {order.redeemDiscount ? (
+            <View className="flex-row items-center" style={{ gap: 3, backgroundColor: "rgba(49,151,84,0.1)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+              <Gift size={10} color={BRAND_GREEN} strokeWidth={2.6} />
+              <Text style={{ fontSize: 10, fontWeight: "800", color: BRAND_GREEN }}>แลกฟรี</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {/* Lines the barista has to make */}

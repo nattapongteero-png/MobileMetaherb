@@ -23,7 +23,14 @@ export type CafeOrder = {
   payLabel: string;
   receiveLabel: string;
   items: CafeOrderItem[];
+  /** ยอดที่ต้องชำระจริง — หักส่วนลดแลกแต้มแล้ว. */
   total: number;
+  /** Set when the bill spent a stamp card: how much came off, and how many
+   *  points it cost. Without it the lines add up to more than the total and
+   *  nothing on the order says why — the free cup would be invisible to the
+   *  barista handing it over, and to anyone reading the day's sales back. */
+  redeemDiscount?: number;
+  redeemPoints?: number;
   /** Running queue number (e.g. #23). */
   queueNo: number;
   queueAhead: number;

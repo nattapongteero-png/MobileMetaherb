@@ -12,7 +12,7 @@ import { GlassView } from "expo-glass-effect";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Check, Clock } from "lucide-react-native";
+import { Check, Clock, Gift } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { StarRow } from "../components/StarRow";
 import { useCafeCart } from "../context/CafeCartContext";
@@ -169,6 +169,19 @@ export function CafeOrderDetailScreen() {
           <KV label="ช่องทางชำระเงิน" value={order.payLabel} />
           <KV label="รับสินค้า" value={order.receiveLabel} />
           <View style={{ height: 1, backgroundColor: "#f0f0f0" }} />
+          {/* The item lines are at full price, so a redeemed bill needs to say
+              where the difference went — otherwise the total looks wrong. */}
+          {order.redeemDiscount ? (
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+                <Gift size={14} color={BRAND_GREEN} strokeWidth={2.4} />
+                <Text style={{ fontSize: 13.5, color: BRAND_GREEN, fontWeight: "600" }}>
+                  แลกฟรี 1 แก้ว{order.redeemPoints ? ` · ใช้ ${order.redeemPoints} แต้ม` : ""}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13.5, fontWeight: "700", color: BRAND_GREEN }}>−{baht(order.redeemDiscount)}</Text>
+            </View>
+          ) : null}
           <KV label="ยอดชำระทั้งหมด" value={baht(order.total)} strong />
         </View>
       </ScrollView>
