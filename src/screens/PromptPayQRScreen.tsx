@@ -26,7 +26,7 @@ const fmtPhone = (p: string) => p.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 export function PromptPayQRScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { total, orderId, orderIds, cafe, receiveLabel, cafeItems } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
+  const { total, orderId, orderIds, cafe, receiveLabel, cafeItems, cafeRedeem } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
   const { placeOrder } = useCafeCart();
 
   const payload = useMemo(() => promptPayPayload(MERCHANT_PROMPTPAY, total), [total]);
@@ -68,7 +68,7 @@ export function PromptPayQRScreen() {
     if (cafe) {
       if (confirming.current) return;
       confirming.current = true;
-      placeOrder(buildCafeOrder({ orderId, total, payLabel: "พร้อมเพย์ PromptPay", receiveLabel: receiveLabel ?? "", items: cafeItems ?? [] }));
+      placeOrder({ ...buildCafeOrder({ orderId, total, payLabel: "พร้อมเพย์ PromptPay", receiveLabel: receiveLabel ?? "", items: cafeItems ?? [] }), ...cafeRedeem });
       nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
       return;
     }

@@ -355,7 +355,7 @@ export type RootStackParamList = {
   BrandInfo: undefined;
   Cart: undefined;
   Payment: undefined;
-  PromptPayQR: { total: number; orderId: string; orderIds?: string[]; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[] };
+  PromptPayQR: { total: number; orderId: string; orderIds?: string[]; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[]; cafeRedeem?: { redeemDiscount: number; redeemPoints: number } };
   PaymentSuccess: { orderId: string; total: number; methodLabel: string; methodDesc?: string };
   PaymentMethod: undefined;
   ShippingMethod: undefined;

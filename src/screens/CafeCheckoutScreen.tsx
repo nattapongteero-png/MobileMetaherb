@@ -11,11 +11,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CreditCard, Store, Bike, type LucideIcon } from "lucide-react-native";
+import { CreditCard, Gift, Store, Bike } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { ChoiceRow, OfferRow, SummaryRow } from "../components/CheckoutRows";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
-import { cafePayMethod, buildCafeOrder } from "../data/cafePayment";
+import { cafePayMethod, buildCafeOrder, CAFE_PAY_METHODS } from "../data/cafePayment";
+import { useStore } from "../store/db";
+import { sessionStore } from "../store/session";
+import { cafeMemberStore, cafePointRule, memberByPhone, usablePoints } from "../store/cafeMembers";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -28,17 +32,34 @@ const RECEIVE = [
 
 export function CafeCheckoutScreen() {
   const nav = useNavigation<Nav>();
-  const { lines, totalQty, totalPrice, payMethod, placeOrder } = useCafeCart();
+  const { lines, totalQty, totalPrice, payMethod, setPayMethod, placeOrder } = useCafeCart();
   // Café accepts only PromptPay + cash (its own state / picker sheet), unlike the
   // product checkout. Same UX shape though — a selected-method card + "เปลี่ยน".
   const method = cafePayMethod(payMethod);
-  const openPaymentSheet = () => nav.navigate("CafePaymentMethod");
 
   const [receive, setReceive] = useState(0);
   const placing = useRef(false); // guards against a double-tap placing two orders
 
+  // The stamp card, read the same way the card screen reads it: by the phone on
+  // the session. The counter has had this on every bill; the app earned points
+  // silently and could not spend them at all, so a customer with a full card had
+  // to pay in the app and then walk in to claim the cup separately.
+  const memberState = useStore(cafeMemberStore);
+  const pointRule = cafePointRule(memberState);
+  const phone = useStore(sessionStore).user?.phone ?? "";
+  const member = phone ? memberByPhone(phone, memberState) : undefined;
+  const memberPoints = member ? usablePoints(member, pointRule) : 0;
+  const canUsePoints = member != null && pointRule.enabled && memberPoints >= pointRule.redeemAt;
+  const [redeeming, setRedeeming] = useState(false);
+  /** The dearest cup within the cap — the same rule the POS applies. */
+  const redeemValue = lines.reduce(
+    (best, l) => (l.unitPrice > 0 && l.unitPrice <= pointRule.maxRedeemPrice ? Math.max(best, l.unitPrice) : best),
+    0,
+  );
+  const discount = redeeming && canUsePoints && redeemValue > 0 ? redeemValue : 0;
+
   const shipping = RECEIVE[receive].fee;
-  const grand = totalPrice + shipping;
+  const grand = Math.max(0, totalPrice + shipping - discount);
 
   const pay = () => {
     const orderId = `CAFE${Date.now().toString().slice(-8)}`;
@@ -47,13 +68,16 @@ export function CafeCheckoutScreen() {
     const items = lines.map((l) => ({ name: l.name, qty: l.qty, summary: l.summary, total: l.unitPrice * l.qty }));
     // PromptPay confirms payment on the QR screen (which then places the order);
     // cash is settled at the counter, so place it straight away.
+    // The redemption rides with the bill, exactly as the POS records it: the
+    // lines stay at full price and the card's contribution is its own figure.
+    const redeem = discount > 0 ? { redeemDiscount: discount, redeemPoints: pointRule.redeemAt } : undefined;
     if (payMethod === "promptpay") {
-      nav.navigate("PromptPayQR", { total: grand, orderId, cafe: true, receiveLabel, cafeItems: items });
+      nav.navigate("PromptPayQR", { total: grand, orderId, cafe: true, receiveLabel, cafeItems: items, cafeRedeem: redeem });
       return;
     }
     if (placing.current) return;
     placing.current = true;
-    placeOrder(buildCafeOrder({ orderId, total: grand, payLabel: method.label, receiveLabel, items }));
+    placeOrder({ ...buildCafeOrder({ orderId, total: grand, payLabel: method.label, receiveLabel, items }), ...redeem });
     nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
   };
 
@@ -86,47 +110,70 @@ export function CafeCheckoutScreen() {
         <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
           <Text style={{ fontSize: 15, fontWeight: "800", color: TEXT_PRIMARY, marginBottom: 6 }}>รับสินค้า</Text>
           {RECEIVE.map((r, i) => (
-            <Row key={r.id} Icon={r.Icon} label={r.label} desc={r.desc} active={receive === i} onPress={() => setReceive(i)} />
+            <ChoiceRow key={r.id} Icon={r.Icon} label={r.label} desc={r.desc} active={receive === i} divider={i > 0} onPress={() => setReceive(i)} />
           ))}
         </View>
 
-        {/* Payment method — selected card + "เปลี่ยน" → shared PaymentMethod sheet (matches product) */}
-        <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <CreditCard size={18} color={BRAND_GREEN} />
-              <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>วิธีชำระเงิน</Text>
+        {/* สมาชิก & แต้ม — the same block the POS bill carries. Shown only to a
+            member: a stamp card is not something to advertise mid-checkout to
+            someone who has not joined, and joining still happens at the counter. */}
+        {member ? (
+          <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <Gift size={18} color={BRAND_GREEN} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>บัตรสะสมแต้ม</Text>
             </View>
-            <Pressable hitSlop={6} onPress={openPaymentSheet} className="active:opacity-60">
-              <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>เปลี่ยน</Text>
-            </Pressable>
+            <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>
+              มี {memberPoints} แต้ม · บิลนี้ได้อีก {pointRule.earnPerVisit} แต้ม
+            </Text>
+            {canUsePoints && redeemValue > 0 ? (
+              <OfferRow
+                Icon={Gift}
+                label="ใช้แต้มแลกฟรี 1 แก้ว"
+                desc={`ตัด ${pointRule.redeemAt} แต้ม · ลดให้ ${baht(redeemValue)}`}
+                active={redeeming}
+                divider
+                onPress={() => setRedeeming((v) => !v)}
+              />
+            ) : canUsePoints ? (
+              <Text style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 8 }}>
+                แต้มครบแลกได้แล้ว — แลกได้กับเมนูราคาไม่เกิน {baht(pointRule.maxRedeemPrice)}
+              </Text>
+            ) : null}
           </View>
-          <Pressable
-            onPress={openPaymentSheet}
-            className="flex-row items-center active:opacity-90"
-            style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingHorizontal: 14, paddingVertical: 12, gap: 12 }}
-          >
-            <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              {method.image ? (
-                <Image source={method.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
-          resizeMethod="resize" />
-              ) : method.Icon ? (
-                <method.Icon size={22} color={BRAND_GREEN} />
-              ) : null}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: TEXT_PRIMARY, lineHeight: 18 }}>{method.label}</Text>
-              <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>{method.desc}</Text>
-            </View>
-          </Pressable>
+        ) : null}
+
+        {/* วิธีชำระเงิน — the choices themselves, as the POS shows them. It used
+            to be a card plus a "เปลี่ยน" that opened a screen of its own, which
+            is a whole extra step for a list of two. */}
+        <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <CreditCard size={18} color={BRAND_GREEN} />
+            <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>วิธีชำระเงิน</Text>
+          </View>
+          {CAFE_PAY_METHODS.map((m, i) => (
+            <ChoiceRow
+              key={m.id}
+              Icon={m.Icon}
+              image={m.image}
+              label={m.label}
+              desc={m.desc}
+              active={payMethod === m.id}
+              divider={i > 0}
+              onPress={() => setPayMethod(m.id)}
+            />
+          ))}
         </View>
 
         {/* Totals */}
         <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8, gap: 8 }}>
-          <KV label={`ยอดสินค้า (${totalQty} รายการ)`} value={baht(totalPrice)} />
-          <KV label="ค่าจัดส่ง" value={shipping ? baht(shipping) : "ฟรี"} />
+          <SummaryRow label={`ยอดสินค้า (${totalQty} รายการ)`} value={baht(totalPrice)} />
+          <SummaryRow label="ค่าจัดส่ง" value={shipping ? baht(shipping) : "ฟรี"} />
+          {discount > 0 ? (
+            <SummaryRow label={`แลกฟรี 1 แก้ว · ใช้ ${pointRule.redeemAt} แต้ม`} value={`−${baht(discount)}`} tint={BRAND_GREEN} />
+          ) : null}
           <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 2 }} />
-          <KV label="ยอดชำระทั้งหมด" value={baht(grand)} strong />
+          <SummaryRow label="ยอดชำระทั้งหมด" value={baht(grand)} strong />
         </View>
       </ScrollView>
         {/* Edge fades while scrolling */}
@@ -154,32 +201,4 @@ export function CafeCheckoutScreen() {
   );
 }
 
-function Row({ Icon, label, desc, active, onPress }: { Icon: LucideIcon; label: string; desc: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className="active:opacity-90"
-      style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10, backgroundColor: active ? "rgba(49,151,84,0.06)" : "#f9fafb", borderRadius: 16, borderWidth: 1, borderColor: active ? BRAND_GREEN : "#f0f0f0", paddingHorizontal: 14, paddingVertical: 12 }}
-    >
-      <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={22} color={BRAND_GREEN} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 13.5, fontWeight: "600", color: "#0a0a0a" }}>{label}</Text>
-        <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 1 }}>{desc}</Text>
-      </View>
-      <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: active ? BRAND_GREEN : "#cbd5d1", alignItems: "center", justifyContent: "center" }}>
-        {active ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND_GREEN }} /> : null}
-      </View>
-    </Pressable>
-  );
-}
 
-function KV({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-      <Text style={{ fontSize: strong ? 14.5 : 13, color: strong ? TEXT_PRIMARY : TEXT_SECONDARY, fontWeight: strong ? "800" : "400" }}>{label}</Text>
-      <Text style={{ fontSize: strong ? 18 : 13.5, fontWeight: strong ? "800" : "600", color: strong ? BRAND_GREEN : TEXT_PRIMARY }}>{value}</Text>
-    </View>
-  );
-}

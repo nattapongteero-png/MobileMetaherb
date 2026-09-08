@@ -18,7 +18,7 @@ import {
   type PlaceCafeOrderInput,
 } from "../store/cafe";
 import { currentUserId, sessionStore } from "../store/session";
-import { earnPointsForPhone } from "../store/cafeMembers";
+import { earnPointsForPhone, memberByPhone, redeemPoints } from "../store/cafeMembers";
 
 /**
  * META Caffe cart — shared across the café landing, item-detail and cart screens.
@@ -121,7 +121,16 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
     // the same lookup the card screen uses ties the order to a member here.
     // No phone, or a phone that is not a member yet, simply earns nothing:
     // joining still happens at the counter, where a person can explain it.
-    if (!alreadyPlaced) earnPointsForPhone(sessionStore.get().user?.phone, order.orderId);
+    if (!alreadyPlaced) {
+      const phone = sessionStore.get().user?.phone;
+      // Redeem before earning, the order settle() uses at the till: otherwise
+      // the point this visit just earned could pay for this visit's free cup.
+      if (order.redeemDiscount) {
+        const m = phone ? memberByPhone(phone) : undefined;
+        if (m) redeemPoints(m.id, order.orderId);
+      }
+      earnPointsForPhone(phone, order.orderId);
+    }
     setLines([]);
     const first = order.items[0];
     const itemsLabel = first ? (order.items.length > 1 ? `${first.name} +${order.items.length - 1}` : first.name) : "ออเดอร์กาแฟ";

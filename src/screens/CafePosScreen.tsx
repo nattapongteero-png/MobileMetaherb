@@ -6,10 +6,11 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import QRCode from "react-native-qrcode-svg";
-import { Banknote, Check, ChevronLeft, Coffee, Gift, ListOrdered, Minus, PauseCircle, Plus, QrCode, ReceiptText, Search, Share2, Trash2, UserRound, X } from "lucide-react-native";
+import { Banknote, Check, ChevronLeft, Coffee, CreditCard, Gift, ListOrdered, Minus, PauseCircle, Plus, QrCode, ReceiptText, Search, Share2, Trash2, UserRound, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
 import { GlassActionBar, PrimaryAction } from "../components/GlassActionBar";
+import { ChoiceRow, OfferRow, SummaryRow } from "../components/CheckoutRows";
 import { HeaderFade } from "../components/HeaderFade";
 import { CountBadge } from "../components/CountBadge";
 import { BottomSheet } from "../components/BottomSheet";
@@ -823,11 +824,14 @@ export function CafePosScreen() {
         <View style={{ flex: 1 }}>
         {stage === "bill" ? (
         <>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 120 }}>
-          {/* Line items — one iOS-grouped card, hairline between rows, matching
-              the payment-channel card below it. Loose rows on the page made the
-              bill read as a different kind of thing from the rest of the sheet. */}
-          <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#f0f0f0", paddingHorizontal: 14, overflow: "hidden" }}>
+        {/* Laid out as the customer's own ชำระเงิน page: full-bleed white
+            sections on grey, each under its own heading, in the same order.
+            The cashier's bill and the customer's are the same document, so
+            they are read the same way — the only section missing here is
+            รับสินค้า, which a walk-in has already answered by walking in. */}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: 130 }}>
+          <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+            <Text style={{ fontSize: 15, fontWeight: "800", color: "#0a0a0a", marginBottom: 12 }}>สรุปคำสั่งซื้อ</Text>
             {bill.map((line, i) => {
               const it = byId[line.itemId];
               if (!it) return null;
@@ -882,15 +886,19 @@ export function CafePosScreen() {
             })}
           </View>
 
-          {/* สมาชิก — attach before paying, so the free cup and the points both
-              land on this bill */}
-          <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#f0f0f0", overflow: "hidden" }}>
+          {/* บัตรสะสมแต้ม — attach before paying, so the free cup and the points
+              both land on this bill */}
+          <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
+            <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
+              <Gift size={18} color={BRAND_GREEN} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>บัตรสะสมแต้ม</Text>
+            </View>
             {member ? (
               /* The attached member is drawn as the same card the picker and
                  the สมาชิก page use — the ring says how close the card is, and
                  the แลกฟรีได้ chip says it outright, which a line of text on an
                  avatar row never did. Tapping it swaps member; the ✕ detaches. */
-              <View style={{ padding: 10 }}>
+              <View style={{ marginTop: 6 }}>
                 <MemberCard
                   member={member}
                   points={memberPoints}
@@ -904,9 +912,9 @@ export function CafePosScreen() {
               <Pressable
                 onPress={() => setMemberOpen(true)}
                 className="flex-row items-center active:opacity-70"
-                style={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
+                style={{ minHeight: 60, paddingVertical: 12, gap: 12 }}
               >
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
                   <UserRound size={19} color={BRAND_GREEN} strokeWidth={2.2} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -919,53 +927,56 @@ export function CafePosScreen() {
               </Pressable>
             )}
 
-            {/* Redeem is offered only when it can actually be honoured */}
+            {/* Redeem is offered only when it can actually be honoured. Same
+                row the customer's own checkout uses. */}
             {canUsePoints && redeemValue > 0 ? (
-              <Pressable
-                onPress={() => setRedeeming((v) => !v)}
-                className="flex-row items-center active:opacity-70"
-                style={{ minHeight: 56, paddingHorizontal: 16, paddingVertical: 12, gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(60,60,67,0.12)" }}
-              >
-                <Gift size={18} color={BRAND_GREEN} strokeWidth={2.2} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#1c1c1e" }}>ใช้แต้มแลกฟรี 1 แก้ว</Text>
-                  <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>ตัด {pointRule.redeemAt} แต้ม · ลดให้ ฿{redeemValue.toLocaleString()}</Text>
-                </View>
-                <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: redeeming ? BRAND_GREEN : "#cbd0cb", backgroundColor: redeeming ? BRAND_GREEN : "transparent", alignItems: "center", justifyContent: "center" }}>
-                  {redeeming ? <Check size={13} color="#fff" strokeWidth={3} /> : null}
-                </View>
-              </Pressable>
+              <View>
+                <OfferRow
+                  Icon={Gift}
+                  label="ใช้แต้มแลกฟรี 1 แก้ว"
+                  desc={`ตัด ${pointRule.redeemAt} แต้ม · ลดให้ ฿${redeemValue.toLocaleString()}`}
+                  active={redeeming}
+                  divider
+                  onPress={() => setRedeeming((v) => !v)}
+                />
+              </View>
             ) : null}
           </View>
 
-          <View>
-            {/* iOS-grouped card — same rows as CafePaymentMethodScreen: icon ·
-                label/desc · 22px radio, hairline separators inside one card */}
-            <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#f0f0f0", overflow: "hidden" }}>
-              {channels.map((c, i) => {
-                const Icon = PAY_ICON[c.id];
-                const active = pay === c.id;
-                return (
-                  <Pressable
-                    key={c.id}
-                    onPress={() => setPay(c.id)}
-                    className="flex-row items-center active:opacity-70"
-                    style={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: "rgba(60,60,67,0.12)" }}
-                  >
-                    <View style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
-                      <Icon size={28} color={active ? BRAND_GREEN : "#9ca3af"} strokeWidth={2} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ fontSize: 16, color: "#1c1c1e", fontWeight: active ? "600" : "400" }}>{c.label}</Text>
-                      <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>{c.sub}</Text>
-                    </View>
-                    <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: active ? BRAND_GREEN : "#cbd0cb", alignItems: "center", justifyContent: "center" }}>
-                      {active ? <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: BRAND_GREEN }} /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
+          {/* วิธีชำระเงิน — the same ChoiceRow the customer's checkout uses, so
+              the two lists cannot drift apart */}
+          <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
+            <View className="flex-row items-center" style={{ gap: 6, marginBottom: 2 }}>
+              <CreditCard size={18} color={BRAND_GREEN} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>วิธีชำระเงิน</Text>
             </View>
+            {channels.map((c, i) => (
+              <ChoiceRow
+                key={c.id}
+                Icon={PAY_ICON[c.id]}
+                label={c.label}
+                desc={c.sub}
+                active={pay === c.id}
+                divider={i > 0}
+                onPress={() => setPay(c.id)}
+              />
+            ))}
+          </View>
+
+          {/* The figures, spelled out. The action bar carries the number to
+              charge, but the bill should show how it was arrived at — the same
+              block, in the same place, as the customer's page. */}
+          <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8, gap: 8 }}>
+            <SummaryRow label={`ยอดสินค้า (${count} รายการ)`} value={`฿${gross.toLocaleString()}`} />
+            {discount > 0 ? (
+              <SummaryRow
+                label={`แลกฟรี 1 แก้ว · ใช้ ${pointRule.redeemAt} แต้ม`}
+                value={`−฿${discount.toLocaleString()}`}
+                tint={BRAND_GREEN}
+              />
+            ) : null}
+            <View style={{ height: 1, backgroundColor: "#f0f0f0", marginVertical: 2 }} />
+            <SummaryRow label="ยอดชำระทั้งหมด" value={`฿${total.toLocaleString()}`} strong />
           </View>
         </ScrollView>
 
