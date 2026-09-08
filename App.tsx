@@ -4,7 +4,11 @@ import "./src/styles/global.css";
 import { hydrateStores } from "./src/store";
 import { useEffect, useState } from "react";
 import { Platform, Text, View, TextInput } from "react-native";
-import { NavigationContainer, type LinkingOptions } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+  type LinkingOptions,
+} from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -51,6 +55,20 @@ const linking: LinkingOptions<RootStackParamList> = {
     },
   },
 };
+
+// Web-only entry links. GitHub Pages serves ONLY the root path (any real path
+// 404s before the app boots), so path-based web linking can't work there — a
+// query string survives instead: ?screen=Cafe opens the café directly. Only
+// names on this list are honoured; an arbitrary ?screen= can't jump into
+// order/admin screens that expect params.
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+const WEB_ENTRY_SCREENS = ["Cafe"] as const;
+function openWebEntryScreen() {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  const wanted = new URLSearchParams(window.location.search).get("screen");
+  const target = WEB_ENTRY_SCREENS.find((s) => s === wanted);
+  if (target && navigationRef.isReady()) navigationRef.navigate(target);
+}
 
 // Map fontWeight values to the loaded Thai font family — RN doesn't auto-pick
 // a weight variant from a base family, so we resolve via fontWeight at render.
@@ -134,7 +152,7 @@ export default function App() {
   const tree = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer linking={linking}>
+        <NavigationContainer ref={navigationRef} linking={linking} onReady={openWebEntryScreen}>
           <ErrorBoundary>
             <LanguageProvider>
             <ChatProvider>
