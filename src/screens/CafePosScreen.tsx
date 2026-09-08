@@ -178,13 +178,31 @@ function PosTile({ item, qty, width, onPress, onDecrement }: { item: AdminCafeIt
             {/* One control throughout: the + stays put on the right while the
                 − / qty half slides out from under it (and back in on remove) */}
             <Animated.View
-              className="flex-row items-center justify-end"
-              style={{ width: pillWidth, height: PILL_H, overflow: "hidden" }}
+              // Layout inline, not via className: NativeWind's classes do not
+              // reach an Animated.View on web, so `flex-row` was dropped and the
+              // pill laid its children out in a column — which pushed the + below
+              // a 30pt box that clips (overflow: hidden). The + was rendered the
+              // whole time, just out of sight. The customer's card in CafeScreen
+              // writes the same control with inline flex for the same reason.
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                width: pillWidth,
+                height: PILL_H,
+                overflow: "hidden",
+              }}
             >
               <Animated.View
                 pointerEvents={inBill ? "auto" : "none"}
-                className="flex-row items-center"
-                style={{ gap: STEP_GAP, marginRight: STEP_GAP, opacity: slideOpacity, transform: [{ translateX: slideX }] }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: STEP_GAP,
+                  marginRight: STEP_GAP,
+                  opacity: slideOpacity,
+                  transform: [{ translateX: slideX }],
+                }}
               >
                 {/* qty 1 → − becomes a trash, same rule as the charge sheet */}
                 <Pressable
