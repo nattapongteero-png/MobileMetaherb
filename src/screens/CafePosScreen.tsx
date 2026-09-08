@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, useWindowDimensions, Share, Modal, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, Share, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -15,6 +15,7 @@ import { CountBadge } from "../components/CountBadge";
 import { BottomSheet } from "../components/BottomSheet";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN, DIVIDER_GRAY, PRICE_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { useAppWidth } from "../theme/layout";
 import { useStore } from "../store/db";
 import { cafeStore, cafeQueue, placeCafeOrder } from "../store/cafe";
 import { cafeAdminStore, cafeOptionLibrary, cafePayInfo, CAFE_PAY_CHANNELS, type CafePayChannelId } from "../store/cafeAdmin";
@@ -257,7 +258,10 @@ function BarCircle({ children, onPress, label, tint = "rgba(49,151,84,0.12)" }: 
 export function CafePosScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { width: winW } = useWindowDimensions();
+  // The app frame, not the browser window — on web the POS renders inside a
+  // 430pt phone frame, and measuring the window made every tile half a laptop
+  // screen wide.
+  const winW = useAppWidth();
   const [subFilter, setSubFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [bill, setBill] = useState<Bill>([]);

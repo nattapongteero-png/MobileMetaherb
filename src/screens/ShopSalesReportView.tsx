@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, Animated, Image, LayoutAnimation, Modal, ScrollView, useWindowDimensions, type ImageSourcePropType } from "react-native";
+import { View, Text, Pressable, Animated, Image, LayoutAnimation, Modal, ScrollView, type ImageSourcePropType } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { DollarSign, ShoppingCart, FileText, TrendingUp, TrendingDown, BarChart3, Package, Percent, CheckCircle2, ChevronDown, Check, CalendarDays, type LucideIcon } from "lucide-react-native";
@@ -27,7 +27,7 @@ import {
   type SeriesKey,
 } from "../data/salesReport";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_MUTED, cardShadow } from "../theme/tokens";
-import { isTablet } from "../theme/layout";
+import { isTablet, useAppWidth } from "../theme/layout";
 import { menuAnchor } from "../theme/menuAnchor";
 import { showToast } from "../components/Toast";
 import { exportSalesReportPDF, exportSalesReportExcel, type ReportExportData } from "../utils/reportExport";
@@ -651,7 +651,9 @@ export function ShopSalesReportView({ period, setPeriod, dateSel, exportRef }: {
   if (exportRef) exportRef.current = runExport;
 
   // Tablet gets real table columns; phones get the stacked two-deck rows.
-  const isWide = useWindowDimensions().width >= 640;
+  // Measured against the app frame: on web the report sits in a 430pt phone
+  // frame, so a wide browser window is not a wide report.
+  const isWide = useAppWidth() >= 640;
   const sortLabel = SORT_OPTIONS.find((s) => s.id === sort)?.label ?? "";
   // Each sort mode gets its own icon + accent (Von Restorff: distinct states
   // read at a glance) — reusing the KPI accent hues from this screen.

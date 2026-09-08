@@ -157,7 +157,7 @@ import { CouponsOwnerSection } from "./CouponsView";
 import { SalesDatePicker, type DateRange } from "../components/SalesDatePicker";
 import type { Period } from "../data/salesReport";
 import type { RootStackParamList } from "../navigation/RootStack";
-import { gridColumns, gridCardWidth, isTablet } from "../theme/layout";
+import { gridColumns, gridCardWidth, isTablet, useAppWidth } from "../theme/layout";
 import {
   BRAND_GREEN,
   BRAND_GREEN_DARK,
@@ -1459,7 +1459,6 @@ function ShopFrontTabs({
 // cover banner + shop info card (avatar/name/verified/stats) + product grid.
 function ShopFrontTab({ insetsBottom, bannerTop = 0 }: { insetsBottom: number; bannerTop?: number }) {
   const nav = useNavigation<Nav>();
-  const { width } = useWindowDimensions();
   // Display fields reflect the owner's profile edits (logo / banner / name / desc);
   // fall back to the canonical SHOP defaults when not customized.
   const { shopLogoUri, shopBannerUri, shopProfile } = useSeller();
@@ -3159,9 +3158,10 @@ function SalesBreakdownSheet({
   data: { title: string; lines: SalesLine[] } | null;
   onClose: () => void;
 }) {
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
   // Min card width controls column count via flex-wrap: ~1 col on phones,
-  // 2 on large phones / small tablets, 3 on iPad — fully fluid.
+  // 2 on large phones / small tablets, 3 on iPad — fully fluid. Measured
+  // against the app frame, so a wide browser window does not fake a tablet.
   const minCardW = width >= 600 ? 240 : 9999; // 9999 → force single column on phones
   const lines = data?.lines ?? [];
   const total = linesTotal(lines);
