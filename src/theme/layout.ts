@@ -1,4 +1,4 @@
-import { Dimensions, Platform } from "react-native";
+import { Dimensions, Platform, useWindowDimensions } from "react-native";
 
 /**
  * Responsive layout helpers.
@@ -19,6 +19,18 @@ export const appWidth = () =>
   Platform.OS === "web"
     ? Math.min(Dimensions.get("window").width, APP_MAX_WIDTH)
     : Dimensions.get("window").width;
+
+/**
+ * `appWidth()` as a hook — the same clamped width, but re-read when the window
+ * actually changes: a browser resize, or a device rotating. The plain function
+ * is captured once at import, which is fine for a value read at module scope
+ * but wrong for anything that has to survive a resize, so a layout that scales
+ * off the width (rather than just flexing) should use this.
+ */
+export const useAppWidth = () => {
+  const { width } = useWindowDimensions();
+  return Platform.OS === "web" ? Math.min(width, APP_MAX_WIDTH) : width;
+};
 
 /** Tablet = shortest side ≥ 700pt (iPad mini and up). */
 export const isTablet = () =>

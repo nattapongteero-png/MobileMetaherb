@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Dimensions } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -8,12 +8,20 @@ import { HeaderFade } from "../components/HeaderFade";
 import { EmptyState } from "../components/EmptyState";
 import { StampRing } from "../components/StampRing";
 import { BRAND_GREEN, DIVIDER_GRAY, TEXT_MUTED, cardShadow } from "../theme/tokens";
+import { useAppWidth } from "../theme/layout";
 import { useStore } from "../store/db";
 import { cafeMemberStore, cafePointRule, memberByPhone, memberTxns, usablePoints } from "../store/cafeMembers";
 import { sessionStore } from "../store/session";
 
-/** Card width: the page's 16pt margins on both sides. */
-const CARD_W = Dimensions.get("window").width - 32;
+/** The page's 16pt margins on both sides. */
+const PAGE_PAD = 32;
+/**
+ * The ring is drawn at a size, not stretched to fit, so it needs a ceiling:
+ * on a tablet — or a rotated phone — a card the full width of the window would
+ * put a 900pt coffee cup on screen. 398 is the widest phone (430) less the
+ * margins, which is the canvas the card was designed on.
+ */
+const RING_MAX = 398;
 
 const fmtDate = (t: number) => new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -27,6 +35,7 @@ const fmtDate = (t: number) => new Date(t).toLocaleDateString("th-TH", { day: "n
 export function CafeStampCardScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
+  const ringSize = Math.min(useAppWidth() - PAGE_PAD, RING_MAX);
   const state = useStore(cafeMemberStore);
   const session = useStore(sessionStore);
   const rule = cafePointRule(state);
@@ -61,7 +70,7 @@ export function CafeStampCardScreen() {
                 {/* Runs to the card's bottom edge — the card's own crop finishes
                     the ring, so no strip of white is left under it. */}
                 <View style={{ alignItems: "center", marginTop: 18, marginHorizontal: -20 }}>
-                  <StampRing size={CARD_W} points={points} redeemAt={rule.redeemAt} />
+                  <StampRing size={ringSize} points={points} redeemAt={rule.redeemAt} />
                 </View>
               </View>
 

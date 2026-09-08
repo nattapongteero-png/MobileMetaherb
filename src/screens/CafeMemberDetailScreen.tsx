@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { View, Text, ScrollView, Dimensions, Animated, PanResponder, Platform } from "react-native";
+import { View, Text, ScrollView, Animated, PanResponder, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -20,13 +20,19 @@ import {
   usablePoints,
 } from "../store/cafeMembers";
 import { StampRing } from "../components/StampRing";
+import { useAppWidth } from "../theme/layout";
 import { fmtMemberPhone } from "./CafeMembersScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 /** The ring, inset from the card's sides so it never touches the edge. */
-const CARD_W = Dimensions.get("window").width - 32;
+const PAGE_PAD = 32;
 const RING_INSET = 20;
-const RING_SIZE = CARD_W - RING_INSET * 2;
+/**
+ * The ring is drawn at a size rather than stretched, so it needs a ceiling —
+ * see CafeStampCardScreen. 358 is the widest phone (430) less the page margins
+ * and the ring's own inset.
+ */
+const RING_MAX = 358;
 
 /** The redeem button sits on the tall tile's bottom edge. */
 const REDEEM_H = 52;
@@ -127,6 +133,7 @@ function SwipeRedeem({ enabled, label, onDone }: { enabled: boolean; label: stri
 export function CafeMemberDetailScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
+  const ringSize = Math.min(useAppWidth() - PAGE_PAD - RING_INSET * 2, RING_MAX);
   const { memberId } = useRoute<RouteProp<RootStackParamList, "CafeMemberDetail">>().params;
   const state = useStore(cafeMemberStore);
   const rule = cafePointRule(state);
@@ -181,7 +188,7 @@ export function CafeMemberDetailScreen() {
             </View>
 
             <View style={{ alignItems: "center", marginTop: 6 }}>
-              <StampRing size={RING_SIZE} points={points} redeemAt={rule.redeemAt} crop={0.56} />
+              <StampRing size={ringSize} points={points} redeemAt={rule.redeemAt} crop={0.56} />
             </View>
 
 
