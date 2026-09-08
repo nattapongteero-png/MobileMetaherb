@@ -16,7 +16,7 @@ import { SubPageHeader } from "../components/SubPageHeader";
 import { ChoiceRow, OfferRow, SummaryRow } from "../components/CheckoutRows";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
-import { cafePayMethod, buildCafeOrder, CAFE_PAY_METHODS } from "../data/cafePayment";
+import { cafePayMethod, buildCafeOrder } from "../data/cafePayment";
 import { useStore } from "../store/db";
 import { sessionStore } from "../store/session";
 import { cafeMemberStore, cafePointRule, memberByPhone, usablePoints } from "../store/cafeMembers";
@@ -32,10 +32,11 @@ const RECEIVE = [
 
 export function CafeCheckoutScreen() {
   const nav = useNavigation<Nav>();
-  const { lines, totalQty, totalPrice, payMethod, setPayMethod, placeOrder } = useCafeCart();
+  const { lines, totalQty, totalPrice, payMethod, placeOrder } = useCafeCart();
   // Café accepts only PromptPay + cash (its own state / picker sheet), unlike the
   // product checkout. Same UX shape though — a selected-method card + "เปลี่ยน".
   const method = cafePayMethod(payMethod);
+  const openPaymentSheet = () => nav.navigate("CafePaymentMethod");
 
   const [receive, setReceive] = useState(0);
   const placing = useRef(false); // guards against a double-tap placing two orders
@@ -143,26 +144,35 @@ export function CafeCheckoutScreen() {
           </View>
         ) : null}
 
-        {/* วิธีชำระเงิน — the choices themselves, as the POS shows them. It used
-            to be a card plus a "เปลี่ยน" that opened a screen of its own, which
-            is a whole extra step for a list of two. */}
+        {/* Payment method — selected card + "เปลี่ยน" → shared PaymentMethod sheet (matches product) */}
         <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <CreditCard size={18} color={BRAND_GREEN} />
-            <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>วิธีชำระเงิน</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <CreditCard size={18} color={BRAND_GREEN} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>วิธีชำระเงิน</Text>
+            </View>
+            <Pressable hitSlop={6} onPress={openPaymentSheet} className="active:opacity-60">
+              <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>เปลี่ยน</Text>
+            </Pressable>
           </View>
-          {CAFE_PAY_METHODS.map((m, i) => (
-            <ChoiceRow
-              key={m.id}
-              Icon={m.Icon}
-              image={m.image}
-              label={m.label}
-              desc={m.desc}
-              active={payMethod === m.id}
-              divider={i > 0}
-              onPress={() => setPayMethod(m.id)}
-            />
-          ))}
+          <Pressable
+            onPress={openPaymentSheet}
+            className="flex-row items-center active:opacity-90"
+            style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingHorizontal: 14, paddingVertical: 12, gap: 12 }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {method.image ? (
+                <Image source={method.image} style={{ width: "100%", height: "100%" }} resizeMode="cover"
+          resizeMethod="resize" />
+              ) : method.Icon ? (
+                <method.Icon size={22} color={BRAND_GREEN} />
+              ) : null}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "500", color: TEXT_PRIMARY, lineHeight: 18 }}>{method.label}</Text>
+              <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>{method.desc}</Text>
+            </View>
+          </Pressable>
         </View>
 
         {/* Totals */}

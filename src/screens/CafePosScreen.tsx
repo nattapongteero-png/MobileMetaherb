@@ -15,7 +15,7 @@ import { HeaderFade } from "../components/HeaderFade";
 import { CountBadge } from "../components/CountBadge";
 import { BottomSheet } from "../components/BottomSheet";
 import { showToast } from "../components/Toast";
-import { BRAND_GREEN, DIVIDER_GRAY, PRICE_GREEN, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, DIVIDER_GRAY, PRICE_GREEN, TEXT_MUTED } from "../theme/tokens";
 import { useAppWidth } from "../theme/layout";
 import { useStore } from "../store/db";
 import { cafeStore, cafeQueue, placeCafeOrder } from "../store/cafe";
@@ -300,6 +300,7 @@ export function CafePosScreen() {
   const [resumedId, setResumedId] = useState<number | null>(null);
   const [heldOpen, setHeldOpen] = useState(false);
   const [checkout, setCheckout] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [pay, setPay] = useState<CafePayChannelId>("cash");
   // Checkout runs as stages inside the one sheet (no stacked modals):
   // bill → the channel's own step (cash / qr) → done.
@@ -322,6 +323,7 @@ export function CafePosScreen() {
   }, [menu, subFilter, query]);
 
   const channels = CAFE_PAY_CHANNELS.filter((c) => adminState.pay[c.id]);
+  const payChannel = channels.find((c) => c.id === pay) ?? channels[0];
   // 2-up everywhere (bigger tap targets + readable photos, per Fitts).
   // Floor per project convention so flex-wrap can't break the grid.
   const tileW = Math.floor((winW - 32 - 10) / 2);
@@ -943,24 +945,33 @@ export function CafePosScreen() {
             ) : null}
           </View>
 
-          {/* วิธีชำระเงิน — the same ChoiceRow the customer's checkout uses, so
-              the two lists cannot drift apart */}
+          {/* วิธีชำระเงิน — the selected method as a card with a "เปลี่ยน", the
+              shape the customer's checkout uses. The picker itself is a sheet
+              rather than a pushed screen: this subtree is already inside the
+              fullScreen checkout Modal, and there is nowhere to push to. */}
           <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
-            <View className="flex-row items-center" style={{ gap: 6, marginBottom: 2 }}>
-              <CreditCard size={18} color={BRAND_GREEN} />
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>วิธีชำระเงิน</Text>
+            <View className="flex-row items-center justify-between" style={{ marginBottom: 12 }}>
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <CreditCard size={18} color={BRAND_GREEN} />
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>วิธีชำระเงิน</Text>
+              </View>
+              <Pressable hitSlop={6} onPress={() => setPayOpen(true)} className="active:opacity-60">
+                <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>เปลี่ยน</Text>
+              </Pressable>
             </View>
-            {channels.map((c, i) => (
-              <ChoiceRow
-                key={c.id}
-                Icon={PAY_ICON[c.id]}
-                label={c.label}
-                desc={c.sub}
-                active={pay === c.id}
-                divider={i > 0}
-                onPress={() => setPay(c.id)}
-              />
-            ))}
+            <Pressable
+              onPress={() => setPayOpen(true)}
+              className="flex-row items-center active:opacity-90"
+              style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingHorizontal: 14, paddingVertical: 12, gap: 12 }}
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                {(() => { const Icon = PAY_ICON[pay]; return <Icon size={22} color={BRAND_GREEN} />; })()}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: "500", color: "#0a0a0a", lineHeight: 18 }}>{payChannel?.label}</Text>
+                <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>{payChannel?.sub}</Text>
+              </View>
+            </Pressable>
           </View>
 
           {/* The figures, spelled out. The action bar carries the number to
@@ -1268,6 +1279,31 @@ export function CafePosScreen() {
           list does the work and registering is the exception, parked top-right.
           Rendered INSIDE the checkout modal, which is fullScreen and would
           otherwise cover a sheet that is only its sibling. */}
+      {/* ช่องทางชำระเงิน — the picker behind "เปลี่ยน". A sheet, not a pushed
+          screen, because the bill it belongs to is already a fullScreen Modal.
+          The rows are the shared ChoiceRow, so this list and the customer's
+          picker cannot drift apart. */}
+      <BottomSheet
+        visible={payOpen}
+        onClose={() => setPayOpen(false)}
+        title="ช่องทางชำระเงิน"
+        centerTitle
+      >
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          {channels.map((c, i) => (
+            <ChoiceRow
+              key={c.id}
+              Icon={PAY_ICON[c.id]}
+              label={c.label}
+              desc={c.sub}
+              active={pay === c.id}
+              divider={i > 0}
+              onPress={() => { setPay(c.id); setPayOpen(false); }}
+            />
+          ))}
+        </View>
+      </BottomSheet>
+
       <BottomSheet
         visible={memberOpen}
         onClose={closeMemberSheet}
