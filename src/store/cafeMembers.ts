@@ -183,6 +183,17 @@ export function earnPoints(memberId: string, orderId?: string, now = Date.now())
   return gained;
 }
 
+/**
+ * Earn for an order placed in the app, where the customer is known by the phone
+ * on their session rather than by a member the cashier picked. Unknown numbers
+ * — and customers who have not joined — simply earn nothing; joining still
+ * happens at the counter, where a person can explain what the card is.
+ */
+export function earnPointsForPhone(phone: string | undefined, orderId?: string, now = Date.now()): number {
+  const m = phone ? memberByPhone(phone) : undefined;
+  return m ? earnPoints(m.id, orderId, now) : 0;
+}
+
 /** Spend a full card. Returns false (and changes nothing) when short. */
 export function redeemPoints(memberId: string, orderId?: string, now = Date.now()): boolean {
   const rule = cafePointRule();

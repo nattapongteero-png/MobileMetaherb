@@ -68,6 +68,10 @@ type Sale = {
    *  and nothing on it says the cup was free. */
   redeemDiscount: number;
   redeemPoints: number;
+  /** The member's card as this bill moved it — "ตอนนี้มีกี่แต้มแล้ว" is the
+   *  question asked at every handover, and it was unanswerable without leaving
+   *  the till. Null when the bill had no member. */
+  member?: { name: string; before: number; after: number; earned: number };
   /** Kept because the bill is emptied on settle — the receipt reads from here. */
   items: { name: string; qty: number; summary: string; total: number }[];
   received?: number;
@@ -361,6 +365,10 @@ export function CafePosScreen() {
   // hides, but the flag stays), and without this the bill would keep the
   // discount while checkout quietly failed to take the points for it.
   const discount = redeeming && canUsePoints && redeemValue > 0 ? redeemValue : 0;
+  /** Where the card lands once this bill is settled — redeem first, then earn,
+   *  the same order settle() applies. */
+  const memberPointsAfter =
+    memberPoints - (discount > 0 ? pointRule.redeemAt : 0) + (pointRule.enabled ? pointRule.earnPerVisit : 0);
   const total = Math.max(0, gross - discount);
   const count = billCount(bill);
   const cups = bill.reduce((n, l) => n + l.qty, 0);
@@ -379,6 +387,16 @@ export function CafePosScreen() {
   // Search results — capped, because the sheet is a picker, not a directory.
   const memberHits = cafeMembers(memberState)
     .filter((m) => matchesMember(m, memberQuery))
+    // Browsing the list: put the cards that can be spent on top, so a free cup
+    // owed is in the cashier's first screenful rather than eight rows down.
+    // Once they are typing they are looking for one person, and reordering
+    // their results under them would only get in the way.
+    .sort((a, bm) =>
+      memberQuery.trim()
+        ? 0
+        : Number(usablePoints(bm, pointRule) >= pointRule.redeemAt) -
+          Number(usablePoints(a, pointRule) >= pointRule.redeemAt),
+    )
     .slice(0, 8);
 
   const closeMemberSheet = () => {
@@ -551,9 +569,17 @@ export function CafePosScreen() {
     // Redeem first (it consumes the full card), then earn from this purchase —
     // the order matters, otherwise today's visit could pay for today's free one.
     // One bill = one point, however many cups are on it.
+    let movement: Sale["member"];
     if (memberId) {
+      const before = memberPoints;
       if (redeeming && discount > 0) redeemPoints(memberId, `POS-${now}`);
-      earnPoints(memberId, `POS-${now}`);
+      const earned = earnPoints(memberId, `POS-${now}`);
+      movement = {
+        name: member?.name ?? "",
+        before,
+        after: before - (discount > 0 ? pointRule.redeemAt : 0) + earned,
+        earned,
+      };
     }
     setMemberId(null);
     setRedeeming(false);
@@ -565,6 +591,7 @@ export function CafePosScreen() {
       change: received != null ? received - total : 0,
       redeemDiscount: discount,
       redeemPoints: discount > 0 ? pointRule.redeemAt : 0,
+      member: movement,
       items: bill.map((l) => ({
         name: byId[l.itemId]?.name ?? l.itemId,
         qty: l.qty,
@@ -593,6 +620,7 @@ export function CafePosScreen() {
       "",
       r.redeemDiscount > 0 ? `แลกฟรี 1 แก้ว (ใช้ ${r.redeemPoints} แต้ม)  −฿${r.redeemDiscount.toLocaleString()}` : "",
       `รวม ฿${r.total.toLocaleString()}`,
+      r.member ? `แต้มสะสม ${r.member.before} → ${r.member.after} (+${r.member.earned})` : "",
       `ชำระโดย ${r.payLabel}`,
       r.change > 0 ? `รับเงิน ฿${(r.received ?? 0).toLocaleString()} · เงินทอน ฿${r.change.toLocaleString()}` : "",
       "",
@@ -857,24 +885,39 @@ export function CafePosScreen() {
           {/* สมาชิก — attach before paying, so the free cup and the points both
               land on this bill */}
           <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#f0f0f0", overflow: "hidden" }}>
-            <Pressable
-              onPress={() => (member ? setMemberId(null) : setMemberOpen(true))}
-              className="flex-row items-center active:opacity-70"
-              style={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
-            >
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                <UserRound size={19} color={BRAND_GREEN} strokeWidth={2.2} />
+            {member ? (
+              /* The attached member is drawn as the same card the picker and
+                 the สมาชิก page use — the ring says how close the card is, and
+                 the แลกฟรีได้ chip says it outright, which a line of text on an
+                 avatar row never did. Tapping it swaps member; the ✕ detaches. */
+              <View style={{ padding: 10 }}>
+                <MemberCard
+                  member={member}
+                  points={memberPoints}
+                  redeemAt={pointRule.redeemAt}
+                  note={`บิลนี้จบเป็น ${memberPointsAfter} แต้ม`}
+                  onPress={() => setMemberOpen(true)}
+                  onRemove={() => { setMemberId(null); setRedeeming(false); }}
+                />
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: "#1c1c1e" }}>
-                  {member ? member.name : "สมาชิก"}
-                </Text>
-                <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>
-                  {member ? `มี ${memberPoints} แต้ม · แตะเพื่อเอาสมาชิกออกจากบิล` : "กรอกเบอร์ลูกค้าเพื่อสะสมแต้ม (บิลนี้ได้ 1 แต้ม)"}
-                </Text>
-              </View>
-              {!member ? <Plus size={18} color={BRAND_GREEN} strokeWidth={2.6} /> : <X size={17} color="#9ca3af" strokeWidth={2.4} />}
-            </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => setMemberOpen(true)}
+                className="flex-row items-center active:opacity-70"
+                style={{ minHeight: 60, paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+                  <UserRound size={19} color={BRAND_GREEN} strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#1c1c1e" }}>สมาชิก</Text>
+                  <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>
+                    {`กรอกเบอร์ลูกค้าเพื่อสะสมแต้ม (บิลนี้ได้ ${pointRule.earnPerVisit} แต้ม)`}
+                  </Text>
+                </View>
+                <Plus size={18} color={BRAND_GREEN} strokeWidth={2.6} />
+              </Pressable>
+            )}
 
             {/* Redeem is offered only when it can actually be honoured */}
             {canUsePoints && redeemValue > 0 ? (
@@ -1098,6 +1141,15 @@ export function CafePosScreen() {
                   <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>ชำระโดย</Text>
                   <Text style={{ fontSize: 12.5, color: "#0a0a0a" }}>{sale?.payLabel}</Text>
                 </View>
+                {sale?.member ? (
+                  <View className="flex-row items-center justify-between">
+                    <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>แต้มสะสม</Text>
+                    <Text style={{ fontSize: 12.5, color: "#0a0a0a" }}>
+                      {sale.member.before} → {sale.member.after}
+                      {sale.member.earned > 0 ? ` (+${sale.member.earned})` : ""}
+                    </Text>
+                  </View>
+                ) : null}
                 {sale && sale.change > 0 ? (
                   <>
                     <View className="flex-row items-center justify-between">
@@ -1138,6 +1190,32 @@ export function CafePosScreen() {
               <Text style={{ fontSize: 18, fontWeight: "800", color: "#0a0a0a", marginTop: 8 }}>รับชำระสำเร็จ</Text>
               <Text style={{ fontSize: 13, color: TEXT_MUTED }}>แจ้งเลขคิวนี้กับลูกค้า</Text>
               <Text style={{ fontSize: 56, fontWeight: "900", color: BRAND_GREEN, marginTop: 2 }}>#{sale?.queueNo}</Text>
+
+              {/* The card as this bill left it. "ตอนนี้มีกี่แต้มแล้ว" is asked at
+                  the handover, and answering it used to mean leaving the till. */}
+              {sale?.member ? (
+                <View style={{ alignSelf: "stretch", backgroundColor: "rgba(49,151,84,0.08)", borderRadius: 16, padding: 14, gap: 6, marginTop: 12 }}>
+                  <View className="flex-row items-center" style={{ gap: 7 }}>
+                    <Gift size={15} color={BRAND_GREEN} strokeWidth={2.4} />
+                    <Text style={{ fontSize: 13.5, fontWeight: "700", color: BRAND_GREEN }} numberOfLines={1}>
+                      {sale.member.name || "สมาชิก"}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-baseline" style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 22, fontWeight: "900", color: "#0a0a0a" }}>{sale.member.after}</Text>
+                    <Text style={{ fontSize: 13, color: TEXT_MUTED }}>
+                      แต้ม · เดิม {sale.member.before}
+                      {sale.redeemDiscount > 0 ? ` − ${sale.redeemPoints} (แลกฟรี)` : ""}
+                      {sale.member.earned > 0 ? ` + ${sale.member.earned} (บิลนี้)` : ""}
+                    </Text>
+                  </View>
+                  {sale.member.after >= pointRule.redeemAt ? (
+                    <Text style={{ fontSize: 12.5, color: BRAND_GREEN, fontWeight: "600" }}>บัตรเต็มแล้ว — ครั้งหน้าแลกฟรีได้ 1 แก้ว</Text>
+                  ) : (
+                    <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>อีก {pointRule.redeemAt - sale.member.after} ครั้ง แลกฟรี 1 แก้ว</Text>
+                  )}
+                </View>
+              ) : null}
 
               <View style={{ alignSelf: "stretch", backgroundColor: "#fafafa", borderRadius: 16, padding: 16, gap: 10, marginTop: 12 }}>
                 <View className="flex-row items-center justify-between">

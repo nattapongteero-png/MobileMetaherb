@@ -14,6 +14,7 @@ import {
   redeemPoints,
   setCafePointRule,
   usablePoints,
+  earnPointsForPhone,
 } from "./cafeMembers";
 
 const NOW = new Date(2026, 8, 2, 10, 0).getTime();
@@ -115,5 +116,20 @@ describe("cafeMembers store", () => {
     expect(memberById(m.id)?.points).toBe(6);
     expect(redeemPoints(m.id, undefined, NOW)).toBe(true);
     expect(memberById(m.id)?.points).toBe(0);
+  });
+
+  it("earns for an app order, matched by the phone on the session", () => {
+    const m = addCafeMember({ phone: "0812345678", name: "มิค" }, NOW);
+    // Dashes are how a phone is displayed; the match is on digits.
+    expect(earnPointsForPhone("081-234-5678", "CAFE-1", NOW)).toBe(1);
+    expect(memberById(m.id)?.points).toBe(1);
+    expect(memberTxns(m.id)[0].orderId).toBe("CAFE-1");
+  });
+
+  it("earns nothing when the customer is not a member, and does not throw", () => {
+    addCafeMember({ phone: "0812345678", name: "มิค" }, NOW);
+    expect(earnPointsForPhone("0899999999", "CAFE-2", NOW)).toBe(0);
+    expect(earnPointsForPhone(undefined, "CAFE-3", NOW)).toBe(0);
+    expect(earnPointsForPhone("", "CAFE-4", NOW)).toBe(0);
   });
 });

@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CalendarDays, Phone, Search, X } from "lucide-react-native";
+import { CalendarDays, Coffee, Gift, Phone, Search, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { HeaderFade } from "../components/HeaderFade";
 import { EmptyState } from "../components/EmptyState";
@@ -39,22 +39,49 @@ export const fmtMemberPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)
  * card, header row (avatar tile + name + status chip), divider, then the stamp
  * card's progress as the footer.
  */
-export function MemberCard({ member, points, redeemAt, onPress }: {
+export function MemberCard({ member, points, redeemAt, onPress, note, onRemove }: {
   member: CafeMember;
   points: number;
   redeemAt: number;
   onPress: () => void;
+  /** Replaces the joined date. The POS bill says where the card lands once the
+   *  bill is settled, which matters more there than when they signed up. */
+  note?: string;
+  /** Shown as an ✕ at the end of the name row — inside the text column, clear
+   *  of the ring. Given when the card is an attachment that can be undone. */
+  onRemove?: () => void;
 }) {
   return (
     <Pressable onPress={onPress} className="flex-row items-center active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", paddingLeft: 14, paddingVertical: 14, paddingRight: 6, gap: 12, overflow: "hidden" }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View>
-          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
+            {onRemove ? (
+              <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel="เอาสมาชิกออกจากบิล" className="active:opacity-60">
+                <X size={16} color="#9ca3af" strokeWidth={2.4} />
+              </Pressable>
+            ) : null}
+          </View>
           <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>{fmtMemberPhone(member.phone)}</Text>
+          {/* The ring already carries the count, but 10/10 and 7/10 read alike
+              at a glance on a busy counter — the state itself has to be said. */}
+          {points >= redeemAt ? (
+            <View className="flex-row items-center self-start" style={{ gap: 4, marginTop: 6, backgroundColor: "rgba(49,151,84,0.1)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Gift size={11} color={BRAND_GREEN} strokeWidth={2.6} />
+              <Text style={{ fontSize: 10.5, fontWeight: "800", color: BRAND_GREEN }}>แลกฟรีได้</Text>
+            </View>
+          ) : null}
           <View className="flex-row items-center" style={{ gap: 5, marginTop: 8 }}>
-            <CalendarDays size={12} color="#9ca3af" strokeWidth={2.2} />
+            {/* The icon follows the line: a date when it is the joining date, a
+                cup when the POS has replaced it with where this bill lands. */}
+            {note ? (
+              <Coffee size={12} color="#9ca3af" strokeWidth={2.2} />
+            ) : (
+              <CalendarDays size={12} color="#9ca3af" strokeWidth={2.2} />
+            )}
             <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED }}>
-              เป็นสมาชิกตั้งแต่ {fmtJoined(member.joinedAt)}
+              {note ?? `เป็นสมาชิกตั้งแต่ ${fmtJoined(member.joinedAt)}`}
             </Text>
           </View>
         </View>

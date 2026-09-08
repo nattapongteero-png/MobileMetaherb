@@ -14,9 +14,11 @@ import {
   placeCafeOrder,
   rateCafeOrder,
   type CafeOrder,
+  cafeOrderById,
   type PlaceCafeOrderInput,
 } from "../store/cafe";
-import { currentUserId } from "../store/session";
+import { currentUserId, sessionStore } from "../store/session";
+import { earnPointsForPhone } from "../store/cafeMembers";
 
 /**
  * META Caffe cart — shared across the café landing, item-detail and cart screens.
@@ -108,8 +110,18 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
   const clear = () => setLines([]);
 
   const placeOrder: Ctx["placeOrder"] = (order) => {
-    // Idempotent per orderId, enforced by the store.
+    // Idempotent per orderId, enforced by the store — but earning is not, so
+    // ask first whether this order is new before awarding anything for it.
+    const alreadyPlaced = cafeOrderById(order.orderId) != null;
     placeCafeOrder(order);
+    // An order placed in the app is a visit like any other. Only the POS used
+    // to earn, so a customer could order through the app week after week and
+    // stay on zero — while their own card screen told them "ซื้อ 1 ครั้ง ได้ 1
+    // แต้ม". The card is keyed by phone, which is what the session carries, so
+    // the same lookup the card screen uses ties the order to a member here.
+    // No phone, or a phone that is not a member yet, simply earns nothing:
+    // joining still happens at the counter, where a person can explain it.
+    if (!alreadyPlaced) earnPointsForPhone(sessionStore.get().user?.phone, order.orderId);
     setLines([]);
     const first = order.items[0];
     const itemsLabel = first ? (order.items.length > 1 ? `${first.name} +${order.items.length - 1}` : first.name) : "ออเดอร์กาแฟ";
