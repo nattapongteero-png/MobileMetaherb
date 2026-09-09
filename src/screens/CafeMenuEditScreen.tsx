@@ -21,6 +21,7 @@ import {
   setCafeItemOff,
   cafeAdminStore,
   cafeOptionLibrary,
+  DEFAULT_CAFE_PREP_MIN,
   type CafeItemTag,
   type CafeOptionGroup,
 } from "../store/cafeAdmin";
@@ -194,7 +195,7 @@ function PriceStepper({ value, onChange }: { value: string; onChange: (v: string
 }
 
 /**
- * เพิ่ม/แก้ไขเมนู Meta Cafe (17.1) — the café counterpart of AddProductScreen:
+ * เพิ่ม/แก้ไขเมนู METAHERB Café (17.1) — the café counterpart of AddProductScreen:
  * same white Sections, pill inputs, ChipSelect and the floating Liquid Glass
  * save bar, so both create forms read as one system. Route: CafeMenuEdit
  * ({ itemId } = edit, absent = create).
@@ -220,6 +221,9 @@ export function CafeMenuEditScreen() {
   const [cost, setCost] = useState(item?.cost != null ? String(item.cost) : "");
   const [fullPrice, setFullPrice] = useState(item?.fullPrice != null ? String(item.fullPrice) : "");
   const [barcode, setBarcode] = useState(item?.barcode ?? "");
+  // เวลาทำต่อแก้ว — the queue clock and the customer's "รับได้ ~x นาที" are
+  // computed from this, so it lives with the menu, not with the order.
+  const [prepMinutes, setPrepMinutes] = useState(item?.prepMinutes != null ? String(item.prepMinutes) : "");
   // Inventory — ควบคุมสินค้าคงคลัง toggle + จำนวนสินค้าในคลัง.
   const [trackStock, setTrackStock] = useState(item?.trackStock ?? false);
   const [stockQty, setStockQty] = useState(item?.stockQty != null ? String(item.stockQty) : "");
@@ -294,6 +298,9 @@ export function CafeMenuEditScreen() {
     if (!n) return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกชื่อเมนู");
     if (!Number.isFinite(p) || p <= 0) return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกราคาขายให้ถูกต้อง");
     if (fullP > 0 && fullP < p) return Alert.alert("ราคาไม่ถูกต้อง", "ราคาเต็มต้องไม่ต่ำกว่าราคาขาย");
+    // เวลาทำเป็นตัวตั้งของเวลารับที่ลูกค้าเห็น — เมนูที่ไม่มีเวลาจะทำให้คิวเพี้ยน
+    const prepM = Number(stripCommas(prepMinutes));
+    if (!Number.isFinite(prepM) || prepM <= 0) return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกเวลาทำต่อแก้ว");
     if (trackStock && !stockQty.trim()) return Alert.alert("กรอกข้อมูลไม่ครบ", "กรุณากรอกจำนวนสินค้าในคลัง");
 
     // Drop half-filled option rows so the storefront never sees a blank choice.
@@ -321,6 +328,7 @@ export function CafeMenuEditScreen() {
       cost: num(cost),
       fullPrice: fullP > p ? fullP : undefined,
       barcode: barcode.trim() || undefined,
+      prepMinutes: prepM,
       trackStock,
       stockQty: trackStock ? num(stockQty) : undefined,
       tags,
@@ -417,6 +425,10 @@ export function CafeMenuEditScreen() {
               </View>
             ) : null}
             {/* บาร์โค้ด last — back-office metadata, not something customers see. */}
+            <View>
+              <FieldLabel required>เวลาทำต่อแก้ว</FieldLabel>
+              <MoneyInput value={prepMinutes} onChange={setPrepMinutes} suffix="นาที" placeholder={`เช่น ${DEFAULT_CAFE_PREP_MIN}`} />
+            </View>
             <View>
               <FieldLabel>บาร์โค้ด</FieldLabel>
               <TextInput value={barcode} onChangeText={setBarcode} placeholder="เช่น 8850000000000" placeholderTextColor="#a3a3a3" keyboardType="numeric" style={INPUT} />

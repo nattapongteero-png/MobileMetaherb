@@ -50,7 +50,7 @@ import { useSeller } from "../context/SellerContext";
 import type { OrderStatus } from "../data/orders";
 import { useStore } from "../store/db";
 import { sessionStore, signOut } from "../store/session";
-import { cafeMemberStore, cafePointRule, memberByPhone, usablePoints } from "../store/cafeMembers";
+import { cafeMemberStore, cafePointRule, memberForUser, usablePoints } from "../store/cafeMembers";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { isTablet } from "../theme/layout";
 
@@ -210,7 +210,7 @@ function ShopFeatureCard({ image, title, subtitle, buttonLabel, onPress }: {
   );
 }
 
-/** META Caffe promo — same gradient layout as SellerApplyCard, coffee-themed.
+/** METAHERB Café promo — same gradient layout as SellerApplyCard, coffee-themed.
  *  A new company feature: order food / snacks / drinks from the café. */
 function CafeFeatureCard({ onPress }: { onPress: () => void }) {
   return (
@@ -225,7 +225,7 @@ function CafeFeatureCard({ onPress }: { onPress: () => void }) {
           <Image source={CAFE_IMG} style={{ position: "absolute", right: 2, bottom: -10, width: 120, height: 120 }} resizeMode="contain" />
           <View style={{ gap: 3 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-              <Text style={{ fontSize: 17, fontWeight: "800", color: "#fff", lineHeight: 22, letterSpacing: 0.2 }}>META Caffe</Text>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: "#fff", lineHeight: 22, letterSpacing: 0.2 }}>METAHERB Café</Text>
               <View style={{ backgroundColor: "#e8c878", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1.5 }}>
                 <Text style={{ fontSize: 9.5, fontWeight: "800", color: "#0b3d2e", letterSpacing: 0.3 }}>ใหม่</Text>
               </View>
@@ -258,7 +258,7 @@ export function AccountScreen() {
   // The café's own stamp card, matched to this account by phone number.
   const cafeState = useStore(cafeMemberStore);
   const cafeRule = cafePointRule(cafeState);
-  const cafeMember = user?.phone ? memberByPhone(user.phone, cafeState) : undefined;
+  const cafeMember = memberForUser(user, cafeState);
   const cafePoints = cafeMember ? usablePoints(cafeMember, cafeRule) : 0;
   const ACTIVE_COUPONS = useActiveCouponCount();
 
@@ -453,10 +453,15 @@ export function AccountScreen() {
                 <Pressable onPress={() => go("CafeStampCard")} className="active:opacity-70" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 14 }}>
                   <Coffee size={17} color="#ffd27a" strokeWidth={2.2} />
                   <View>
+                    {/* A dash said nothing — someone who has never joined read
+                        it as "no points yet" rather than as something they can
+                        do. The tile now names the action instead. */}
                     <Text style={{ fontSize: 15, fontWeight: "800", color: "#ffffff", lineHeight: 18 }}>
-                      {cafeMember ? `${cafePoints}/${cafeRule.redeemAt}` : "—"}
+                      {cafeMember ? `${cafePoints}/${cafeRule.redeemAt}` : "สมัคร"}
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>แต้มคาเฟ่</Text>
+                    <Text style={{ fontSize: 10.5, color: "rgba(255,255,255,0.72)", lineHeight: 14 }}>
+                      {cafeMember ? "แต้มคาเฟ่" : "สมาชิกคาเฟ่"}
+                    </Text>
                   </View>
                 </Pressable>
               </View>
@@ -540,7 +545,7 @@ export function AccountScreen() {
             ]}
           />
 
-          {/* META Caffe — new café-ordering feature from the company */}
+          {/* METAHERB Café — new café-ordering feature from the company */}
           <CafeFeatureCard onPress={() => go("Cafe")} />
 
           {/* More services */}
@@ -575,9 +580,9 @@ export function AccountScreen() {
                 <MenuList
                   items={[
                     { label: "แดชบอร์ดร้านค้า", Icon: Store, onPress: () => go("MyShop") },
-                    // META Caffe is run centrally by Metaherb — its back office
+                    // METAHERB Café is run centrally by Metaherb — its back office
                     // (ตาราง 17) lives outside the seller console.
-                    { label: "หลังบ้าน Meta Cafe", Icon: Coffee, onPress: () => go("CafeAdmin") },
+                    { label: "หลังบ้าน METAHERB Café", Icon: Coffee, onPress: () => go("CafeAdmin") },
                     ...(isTrialBrand ? [{ label: "จัดการแบรนด์ทดสอบ", Icon: FlaskConical, onPress: () => Alert.alert("กำลังพัฒนา", "แดชบอร์ดแบรนด์ทดสอบ กำลังพัฒนา") }] : []),
                   ]}
                 />

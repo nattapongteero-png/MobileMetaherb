@@ -14,7 +14,9 @@ import {
   redeemPoints,
   setCafePointRule,
   usablePoints,
-  earnPointsForPhone,
+  earnPointsForUser,
+  memberForUser,
+  linkMemberAccount,
 } from "./cafeMembers";
 
 const NOW = new Date(2026, 8, 2, 10, 0).getTime();
@@ -121,15 +123,35 @@ describe("cafeMembers store", () => {
   it("earns for an app order, matched by the phone on the session", () => {
     const m = addCafeMember({ phone: "0812345678", name: "มิค" }, NOW);
     // Dashes are how a phone is displayed; the match is on digits.
-    expect(earnPointsForPhone("081-234-5678", "CAFE-1", NOW)).toBe(1);
+    expect(earnPointsForUser({ id: "u-1", phone: "081-234-5678" }, "CAFE-1", NOW)).toBe(1);
     expect(memberById(m.id)?.points).toBe(1);
     expect(memberTxns(m.id)[0].orderId).toBe("CAFE-1");
   });
 
   it("earns nothing when the customer is not a member, and does not throw", () => {
     addCafeMember({ phone: "0812345678", name: "มิค" }, NOW);
-    expect(earnPointsForPhone("0899999999", "CAFE-2", NOW)).toBe(0);
-    expect(earnPointsForPhone(undefined, "CAFE-3", NOW)).toBe(0);
-    expect(earnPointsForPhone("", "CAFE-4", NOW)).toBe(0);
+    expect(earnPointsForUser({ id: "u-1", phone: "0899999999" }, "CAFE-2", NOW)).toBe(0);
+    expect(earnPointsForUser(undefined, "CAFE-3", NOW)).toBe(0);
+    expect(earnPointsForUser(null, "CAFE-4", NOW)).toBe(0);
+  });
+
+  it("keeps the card when the customer changes the phone on their account", () => {
+    const m = addCafeMember({ phone: "0812345678", name: "มิค", userId: "u-1" }, NOW);
+    earnPoints(m.id, "CAFE-5", NOW);
+    // เปลี่ยนเบอร์ในแอป — เบอร์ใหม่ไม่มีในบัตรใบไหนเลย แต่บัตรผูกกับบัญชีไว้แล้ว
+    expect(memberForUser({ id: "u-1", phone: "0999999999" })?.id).toBe(m.id);
+    expect(earnPointsForUser({ id: "u-1", phone: "0999999999" }, "CAFE-6", NOW)).toBe(1);
+  });
+
+  it("links a card the counter created once the same person is seen in the app", () => {
+    const m = addCafeMember({ phone: "0812345678", name: "มิค" }, NOW);
+    expect(memberById(m.id)?.userId).toBeUndefined();
+    // สมัครซ้ำด้วยเบอร์เดิมจากในแอป = คนเดียวกัน — ผูกบัญชีให้ ไม่สร้างใบใหม่
+    const again = addCafeMember({ phone: "081-234-5678", name: "มิค", userId: "u-1" }, NOW);
+    expect(again.id).toBe(m.id);
+    expect(memberById(m.id)?.userId).toBe("u-1");
+    // ผูกแล้วผูกเลย — บัญชีอื่นมาทับไม่ได้
+    linkMemberAccount(m.id, "u-2");
+    expect(memberById(m.id)?.userId).toBe("u-1");
   });
 });

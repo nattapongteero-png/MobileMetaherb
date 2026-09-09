@@ -137,9 +137,9 @@ const DAY_IDS: CafeDayId[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const hhmm = (d: Date): string => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 /**
- * หลังบ้าน Meta Cafe — the café admin console (ตาราง 17: งานหลังบ้าน META Caffe).
+ * หลังบ้าน METAHERB Café — the café admin console (ตาราง 17: งานหลังบ้าน METAHERB Café).
  *
- * META Caffe is run by Metaherb centrally (not by individual shops — see the
+ * METAHERB Café is run by Metaherb centrally (not by individual shops — see the
  * SHOP_MENU_GRID comment in MyShopScreen), so the back office lives outside the
  * seller console. This hub gives the barista/admin: live queue status +
  * new-order alerts (17.10), today's numbers, and the quick-menu grid into the
@@ -228,7 +228,7 @@ export function CafeAdminScreen() {
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader
-        title="หลังบ้าน Meta Cafe"
+        title="หลังบ้าน METAHERB Café"
         subtitle={shopOpen ? `เปิดอยู่ · ปิด ${todayHours.close} น.` : todayHours.enabled ? `ปิดอยู่ · เปิด ${todayHours.open} น.` : "วันนี้ร้านปิด"}
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}

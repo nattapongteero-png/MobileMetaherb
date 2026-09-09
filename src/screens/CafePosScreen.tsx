@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View, Text, ScrollView, Pressable, Image, TextInput, StyleSheet, Alert, Animated, Easing, Share, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets, SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
-import QRCode from "react-native-qrcode-svg";
 import { Banknote, Check, ChevronLeft, Coffee, CreditCard, Gift, ListOrdered, Minus, PauseCircle, Plus, QrCode, ReceiptText, Search, Share2, Trash2, UserRound, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
-import { GlassActionBar, PrimaryAction } from "../components/GlassActionBar";
-import { ChoiceRow, OfferRow, SummaryRow } from "../components/CheckoutRows";
+import { CountAction, GlassActionBar, GradientAction } from "../components/GlassActionBar";
+import { PromptPayCard } from "../components/PromptPayCard";
+import { OfferRow, SummaryRow } from "../components/CheckoutRows";
 import { HeaderFade } from "../components/HeaderFade";
 import { CountBadge } from "../components/CountBadge";
 import { BottomSheet } from "../components/BottomSheet";
@@ -18,10 +18,12 @@ import { showToast } from "../components/Toast";
 import { BRAND_GREEN, BRAND_GREEN_DARK, DIVIDER_GRAY, PRICE_GREEN, TEXT_MUTED } from "../theme/tokens";
 import { useAppWidth } from "../theme/layout";
 import { useStore } from "../store/db";
-import { cafeStore, cafeQueue, placeCafeOrder } from "../store/cafe";
+import { cafeStore, cafeQueue, cafeQueueEta, nextCafeQueueNo, placeCafeOrder } from "../store/cafe";
 import { cafeAdminStore, cafeOptionLibrary, cafePayInfo, CAFE_PAY_CHANNELS, type CafePayChannelId } from "../store/cafeAdmin";
 import { posDraftStore, takePosDraft, type PosChoice, type PosLine } from "../store/posDraft";
-import { activeCafeMenu, resolveOptionGroups, type AdminCafeItem } from "../data/cafeAdminMenu";
+import { posPayStore } from "../store/posPay";
+import { CafePayPickerBody, posPayOptions } from "./CafePaymentMethodScreen";
+import { activeCafeMenu, orderPrepMinutes, resolveOptionGroups, type AdminCafeItem } from "../data/cafeAdminMenu";
 import { CAFE_SUBS } from "../data/cafeMenu";
 import { METAHERB_SHOP } from "../data/shopOrders";
 import { promptPayPayload, MERCHANT_PROMPTPAY, MERCHANT_NAME } from "../utils/promptpay";
@@ -32,12 +34,14 @@ import {
   cafeMembers,
   cafePointRule,
   memberByPhone,
+  linkMemberAccount,
   memberById,
   addCafeMember,
   usablePoints,
   earnPoints,
   redeemPoints,
 } from "../store/cafeMembers";
+import { appAccountByPhone } from "../store/session";
 import type { RootStackParamList } from "../navigation/RootStack";
 
 const SUB_BY_ID = Object.fromEntries(CAFE_SUBS.map((s) => [s.id, s]));
@@ -72,7 +76,7 @@ type Sale = {
   /** The member's card as this bill moved it — "ตอนนี้มีกี่แต้มแล้ว" is the
    *  question asked at every handover, and it was unanswerable without leaving
    *  the till. Null when the bill had no member. */
-  member?: { name: string; before: number; after: number; earned: number };
+  member?: { id: string; name: string; before: number; after: number; earned: number };
   /** Kept because the bill is emptied on settle — the receipt reads from here. */
   items: { name: string; qty: number; summary: string; total: number }[];
   received?: number;
@@ -86,8 +90,6 @@ const STAGE_TITLE: Record<PayStage, string> = {
   done: "รับชำระสำเร็จ",
   receipt: "ใบเสร็จ",
 };
-
-const PROMPTPAY_BLUE = "#003d7a";
 
 /** พอดี + the notes a customer is likely to hand over above that amount. */
 function cashQuickAmounts(total: number): number[] {
@@ -142,6 +144,19 @@ const PILL_H = ADD_BTN;
 const PILL_COLLAPSED_W = ADD_BTN;
 const PILL_W = STEP_BTN * 2 + QTY_W + STEP_GAP * 2;
 const SLIDE_X = STEP_BTN + QTY_W + STEP_GAP * 2;
+
+/** พักบิล — the same pill on the menu grid's bar and on the bill's. */
+function HoldBillButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="items-center justify-center active:opacity-70"
+      style={{ height: 50, borderRadius: 999, borderWidth: 1, borderColor: "#d97706", paddingHorizontal: 16 }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: "700", color: "#d97706" }}>พักบิล</Text>
+    </Pressable>
+  );
+}
 
 /** One tappable menu tile — tapping anywhere on the card is the same as the +
  *  (opens ตัวเลือกเพิ่มเติม, or drops a plain item straight on the bill), exactly
@@ -276,7 +291,7 @@ function BarCircle({ children, onPress, label, tint = "rgba(49,151,84,0.12)" }: 
 }
 
 /**
- * POS หน้าบ้าน Meta Cafe (17.2) — ซื้อ-ขายหน้าร้าน ชำระเงิน และพักบิล.
+ * POS หน้าบ้าน METAHERB Café (17.2) — ซื้อ-ขายหน้าร้าน ชำระเงิน และพักบิล.
  *
  * Charging a bill places a real order in the shared café queue
  * (store/cafe.ts), so the barista's คิวคาเฟ่ picks it up exactly like an
@@ -301,7 +316,10 @@ export function CafePosScreen() {
   const [heldOpen, setHeldOpen] = useState(false);
   const [checkout, setCheckout] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [pay, setPay] = useState<CafePayChannelId>("cash");
+  /** Set while the bill is stepped aside for the option editor (a pushed
+   *  screen) — the editor is the only thing the bill leaves for. */
+  const reopenCheckout = useRef(false);
+  const pay = useStore(posPayStore);
   // Checkout runs as stages inside the one sheet (no stacked modals):
   // bill → the channel's own step (cash / qr) → done.
   const [stage, setStage] = useState<PayStage>("bill");
@@ -310,6 +328,9 @@ export function CafePosScreen() {
 
   const adminState = useStore(cafeAdminStore);
   useStore(cafeStore);
+  /** What the counter still owes the customers standing there. */
+  const queueOrders = cafeQueue(METAHERB_SHOP);
+  const queueWaiting = queueOrders.filter((o) => o.status !== "picked_up").length;
   const menu = useMemo(() => activeCafeMenu(adminState), [adminState]);
   const library = cafeOptionLibrary(adminState);
   const byId = useMemo(() => Object.fromEntries(menu.map((i) => [i.id, i])), [menu]);
@@ -324,6 +345,8 @@ export function CafePosScreen() {
 
   const channels = CAFE_PAY_CHANNELS.filter((c) => adminState.pay[c.id]);
   const payChannel = channels.find((c) => c.id === pay) ?? channels[0];
+  /** The same mark the picker lists it with, so the two cannot disagree. */
+  const payMark = posPayOptions(adminState).find((o) => o.id === pay);
   // 2-up everywhere (bigger tap targets + readable photos, per Fitts).
   // Floor per project convention so flex-wrap can't break the grid.
   const tileW = Math.floor((winW - 32 - 10) / 2);
@@ -370,8 +393,13 @@ export function CafePosScreen() {
   const discount = redeeming && canUsePoints && redeemValue > 0 ? redeemValue : 0;
   /** Where the card lands once this bill is settled — redeem first, then earn,
    *  the same order settle() applies. */
+  /** The member this settled bill belonged to, read live so the ring shows the
+   *  balance the settle just wrote. */
+  const soldMember = sale?.member ? memberById(sale.member.id, memberState) : undefined;
   const memberPointsAfter =
-    memberPoints - (discount > 0 ? pointRule.redeemAt : 0) + (pointRule.enabled ? pointRule.earnPerVisit : 0);
+    discount > 0
+      ? memberPoints - pointRule.redeemAt
+      : memberPoints + (pointRule.enabled ? pointRule.earnPerVisit : 0);
   const total = Math.max(0, gross - discount);
   const count = billCount(bill);
   const cups = bill.reduce((n, l) => n + l.qty, 0);
@@ -432,7 +460,12 @@ export function CafePosScreen() {
     const phone = phoneInput.replace(/[^0-9]/g, "");
     if (phone.length !== 10) { showToast("กรอกเบอร์ 10 หลัก", "error"); return; }
     const found = memberByPhone(phone, memberState);
-    const m = found ?? addCafeMember({ phone, name: memberName.trim() || `คุณ ${phone.slice(-4)}` });
+    // A phone the app already knows brings its own name — better than the
+    // "คุณ 3111" placeholder, and it is the name the customer sees in the app.
+    const account = appAccountByPhone(phone);
+    const m = found
+      ? (account && !found.userId ? (linkMemberAccount(found.id, account.id), memberById(found.id) ?? found) : found)
+      : addCafeMember({ phone, name: memberName.trim() || account?.name || `คุณ ${phone.slice(-4)}`, userId: account?.id });
     setMemberId(m.id);
     setAddMemberOpen(false);
     closeMemberSheet();
@@ -455,10 +488,31 @@ export function CafePosScreen() {
   const draft = useStore(posDraftStore);
   useEffect(() => {
     if (!draft) return;
+    if (draft.editKey) {
+      // Back from the editor: the bill was closed to get there, so put it back.
+      if (reopenCheckout.current) { reopenCheckout.current = false; setStage("bill"); setCheckout(true); }
+      // Came back from an existing line: swap it in place rather than adding a
+      // second cup, and keep it where it was on the bill.
+      const key = [lineKey(draft.itemId, draft.opts), draft.note ?? ""].join("|");
+      setBill((b) => b.map((l) => (l.key === draft.editKey ? { key, itemId: draft.itemId, qty: draft.qty, opts: draft.opts, note: draft.note } : l)));
+      Haptics.selectionAsync().catch(() => {});
+      takePosDraft();
+      return;
+    }
+
     takePosDraft();
     addLine(draft.itemId, draft.opts, draft.qty, draft.note);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
+
+  // Backing out of the editor without saving leaves no draft, so the bill has
+  // to be restored on the way back in.
+  useEffect(() => {
+    const off = nav.addListener("focus", () => {
+      if (reopenCheckout.current) { reopenCheckout.current = false; setStage("bill"); setCheckout(true); }
+    });
+    return off;
+  }, [nav]);
 
   // Emptying the bill by hand discards its identity — the next hold is a new bill.
   useEffect(() => {
@@ -479,6 +533,27 @@ export function CafePosScreen() {
   const addItem = (item: AdminCafeItem) => {
     if (resolveOptionGroups(item, library).length > 0) { nav.navigate("CafePosItem", { itemId: item.id }); return; }
     addLine(item.id, []);
+  };
+  /** Open a line already on the bill to change what was chosen for it. Without
+   *  this the only way to fix "หวานน้อย" was to delete the cup and ring it up
+   *  again from scratch — the customer's own cart has always allowed it. */
+  const editLine = (line: BillLine) => {
+    const it = byId[line.itemId];
+    if (!it || resolveOptionGroups(it, library).length === 0) return;
+    // The bill is a fullScreen Modal, and a pushed screen lands behind it —
+    // tapping a line simply did nothing. Step out of the modal for the edit and
+    // step back in when it returns.
+    reopenCheckout.current = true;
+    setCheckout(false);
+    nav.navigate("CafePosItem", {
+      itemId: line.itemId,
+      editKey: line.key,
+      initial: {
+        picked: Object.fromEntries(line.opts.map((o) => [o.group, o.choice])),
+        note: line.note ?? "",
+        qty: line.qty,
+      },
+    });
   };
   /** Tile − takes one off the most recent variant of that item on the bill. */
   const decrementItem = (itemId: string) => {
@@ -544,18 +619,20 @@ export function CafePosScreen() {
    *  cashier what they must read out — the queue number (and any change). */
   const settle = (received?: number) => {
     if (count === 0) return;
-    const orders = cafeStore.get();
-    const queueNo = orders.reduce((m, o) => Math.max(m, o.queueNo), 0) + 1;
+    const queueNo = nextCafeQueueNo();
     const preparingAhead = cafeQueue(METAHERB_SHOP).filter((o) => o.status === "preparing").length;
     const payLabel = CAFE_PAY_CHANNELS.find((c) => c.id === pay)?.label ?? "เงินสด";
     const now = Date.now();
-    const waitMinutes = 5;
+    // The same clock the app quotes: what this bill takes to make, queued behind
+    // whatever the bar has not finished yet.
+    const prepMinutes = orderPrepMinutes(bill, menu);
+    const { readyAt, waitMinutes } = cafeQueueEta(prepMinutes, now);
     placeCafeOrder({
       orderId: `POS-${now}`,
       userId: "pos-walkin",
       shopName: METAHERB_SHOP,
       payLabel,
-      receiveLabel: "รับที่หน้าร้าน",
+      receiveLabel: "รับที่ร้าน",
       items: bill.map((l) => ({
         name: byId[l.itemId]?.name ?? l.itemId,
         qty: l.qty,
@@ -567,7 +644,8 @@ export function CafePosScreen() {
       queueNo,
       queueAhead: preparingAhead,
       waitMinutes,
-      readyAt: now + waitMinutes * 60000,
+      prepMinutes,
+      readyAt,
     });
     // Redeem first (it consumes the full card), then earn from this purchase —
     // the order matters, otherwise today's visit could pay for today's free one.
@@ -575,9 +653,14 @@ export function CafePosScreen() {
     let movement: Sale["member"];
     if (memberId) {
       const before = memberPoints;
-      if (redeeming && discount > 0) redeemPoints(memberId, `POS-${now}`);
-      const earned = earnPoints(memberId, `POS-${now}`);
+      // A bill that spends the card does not also fill it: the free cup IS what
+      // this visit was worth, and earning on top would hand back a tenth of the
+      // next card for taking the reward.
+      const spent = redeeming && discount > 0;
+      if (spent) redeemPoints(memberId, `POS-${now}`);
+      const earned = spent ? 0 : earnPoints(memberId, `POS-${now}`);
       movement = {
+        id: memberId,
         name: member?.name ?? "",
         before,
         after: before - (discount > 0 ? pointRule.redeemAt : 0) + earned,
@@ -631,6 +714,23 @@ export function CafePosScreen() {
     ].filter(Boolean).join("\n");
   };
 
+  /** "เปลี่ยน" shows the customer's own ช่องทางชำระเงิน — the same body, drawn
+   *  inside the bill rather than navigated to. Leaving the bill for it meant
+   *  dismissing a fullScreen Modal and presenting a modal screen over it, which
+   *  came back to the wrong screen and stranded the header. */
+  const openPayPicker = () => setPayOpen(true);
+
+  /** Back walks the stages it came through. It used to shut the whole sheet
+   *  from anywhere, so stepping out of รับเงินสด to fix the bill dropped the
+   *  cashier on the menu grid — with the bill still there, but two taps away
+   *  and looking like it had been lost. */
+  const backFromStage = () => {
+    if (stage === "cash" || stage === "qr") { setStage("bill"); setCashIn(""); return; }
+    if (stage === "receipt") { setStage("done"); return; }
+    if (stage === "done") { nextSale(); return; }
+    closeCheckout();
+  };
+
   /** Success → straight back to the grid, ready for the next customer. */
   const nextSale = () => {
     setSale(null);
@@ -638,7 +738,9 @@ export function CafePosScreen() {
   };
 
   // Room for the pinned bill bar.
-  const bottomPad = (count > 0 ? 92 : 24) + insets.bottom;
+  // The glass bar is taller than the capsule it replaced, so the grid needs
+  // more room under it — the last row was sliding beneath the buttons.
+  const bottomPad = (count > 0 ? 116 : 24) + insets.bottom;
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
@@ -651,15 +753,31 @@ export function CafePosScreen() {
         rightSlot={
           /* Held bills live behind a header icon (badge = how many) — visible
              but out of the way of the sales grid (Zeigarnik without clutter) */
-          <View>
-            <GlassIconButton onPress={() => setHeldOpen(true)} accessibilityLabel="บิลที่พักไว้">
-              <ReceiptText size={20} color="#1a1a1a" strokeWidth={2.2} />
-            </GlassIconButton>
-            {held.length > 0 ? (
-              <View pointerEvents="none" style={{ position: "absolute", top: -3, right: -3 }}>
-                <CountBadge count={held.length} color="#d97706" />
-              </View>
-            ) : null}
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            {/* คิวออเดอร์ — the till is where the staff stand all day, and the
+                queue was three taps and a screen away through หลังบ้าน. The
+                badge counts what is still being made, so a glance answers
+                "anything waiting?" without opening anything. */}
+            <View>
+              <GlassIconButton onPress={() => nav.navigate("CafeQueue")} accessibilityLabel="คิวออเดอร์">
+                <ListOrdered size={20} color="#1a1a1a" strokeWidth={2.2} />
+              </GlassIconButton>
+              {queueWaiting > 0 ? (
+                <View pointerEvents="none" style={{ position: "absolute", top: -3, right: -3 }}>
+                  <CountBadge count={queueWaiting} />
+                </View>
+              ) : null}
+            </View>
+            <View>
+              <GlassIconButton onPress={() => setHeldOpen(true)} accessibilityLabel="บิลที่พักไว้">
+                <ReceiptText size={20} color="#1a1a1a" strokeWidth={2.2} />
+              </GlassIconButton>
+              {held.length > 0 ? (
+                <View pointerEvents="none" style={{ position: "absolute", top: -3, right: -3 }}>
+                  <CountBadge count={held.length} color="#d97706" />
+                </View>
+              ) : null}
+            </View>
           </View>
         }
         bottomSlot={
@@ -722,35 +840,17 @@ export function CafePosScreen() {
         <HeaderFade />
       </View>
 
-      {/* Pinned bill bar */}
+      {/* Pinned bill bar — the app's own glass bar, not a white capsule of its
+          own. It had its own height, radius, shadow and a bottom offset that
+          floated it higher than every other bar in the app. */}
       {count > 0 ? (
-        <View
-          style={{
-            position: "absolute", left: 16, right: 16, bottom: 16 + insets.bottom,
-            backgroundColor: "#fff", borderRadius: 999, paddingLeft: 20, paddingRight: 8, height: 60,
-            flexDirection: "row", alignItems: "center", gap: 10,
-            shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 16, elevation: 8,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: "800", color: "#0a0a0a" }}>฿ {total.toLocaleString()}</Text>
-            <Text style={{ fontSize: 11, color: TEXT_MUTED }}>{count} รายการ</Text>
-          </View>
-          <Pressable
-            onPress={holdBill}
-            className="active:opacity-70"
-            style={{ height: 44, borderRadius: 999, borderWidth: 1, borderColor: "#d97706", paddingHorizontal: 14, justifyContent: "center" }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#d97706" }}>พักบิล</Text>
-          </Pressable>
-          <Pressable
-            onPress={openCheckout}
-            className="active:opacity-80"
-            style={{ height: 44, borderRadius: 999, backgroundColor: BRAND_GREEN, paddingHorizontal: 18, justifyContent: "center" }}
-          >
-            <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#fff" }}>ชำระเงิน</Text>
-          </Pressable>
-        </View>
+        <GlassActionBar>
+          <HoldBillButton onPress={holdBill} />
+          {/* Count and total inside the button, as the customer's cart bar has
+              them — the till kept them in a block beside it, so the same bar
+              read as two different things. */}
+          <CountAction count={count} label="ชำระเงิน" amount={`฿${total.toLocaleString()}`} onPress={openCheckout} />
+        </GlassActionBar>
       ) : null}
 
       {/* Held-bills sheet — iOS-grouped rows (same card language as the
@@ -816,11 +916,16 @@ export function CafePosScreen() {
           the one gesture that must not be easy here. Kept as a modal rather
           than a route so the bill, the held bills and the attached member stay
           exactly where they are in this screen's state. */}
-      <Modal visible={checkout} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={stage === "done" ? nextSale : closeCheckout}>
+      <Modal visible={checkout} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={backFromStage}>
+        {/* A Modal is its own native view tree, and react-native-safe-area-context
+            gives it zero insets unless a provider is placed inside it. Without
+            this the header sat under the status bar and the back chevron landed
+            beneath the Dynamic Island, where it cannot be tapped. */}
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
           <SubPageHeader
             title={STAGE_TITLE[stage]}
-            onBack={stage === "done" ? nextSale : closeCheckout}
+            onBack={backFromStage}
             showSearch={false}
           />
         <View style={{ flex: 1 }}>
@@ -840,22 +945,33 @@ export function CafePosScreen() {
               const qty = line.qty;
               const accent = SUB_BY_ID[it.subId]?.accent ?? BRAND_GREEN;
               const summary = optionSummary(line);
+              const editable = resolveOptionGroups(it, library).length > 0;
               return (
                 <View key={line.key} className="flex-row items-center" style={{ gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: "rgba(60,60,67,0.12)" }}>
-                  {it.imageUri || it.image != null ? (
-                    <Image source={it.imageUri ? { uri: it.imageUri } : it.image} style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" resizeMethod="resize" />
-                  ) : (
-                    <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: `${accent}1a`, alignItems: "center", justifyContent: "center" }}>
-                      <Coffee size={20} color={accent} strokeWidth={2} />
+                  {/* Tapping the cup edits it; the stepper on the right still
+                      belongs to quantity alone. */}
+                  <Pressable
+                    onPress={() => editLine(line)}
+                    disabled={!editable}
+                    accessibilityLabel={editable ? `แก้ไข ${it.name}` : undefined}
+                    className="flex-row items-center active:opacity-70"
+                    style={{ flex: 1, minWidth: 0, gap: 12 }}
+                  >
+                    {it.imageUri || it.image != null ? (
+                      <Image source={it.imageUri ? { uri: it.imageUri } : it.image} style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#f5f5f5" }} resizeMode="cover" resizeMethod="resize" />
+                    ) : (
+                      <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: `${accent}1a`, alignItems: "center", justifyContent: "center" }}>
+                        <Coffee size={20} color={accent} strokeWidth={2} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{it.name}</Text>
+                      {summary ? (
+                        <Text numberOfLines={2} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 1 }}>{summary}</Text>
+                      ) : null}
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: BRAND_GREEN, marginTop: 2 }}>฿{lineTotal(line, byId).toLocaleString()}</Text>
                     </View>
-                  )}
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{it.name}</Text>
-                    {summary ? (
-                      <Text numberOfLines={2} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 1 }}>{summary}</Text>
-                    ) : null}
-                    <Text style={{ fontSize: 13, fontWeight: "800", color: BRAND_GREEN, marginTop: 2 }}>฿{lineTotal(line, byId).toLocaleString()}</Text>
-                  </View>
+                  </Pressable>
                   {/* Same stepper pill as the menu tile, so one control reads
                       the same in both places */}
                   <View className="flex-row items-center" style={{ height: 32, borderRadius: 999, backgroundColor: "#fff", borderWidth: 1, borderColor: "#e5e7eb" }}>
@@ -891,57 +1007,71 @@ export function CafePosScreen() {
           {/* บัตรสะสมแต้ม — attach before paying, so the free cup and the points
               both land on this bill */}
           <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
-            <View className="flex-row items-center" style={{ gap: 6, marginBottom: 6 }}>
-              <Gift size={18} color={BRAND_GREEN} />
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>บัตรสะสมแต้ม</Text>
+            <View className="flex-row items-center justify-between" style={{ marginBottom: 6 }}>
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <Gift size={18} color={BRAND_GREEN} />
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>บัตรสะสมแต้ม</Text>
+              </View>
+              {/* Same affordance as วิธีชำระเงิน: the word, in the heading row,
+                  whether or not anyone is attached yet. An ✕ on the card read
+                  as "delete this member", which is not what it did, and a bare
+                  + at the end of an empty row said even less. */}
+              <Pressable hitSlop={6} onPress={() => setMemberOpen(true)} className="active:opacity-60">
+                <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>
+                  {member ? "เปลี่ยน" : "เลือก"}
+                </Text>
+              </Pressable>
             </View>
             {member ? (
               /* The attached member is drawn as the same card the picker and
                  the สมาชิก page use — the ring says how close the card is, and
                  the แลกฟรีได้ chip says it outright, which a line of text on an
-                 avatar row never did. Tapping it swaps member; the ✕ detaches. */
+                 avatar row never did. Taking them off the bill lives in the
+                 picker, next to the choices it belongs with. */
               <View style={{ marginTop: 6 }}>
                 <MemberCard
                   member={member}
                   points={memberPoints}
                   redeemAt={pointRule.redeemAt}
-                  note={`บิลนี้จบเป็น ${memberPointsAfter} แต้ม`}
+                  pending={discount > 0 || !pointRule.enabled ? 0 : pointRule.earnPerVisit}
+                  freeCup={discount > 0}
+                  filled
                   onPress={() => setMemberOpen(true)}
-                  onRemove={() => { setMemberId(null); setRedeeming(false); }}
                 />
               </View>
             ) : (
+              /* The empty slot is drawn as the payment card is: a filled tile,
+                 not a bare row. Both are "the choice that goes here", and on a
+                 page where one of them was a tile and the other a line, the
+                 member section read as a caption rather than as something to
+                 fill in. Fill rather than a border, because that is what วิธี
+                 ชำระเงิน already uses — matching it was the point. */
               <Pressable
                 onPress={() => setMemberOpen(true)}
-                className="flex-row items-center active:opacity-70"
-                style={{ minHeight: 60, paddingVertical: 12, gap: 12 }}
+                className="flex-row items-center active:opacity-90"
+                style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingHorizontal: 14, paddingVertical: 12, gap: 12, marginTop: 6 }}
               >
-                <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
-                  <UserRound size={19} color={BRAND_GREEN} strokeWidth={2.2} />
+                <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
+                  <UserRound size={22} color={BRAND_GREEN} strokeWidth={2.2} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#1c1c1e" }}>สมาชิก</Text>
-                  <Text style={{ fontSize: 12, color: "#8a8f8a", marginTop: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "500", color: "#0a0a0a", lineHeight: 18 }}>สมาชิก</Text>
+                  <Text style={{ fontSize: 11, color: TEXT_MUTED, lineHeight: 14 }}>
                     {`กรอกเบอร์ลูกค้าเพื่อสะสมแต้ม (บิลนี้ได้ ${pointRule.earnPerVisit} แต้ม)`}
                   </Text>
                 </View>
-                <Plus size={18} color={BRAND_GREEN} strokeWidth={2.6} />
               </Pressable>
             )}
 
             {/* Redeem is offered only when it can actually be honoured. Same
                 row the customer's own checkout uses. */}
             {canUsePoints && redeemValue > 0 ? (
-              <View>
-                <OfferRow
-                  Icon={Gift}
-                  label="ใช้แต้มแลกฟรี 1 แก้ว"
-                  desc={`ตัด ${pointRule.redeemAt} แต้ม · ลดให้ ฿${redeemValue.toLocaleString()}`}
-                  active={redeeming}
-                  divider
-                  onPress={() => setRedeeming((v) => !v)}
-                />
-              </View>
+              <OfferRow
+                label="ใช้แต้มแลกฟรี 1 แก้ว"
+                desc={`ตัด ${pointRule.redeemAt} แต้ม · ลดให้ ฿${redeemValue.toLocaleString()}`}
+                active={redeeming}
+                onPress={() => setRedeeming((v) => !v)}
+              />
             ) : null}
           </View>
 
@@ -955,17 +1085,23 @@ export function CafePosScreen() {
                 <CreditCard size={18} color={BRAND_GREEN} />
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#0a0a0a", lineHeight: 20 }}>วิธีชำระเงิน</Text>
               </View>
-              <Pressable hitSlop={6} onPress={() => setPayOpen(true)} className="active:opacity-60">
+              <Pressable hitSlop={6} onPress={openPayPicker} className="active:opacity-60">
                 <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK, lineHeight: 18 }}>เปลี่ยน</Text>
               </Pressable>
             </View>
             <Pressable
-              onPress={() => setPayOpen(true)}
+              onPress={openPayPicker}
               className="flex-row items-center active:opacity-90"
               style={{ backgroundColor: "#f9fafb", borderRadius: 24, paddingHorizontal: 14, paddingVertical: 12, gap: 12 }}
             >
+              {/* The mark the picker showed a moment ago — PromptPay is a logo,
+                  and this card was drawing a lucide QR glyph instead. */}
               <View style={{ width: 40, height: 40, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#fff", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                {(() => { const Icon = PAY_ICON[pay]; return <Icon size={22} color={BRAND_GREEN} />; })()}
+                {payMark?.image ? (
+                  <Image source={payMark.image} style={{ width: 30, height: 30, borderRadius: 7 }} resizeMode="cover" resizeMethod="resize" />
+                ) : payMark?.Icon ? (
+                  <payMark.Icon size={22} color={BRAND_GREEN} />
+                ) : null}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: "500", color: "#0a0a0a", lineHeight: 18 }}>{payChannel?.label}</Text>
@@ -1002,13 +1138,16 @@ export function CafePosScreen() {
             ) : undefined
           }
         >
-          <BarCircle onPress={holdBill} label="พักบิล" tint="rgba(217,119,6,0.14)">
-            <PauseCircle size={22} color="#d97706" strokeWidth={2.2} />
-          </BarCircle>
-          <PrimaryAction
-            label={`รับชำระ ฿${total.toLocaleString()}`}
+          {/* The same two controls the menu grid's bar carries — it was a round
+              icon and a flat pill here, an outlined พักบิล and a gradient one
+              there, so crossing into the bill changed the bar under the
+              cashier's thumb. */}
+          <HoldBillButton onPress={holdBill} />
+          <CountAction
+            count={count}
+            label="รับชำระ"
+            amount={`฿${total.toLocaleString()}`}
             onPress={startPayment}
-            disabled={count === 0}
           />
         </GlassActionBar>
         </>
@@ -1060,11 +1199,10 @@ export function CafePosScreen() {
               </View>
             </ScrollView>
 
+            {/* No back down here: the header already carries one, and two ways
+                out of the same step is one more thing to read. */}
             <GlassActionBar>
-              <BarCircle onPress={() => setStage("bill")} label="ย้อนกลับ" tint="rgba(118,118,128,0.12)">
-                <ChevronLeft size={22} color="#6b7280" strokeWidth={2.4} />
-              </BarCircle>
-              <PrimaryAction
+              <GradientAction
                 label="ยืนยันรับเงิน"
                 onPress={() => settle(Number(cashIn) || total)}
                 disabled={!cashEnough}
@@ -1077,13 +1215,14 @@ export function CafePosScreen() {
              cashier confirms receipt themselves. */
           <>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 16, paddingBottom: 16, alignItems: "center" }}>
-              <View style={{ backgroundColor: "#fff", borderRadius: 20, borderWidth: 1, borderColor: "#f0f0f0", padding: 20, alignItems: "center", gap: 12, alignSelf: "stretch" }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: PROMPTPAY_BLUE, letterSpacing: 0.5 }}>PromptPay</Text>
-                <QRCode value={qrPayload} size={200} />
-                <View style={{ alignItems: "center", gap: 2 }}>
-                  <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>{payInfo.merchantName || MERCHANT_NAME}</Text>
-                  <Text style={{ fontSize: 28, fontWeight: "800", color: "#0a0a0a" }}>฿{total.toLocaleString()}</Text>
-                </View>
+              <View style={{ alignSelf: "stretch" }}>
+                <PromptPayCard
+                  payload={qrPayload}
+                  merchantName={payInfo.merchantName || MERCHANT_NAME}
+                  promptPayId={payInfo.promptPayId || MERCHANT_PROMPTPAY}
+                  amount={total}
+                  size={200}
+                />
               </View>
               <Text style={{ fontSize: 13, color: TEXT_MUTED, textAlign: "center", lineHeight: 19 }}>
                 หันจอให้ลูกค้าสแกน แล้วกดยืนยันเมื่อเงินเข้าบัญชีแล้ว
@@ -1091,10 +1230,7 @@ export function CafePosScreen() {
             </ScrollView>
 
             <GlassActionBar>
-              <BarCircle onPress={() => setStage("bill")} label="ย้อนกลับ" tint="rgba(118,118,128,0.12)">
-                <ChevronLeft size={22} color="#6b7280" strokeWidth={2.4} />
-              </BarCircle>
-              <PrimaryAction label="ลูกค้าชำระแล้ว" onPress={() => settle()} />
+              <GradientAction label="ลูกค้าชำระแล้ว" onPress={() => settle()} />
             </GlassActionBar>
           </>
         ) : stage === "receipt" ? (
@@ -1191,10 +1327,7 @@ export function CafePosScreen() {
             </ScrollView>
 
             <GlassActionBar>
-              <BarCircle onPress={() => setStage("done")} label="ย้อนกลับ" tint="rgba(118,118,128,0.12)">
-                <ChevronLeft size={22} color="#6b7280" strokeWidth={2.4} />
-              </BarCircle>
-              <PrimaryAction
+              <GradientAction
                 label="ส่งใบเสร็จให้ลูกค้า"
                 icon={<Share2 size={16} color="#fff" strokeWidth={2.4} />}
                 onPress={() => sale && Share.share({ message: receiptText(sale) }).catch(() => {})}
@@ -1213,29 +1346,27 @@ export function CafePosScreen() {
               <Text style={{ fontSize: 13, color: TEXT_MUTED }}>แจ้งเลขคิวนี้กับลูกค้า</Text>
               <Text style={{ fontSize: 56, fontWeight: "900", color: BRAND_GREEN, marginTop: 2 }}>#{sale?.queueNo}</Text>
 
-              {/* The card as this bill left it. "ตอนนี้มีกี่แต้มแล้ว" is asked at
-                  the handover, and answering it used to mean leaving the till. */}
-              {sale?.member ? (
-                <View style={{ alignSelf: "stretch", backgroundColor: "rgba(49,151,84,0.08)", borderRadius: 16, padding: 14, gap: 6, marginTop: 12 }}>
-                  <View className="flex-row items-center" style={{ gap: 7 }}>
-                    <Gift size={15} color={BRAND_GREEN} strokeWidth={2.4} />
-                    <Text style={{ fontSize: 13.5, fontWeight: "700", color: BRAND_GREEN }} numberOfLines={1}>
-                      {sale.member.name || "สมาชิก"}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-baseline" style={{ gap: 8 }}>
-                    <Text style={{ fontSize: 22, fontWeight: "900", color: "#0a0a0a" }}>{sale.member.after}</Text>
-                    <Text style={{ fontSize: 13, color: TEXT_MUTED }}>
-                      แต้ม · เดิม {sale.member.before}
-                      {sale.redeemDiscount > 0 ? ` − ${sale.redeemPoints} (แลกฟรี)` : ""}
-                      {sale.member.earned > 0 ? ` + ${sale.member.earned} (บิลนี้)` : ""}
-                    </Text>
-                  </View>
-                  {sale.member.after >= pointRule.redeemAt ? (
-                    <Text style={{ fontSize: 12.5, color: BRAND_GREEN, fontWeight: "600" }}>บัตรเต็มแล้ว — ครั้งหน้าแลกฟรีได้ 1 แก้ว</Text>
-                  ) : (
-                    <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>อีก {pointRule.redeemAt - sale.member.after} ครั้ง แลกฟรี 1 แก้ว</Text>
-                  )}
+              {/* The card as this bill left it — the same card the bill showed a
+                  moment ago, so the cashier is looking at the thing they were
+                  just looking at rather than at a summary of it. The ring is
+                  read from the store, which the settle has already updated, and
+                  the pill states what it moved from. */}
+              {soldMember ? (
+                <View style={{ alignSelf: "stretch", marginTop: 12 }}>
+                  <MemberCard
+                    member={soldMember}
+                    // The card exactly as the bill drew it a moment ago: the
+                    // balance this bill started from, and the points it added.
+                    // Counted back from the settled total rather than from the
+                    // opening one, so a bill that spent a card reads from what
+                    // was left of it rather than from what it had before.
+                    points={Math.max(0, (sale?.member?.after ?? 0) - (sale?.member?.earned ?? 0))}
+                    pending={sale?.member?.earned ?? 0}
+                    redeemAt={pointRule.redeemAt}
+                    filled
+                    shadow
+                    onPress={() => {}}
+                  />
                 </View>
               ) : null}
 
@@ -1264,7 +1395,7 @@ export function CafePosScreen() {
               <BarCircle onPress={() => { nextSale(); nav.navigate("CafeQueue"); }} label="ดูคิวออเดอร์" tint="rgba(0,122,255,0.12)">
                 <ListOrdered size={21} color="#007aff" strokeWidth={2.2} />
               </BarCircle>
-              <PrimaryAction label="ขายรายการถัดไป" onPress={nextSale} />
+              <GradientAction label="ขายรายการถัดไป" onPress={nextSale} />
             </GlassActionBar>
           </>
         )}
@@ -1275,32 +1406,35 @@ export function CafePosScreen() {
         <HeaderFade />
         </View>
         </View>
+        </SafeAreaProvider>
       {/* สมาชิก — search first: the counter usually has a member already, so the
           list does the work and registering is the exception, parked top-right.
           Rendered INSIDE the checkout modal, which is fullScreen and would
           otherwise cover a sheet that is only its sibling. */}
-      {/* ช่องทางชำระเงิน — the picker behind "เปลี่ยน". A sheet, not a pushed
-          screen, because the bill it belongs to is already a fullScreen Modal.
-          The rows are the shared ChoiceRow, so this list and the customer's
-          picker cannot drift apart. */}
+      {/* ช่องทางชำระเงิน — the customer's screen, shown as a sheet.
+          It carries its own ✕ and title on the grouped grey, so the sheet is
+          given no header of its own: with one, the till got a white strip the
+          customer's screen does not have, and the two stopped matching. */}
       <BottomSheet
         visible={payOpen}
         onClose={() => setPayOpen(false)}
-        title="ช่องทางชำระเงิน"
-        centerTitle
+        title=""
+        noHeader
+        fill
+        minHeightRatio={0.94}
       >
-        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-          {channels.map((c, i) => (
-            <ChoiceRow
-              key={c.id}
-              Icon={PAY_ICON[c.id]}
-              label={c.label}
-              desc={c.sub}
-              active={pay === c.id}
-              divider={i > 0}
-              onPress={() => { setPay(c.id); setPayOpen(false); }}
-            />
-          ))}
+        {/* The grey has to carry the sheet's own top corners: a square fill
+            painted over them squared the sheet off. */}
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#f2f2f7",
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            overflow: "hidden",
+          }}
+        >
+          <CafePayPickerBody pos onClose={() => setPayOpen(false)} />
         </View>
       </BottomSheet>
 
@@ -1310,8 +1444,11 @@ export function CafePosScreen() {
         title="สมาชิก"
         centerTitle
         // The list should run to the bottom of the sheet; a centerTitle sheet
-        // hugs its content unless told to fill.
+        // hugs its content unless told to fill. Opened at 90% because the
+        // cashier is scanning a list of cards — a sheet sized to its content
+        // shows three of them and asks for a scroll before the first choice.
         fill
+        minHeightRatio={0.9}
         rightSlot={
           <GlassIconButton onPress={openAddMember} size={44} accessibilityLabel="เพิ่มสมาชิกใหม่">
             <Plus size={22} color={BRAND_GREEN} strokeWidth={2.8} />
@@ -1338,6 +1475,23 @@ export function CafePosScreen() {
               </View>
 
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 10, paddingBottom: insets.bottom + 12 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {/* Taking the member off the bill is a choice among the members,
+                    so it lives here rather than as an ✕ on the card. */}
+                {member ? (
+                  <Pressable
+                    onPress={() => { setMemberId(null); setRedeeming(false); closeMemberSheet(); }}
+                    className="flex-row items-center active:opacity-70"
+                    style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", paddingHorizontal: 14, paddingVertical: 14, gap: 12 }}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "#f4f4f5", alignItems: "center", justifyContent: "center" }}>
+                      <X size={19} color="#9ca3af" strokeWidth={2.4} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>ไม่ผูกสมาชิกกับบิลนี้</Text>
+                      <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>บิลนี้จะไม่ได้แต้มและแลกฟรีไม่ได้</Text>
+                    </View>
+                  </Pressable>
+                ) : null}
                 {memberHits.length === 0 ? (
                   <Text style={{ fontSize: 13, color: TEXT_MUTED, textAlign: "center", paddingVertical: 24 }}>
                     {memberQuery ? "ไม่พบสมาชิกที่ค้นหา — กด + มุมขวาบนเพื่อสมัครใหม่" : "พิมพ์เบอร์หรือชื่อเพื่อค้นหา"}
@@ -1380,7 +1534,14 @@ export function CafePosScreen() {
               <FieldLabel>เบอร์โทรศัพท์</FieldLabel>
               <TextInput
                 value={phoneInput}
-                onChangeText={(t) => setPhoneInput(t.replace(/[^0-9]/g, ""))}
+                onChangeText={(t) => {
+                  const d = t.replace(/[^0-9]/g, "");
+                  setPhoneInput(d);
+                  // Same rule as the back-office form: a phone the app knows
+                  // fills its own name in, unless the cashier typed one.
+                  const acc = d.length === 10 ? appAccountByPhone(d) : undefined;
+                  if (acc && !memberName.trim()) setMemberName(acc.name);
+                }}
                 placeholder="08xxxxxxxx"
                 placeholderTextColor="#a3a3a3"
                 keyboardType="number-pad"
@@ -1388,6 +1549,11 @@ export function CafePosScreen() {
                 autoFocus
                 style={PAYOUT_INPUT}
               />
+              {phoneInput.length === 10 && appAccountByPhone(phoneInput) ? (
+                <Text style={{ fontSize: 12, color: BRAND_GREEN_DARK }}>
+                  เบอร์นี้มีบัญชีในแอป — บัตรสะสมจะขึ้นในแอปของลูกค้าเลย
+                </Text>
+              ) : null}
             </View>
             <View style={{ gap: 6 }}>
               <FieldLabel>ชื่อลูกค้า</FieldLabel>
@@ -1402,7 +1568,7 @@ export function CafePosScreen() {
           </ScrollView>
 
           <GlassActionBar>
-            <PrimaryAction
+            <GradientAction
               label="บันทึกและเรียกใช้"
               onPress={attachMember}
               disabled={phoneInput.replace(/\D/g, "").length !== 10}

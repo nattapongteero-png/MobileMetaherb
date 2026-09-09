@@ -26,9 +26,11 @@ type Spec = {
 };
 
 const SPECS: Spec[] = [
-  // The demo account itself, so the customer side of the stamp card is not
-  // empty on a fresh install (phone matches session.DEMO_USER).
-  { id: "mem-seed-me", name: "ณัฐพงษ์", phone: "0614213111", earnedDaysAgo: [2, 5, 9, 14, 22, 30] },
+  // The demo account is deliberately NOT in this list: the app opens as someone
+  // who has not joined yet, so the สมัครสมาชิก flow on บัตรสะสมแต้ม (and the
+  // offer on the café checkout) is what a fresh install actually shows. To go
+  // back to a stamped card, put the demo phone back:
+  //   { id: "mem-seed-me", name: "ณัฐพงษ์", phone: "0614213111", earnedDaysAgo: [2, 5, 9, 14, 22, 30] },
   // Card full — walks in today and gets a free cup.
   { id: "mem-seed-1", name: "มิ้นท์", phone: "0812345678", earnedDaysAgo: [1, 3, 5, 8, 12, 15, 19, 23, 27, 31] },
   // Two thirds of the way there — the most common state on a real card.

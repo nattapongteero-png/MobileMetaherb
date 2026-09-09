@@ -100,7 +100,7 @@ export function CafeNotificationScreen() {
       <StatusBar style="dark" />
 
       <SubPageHeader
-        title="แจ้งเตือน Meta Cafe"
+        title="แจ้งเตือน METAHERB Café"
         subtitle={unreadCount > 0 ? `มี ${unreadCount} รายการที่ยังไม่อ่าน` : "อ่านครบทุกรายการแล้ว"}
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}

@@ -1,5 +1,5 @@
 /**
- * META Caffe — order detail / status (opened by tapping a queue banner).
+ * METAHERB Café — order detail / status (opened by tapping a queue banner).
  * Plain full-bleed sections: order status (queue + estimated ready time, live),
  * ordered items, and order info. Once ready, "รับออเดอร์แล้ว" clears the order.
  * Reads the order from CafeCartContext by id (same source as the queue banners).
@@ -92,7 +92,7 @@ export function CafeOrderDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title="รายละเอียดออเดอร์" subtitle="META Caffe" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <SubPageHeader title="รายละเอียดออเดอร์" subtitle="METAHERB Café" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
 
       <View style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + ((active && done) || (isHistory && !reviewed) ? 96 : 24) }}>

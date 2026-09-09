@@ -1,5 +1,5 @@
 /**
- * สมาชิก & แต้ม Meta Cafe (17.7) — a stamp card, kept deliberately simple.
+ * สมาชิก & แต้ม METAHERB Café (17.7) — a stamp card, kept deliberately simple.
  *
  * The rule is one point per visit — per bill, not per cup and not per baht.
  * Per-cup let one person buy three coffees for their table and walk away with
@@ -10,9 +10,11 @@
  * Members are identified by phone number — it works for a walk-in who has never
  * installed the app, which a QR in the customer app cannot.
  *
- * This is the CAFÉ's own membership. It has no link to a Metaherb account; the
- * phone number is the only key, so a customer who happens to use both is
- * matched by phone if the app ever wants to.
+ * This is the CAFÉ's own membership: a walk-in with no app can hold a card, so
+ * the phone number the cashier types is the key. A customer who also has a
+ * METAHERB account is additionally LINKED to it (`userId`) the first time the
+ * two are seen to be the same person — the phone still finds them at the
+ * counter, and the link keeps their card when they change that phone.
  *
  * Pure TS — no react-native — so it stays Vitest-runnable.
  */
@@ -26,6 +28,11 @@ export type CafeMember = {
   phone: string;
   name: string;
   points: number;
+  /** The METAHERB account this card belongs to, once the two have been matched.
+   *  Set when the customer joins from the app, and when the counter registers a
+   *  phone the app already knows. Looked up before the phone, so changing the
+   *  number in the app no longer strands the card. */
+  userId?: string;
   joinedAt: number;
   /** Last time they bought something — points expire from here, not from join. */
   lastVisitAt: number;
@@ -101,6 +108,22 @@ export function cafePointRule(s: CafeMemberState = cafeMemberStore.get()): CafeP
 export const memberByPhone = (phone: string, s: CafeMemberState = cafeMemberStore.get()): CafeMember | undefined =>
   cafeMembers(s).find((m) => digits(m.phone) === digits(phone));
 
+/**
+ * The card belonging to a signed-in customer: by account first, then by the
+ * phone on that account.
+ *
+ * Order matters. The phone is what the counter knows, so it stays a way in —
+ * but once a card carries an account id, changing the phone number in the app
+ * (or the shop correcting a typo in it) must not lose the card.
+ */
+export const memberForUser = (
+  user: { id: string; phone: string } | null | undefined,
+  s: CafeMemberState = cafeMemberStore.get(),
+): CafeMember | undefined => {
+  if (!user) return undefined;
+  return cafeMembers(s).find((m) => m.userId === user.id) ?? memberByPhone(user.phone, s);
+};
+
 export const memberById = (id: string, s: CafeMemberState = cafeMemberStore.get()): CafeMember | undefined =>
   cafeMembers(s).find((m) => m.id === id);
 
@@ -131,19 +154,34 @@ export const canRedeem = (m: CafeMember, rule: CafePointRule = cafePointRule(), 
 let seq = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${++seq}`;
 
-export function addCafeMember(input: { phone: string; name: string }, now = Date.now()): CafeMember {
+export function addCafeMember(input: { phone: string; name: string; userId?: string }, now = Date.now()): CafeMember {
   const existing = memberByPhone(input.phone);
-  if (existing) return existing; // one member per phone; re-registering is a no-op
+  // One member per phone; re-registering is a no-op — except that it is the
+  // moment the two identities were shown to be the same person, so the link is
+  // recorded even when the card already existed.
+  if (existing) {
+    if (input.userId && !existing.userId) linkMemberAccount(existing.id, input.userId);
+    return memberById(existing.id) ?? existing;
+  }
   const member: CafeMember = {
     id: nextId("mem"),
     phone: digits(input.phone),
     name: input.name.trim(),
+    userId: input.userId,
     points: 0,
     joinedAt: now,
     lastVisitAt: now,
   };
   cafeMemberStore.set((s) => ({ ...s, members: [member, ...cafeMembers(s)] }));
   return member;
+}
+
+/** Tie a card to a METAHERB account. Idempotent; never re-points an existing link. */
+export function linkMemberAccount(memberId: string, userId: string): void {
+  cafeMemberStore.set((s) => ({
+    ...s,
+    members: cafeMembers(s).map((m) => (m.id === memberId && !m.userId ? { ...m, userId } : m)),
+  }));
 }
 
 export function editCafeMember(id: string, patch: Partial<Pick<CafeMember, "name" | "phone">>): void {
@@ -184,13 +222,16 @@ export function earnPoints(memberId: string, orderId?: string, now = Date.now())
 }
 
 /**
- * Earn for an order placed in the app, where the customer is known by the phone
- * on their session rather than by a member the cashier picked. Unknown numbers
- * — and customers who have not joined — simply earn nothing; joining still
- * happens at the counter, where a person can explain what the card is.
+ * Earn for an order placed in the app, where the customer is the signed-in
+ * account rather than a member the cashier picked. Someone who has not joined
+ * simply earns nothing — the app offers them the card at checkout instead.
  */
-export function earnPointsForPhone(phone: string | undefined, orderId?: string, now = Date.now()): number {
-  const m = phone ? memberByPhone(phone) : undefined;
+export function earnPointsForUser(
+  user: { id: string; phone: string } | null | undefined,
+  orderId?: string,
+  now = Date.now(),
+): number {
+  const m = memberForUser(user);
   return m ? earnPoints(m.id, orderId, now) : 0;
 }
 

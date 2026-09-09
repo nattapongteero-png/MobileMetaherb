@@ -1,5 +1,5 @@
 /**
- * Mock café sales history — the numbers behind หลังบ้าน Meta Cafe's report.
+ * Mock café sales history — the numbers behind หลังบ้าน METAHERB Café's report.
  *
  * The console derives every figure from the shared café order store, so an
  * empty store made the whole report read as broken (flat chart, no top sellers,

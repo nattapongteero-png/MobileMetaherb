@@ -9,6 +9,7 @@ import { Clock, Download } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 import { promptPayPayload, MERCHANT_PROMPTPAY, MERCHANT_NAME } from "../utils/promptpay";
+import { PromptPayCard } from "../components/PromptPayCard";
 import { useCafeCart } from "../context/CafeCartContext";
 import { buildCafeOrder } from "../data/cafePayment";
 import { markPaid } from "../store/orders";
@@ -26,7 +27,7 @@ const fmtPhone = (p: string) => p.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 export function PromptPayQRScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { total, orderId, orderIds, cafe, receiveLabel, cafeItems, cafeRedeem } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
+  const { total, orderId, orderIds, cafe, receiveLabel, cafeItems, cafePrep, cafeRedeem } = useRoute<RouteProp<RootStackParamList, "PromptPayQR">>().params;
   const { placeOrder } = useCafeCart();
 
   const payload = useMemo(() => promptPayPayload(MERCHANT_PROMPTPAY, total), [total]);
@@ -68,7 +69,7 @@ export function PromptPayQRScreen() {
     if (cafe) {
       if (confirming.current) return;
       confirming.current = true;
-      placeOrder({ ...buildCafeOrder({ orderId, total, payLabel: "พร้อมเพย์ PromptPay", receiveLabel: receiveLabel ?? "", items: cafeItems ?? [] }), ...cafeRedeem });
+      placeOrder({ ...buildCafeOrder({ orderId, total, payLabel: "พร้อมเพย์ PromptPay", receiveLabel: receiveLabel ?? "", items: cafeItems ?? [], prepMinutes: cafePrep ?? 0 }), ...cafeRedeem });
       nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
       return;
     }
@@ -92,44 +93,13 @@ export function PromptPayQRScreen() {
       />
 
       <ScrollView contentContainerStyle={{ padding: 20, alignItems: "center", paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-        {/* QR card */}
-        <View
-          style={{
-            width: "100%",
-            backgroundColor: "#fff",
-            borderRadius: 24,
-            alignItems: "center",
-            paddingBottom: 22,
-            overflow: "hidden",
-            shadowColor: "#0a3d22",
-            shadowOpacity: 0.08,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 8 },
-          }}
-        >
-          {/* PromptPay brand strip */}
-          <View style={{ width: "100%", backgroundColor: PROMPTPAY_BLUE, paddingVertical: 12, alignItems: "center" }}>
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: 0.5 }}>
-              พร้อมเพย์ <Text style={{ color: "#9fd3ff" }}>PromptPay</Text>
-            </Text>
-          </View>
-
-          <View style={{ padding: 22, alignItems: "center" }}>
-            <View style={{ padding: 12, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "#eee" }}>
-              <QRCode value={payload} size={216} getRef={(c) => (qrRef.current = c)} />
-            </View>
-
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0a0a0a", marginTop: 18 }}>{MERCHANT_NAME}</Text>
-            <Text style={{ fontSize: 13, color: "#737373", marginTop: 2 }}>{fmtPhone(MERCHANT_PROMPTPAY)}</Text>
-
-            <View style={{ height: 1, backgroundColor: "#f0f0f0", alignSelf: "stretch", marginVertical: 16 }} />
-
-            <Text style={{ fontSize: 13, color: "#737373" }}>ยอดที่ต้องชำระ</Text>
-            <Text style={{ fontSize: 34, fontWeight: "800", color: BRAND_GREEN_DARK, marginTop: 2 }}>
-              ฿{total.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </Text>
-          </View>
-        </View>
+        <PromptPayCard
+          payload={payload}
+          merchantName={MERCHANT_NAME}
+          promptPayId={MERCHANT_PROMPTPAY}
+          amount={total}
+          getRef={(c) => { qrRef.current = c as typeof qrRef.current; }}
+        />
 
         {/* Save QR */}
         <Pressable

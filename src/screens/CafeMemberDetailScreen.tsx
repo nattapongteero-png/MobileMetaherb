@@ -1,5 +1,4 @@
-import { useRef, useState } from "react";
-import { View, Text, ScrollView, Animated, PanResponder, Platform } from "react-native";
+import { View, Text, ScrollView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -10,7 +9,6 @@ import { HeaderFade } from "../components/HeaderFade";
 import { EmptyState } from "../components/EmptyState";
 import { BRAND_GREEN, TEXT_MUTED, cardShadow } from "../theme/tokens";
 import { useStore } from "../store/db";
-import { showToast } from "../components/Toast";
 import {
   cafeMemberStore,
   canRedeem,
@@ -34,96 +32,8 @@ const RING_INSET = 20;
  */
 const RING_MAX = 358;
 
-/** The redeem button sits on the tall tile's bottom edge. */
-const REDEEM_H = 52;
-
 const fmtDate = (t: number) => new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
-/**
- * Swipe-to-confirm — redeeming spends a whole card, so it asks for a deliberate
- * gesture rather than a tap that a sleeve on the counter could trigger.
- */
-function SwipeRedeem({ enabled, label, onDone }: { enabled: boolean; label: string; onDone: () => void }) {
-  const [trackW, setTrackW] = useState(0);
-  const knob = REDEEM_H - 8;
-  const maxX = Math.max(0, trackW - knob - 8);
-  const x = useRef(new Animated.Value(0)).current;
-  const at = useRef(0);
-
-  const spring = (to: number) => Animated.spring(x, { toValue: to, useNativeDriver: true, bounciness: 0 }).start();
-
-  // The responder is built once, so it reads the live values through refs.
-  const enabledRef = useRef(enabled);
-  const maxRef = useRef(maxX);
-  const onDoneRef = useRef(onDone);
-  enabledRef.current = enabled;
-  maxRef.current = maxX;
-  onDoneRef.current = onDone;
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_e, g) => enabledRef.current && Math.abs(g.dx) > 3,
-      onPanResponderMove: (_e, g) => {
-        const v = Math.min(maxRef.current, Math.max(0, g.dx));
-        at.current = v;
-        x.setValue(v);
-      },
-      onPanResponderRelease: () => {
-        // Three quarters of the track is a decision, not a nudge.
-        if (maxRef.current > 0 && at.current >= maxRef.current * 0.75) {
-          spring(maxRef.current);
-          onDoneRef.current();
-          setTimeout(() => { at.current = 0; spring(0); }, 350);
-        } else {
-          at.current = 0;
-          spring(0);
-        }
-      },
-    }),
-  ).current;
-
-  return (
-    <View
-      onLayout={(e) => setTrackW(e.nativeEvent.layout.width)}
-      // White capsule on the tinted block, outlined rather than shadowed: on a
-      // flat tint a hairline reads cleaner than a soft shadow.
-      style={{
-        height: REDEEM_H,
-        borderRadius: REDEEM_H / 2,
-        backgroundColor: "#fff",
-        borderWidth: 1,
-        borderColor: "#dfe7e2",
-        justifyContent: "center",
-      }}
-    >
-      <Animated.Text
-        style={{
-          textAlign: "center", fontSize: 13.5, fontWeight: "800", letterSpacing: 0.2,
-          color: enabled ? "#0a0a0a" : "#9ca3af",
-          paddingLeft: knob * 0.6,
-          opacity: maxX > 0 ? x.interpolate({ inputRange: [0, maxX], outputRange: [1, 0] }) : 1,
-        }}
-      >
-        {label}
-      </Animated.Text>
-
-      {/* Always there, so the control still reads as a swipe; grey while the
-          card is short, because the drag will not take. */}
-      <Animated.View
-        {...pan.panHandlers}
-        style={{
-          position: "absolute", left: 4, width: knob, height: knob, borderRadius: knob / 2,
-          backgroundColor: enabled ? "#171717" : "#c9cfcb",
-          alignItems: "center", justifyContent: "center",
-          transform: [{ translateX: x }],
-        }}
-      >
-        <ChevronsRight size={17} color="#fff" strokeWidth={2.8} />
-      </Animated.View>
-    </View>
-  );
-}
 
 /**
  * บัตรสะสมแต้มรายคน (17.7) — the ring first, because the balance is what the
@@ -143,18 +53,6 @@ export function CafeMemberDetailScreen() {
   const txns = member ? memberTxns(member.id, state) : [];
   const redeemCount = txns.filter((t) => t.reason === "redeem").length;
   const redeemable = member != null && canRedeem(member, rule);
-  // Spending a card happens at the till, not here. A free cup only exists once
-  // there is a bill to take it off — redeeming from this page burnt the points
-  // with nothing to show for it and no order to trace the dispute back to. So
-  // the swipe hands the member to the POS with the redeem already armed: the
-  // cashier rings up what the customer actually asked for, and the discount
-  // lands on that bill. (The customer's own card screen is read-only for the
-  // same reason.)
-  const onRedeem = () => {
-    if (!member) return;
-    showToast("เลือกเมนูที่ลูกค้าต้องการ แล้วส่วนลดจะขึ้นเอง", "info");
-    nav.navigate("CafePos", { memberId: member.id, redeem: true });
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
@@ -222,7 +120,14 @@ export function CafeMemberDetailScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "800", color: "#0a0a0a" }}>{redeemCount} แก้ว</Text>
               </View>
 
-              <SwipeRedeem enabled={redeemable} label={redeemable ? "เลื่อนเพื่อแลกที่ POS" : "แต้มไม่พอ"} onDone={onRedeem} />
+              {/* Where redeeming happens, stated rather than offered. This page
+                  is a record — it answers "how does this member stand", and the
+                  free cup is taken off a bill, which only the till has. */}
+              <Text style={{ fontSize: 12.5, color: "#0a0a0a", textAlign: "center", fontWeight: redeemable ? "700" : "400" }}>
+                {redeemable
+                  ? `แลกฟรีได้ 1 แก้ว ผูกสมาชิกในบิลที่หน้าขาย แล้วติ๊กใช้แต้ม`
+                  : `อีก ${rule.redeemAt - points} ครั้ง แลกฟรี 1 แก้ว`}
+              </Text>
             </View>
           </View>
 

@@ -1,5 +1,5 @@
 /**
- * META Caffe — favourite menu.
+ * METAHERB Café — favourite menu.
  * Items the customer starred (with their saved options). Tapping one opens the
  * item detail pre-filled with those options so they can quickly reorder "the
  * usual". The star removes it from favourites.
@@ -35,7 +35,7 @@ export function CafeFavoritesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title="เมนูโปรด" subtitle="META Caffe" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <SubPageHeader title="เมนูโปรด" subtitle="METAHERB Café" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
 
       {empty ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 14 }}>

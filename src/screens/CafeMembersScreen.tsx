@@ -4,13 +4,13 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CalendarDays, Coffee, Gift, Phone, Search, X } from "lucide-react-native";
+import { CalendarDays, Gift, Phone, Search, X } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { HeaderFade } from "../components/HeaderFade";
 import { EmptyState } from "../components/EmptyState";
 import { StampRing } from "../components/StampRing";
 import { PMAddFab } from "./MyShopScreen";
-import { BRAND_GREEN, DIVIDER_GRAY, TEXT_MUTED } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, DIVIDER_GRAY, TEXT_MUTED, cardShadow } from "../theme/tokens";
 import { useStore } from "../store/db";
 import type { RootStackParamList } from "../navigation/RootStack";
 import {
@@ -39,7 +39,7 @@ export const fmtMemberPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)
  * card, header row (avatar tile + name + status chip), divider, then the stamp
  * card's progress as the footer.
  */
-export function MemberCard({ member, points, redeemAt, onPress, note, onRemove }: {
+export function MemberCard({ member, points, redeemAt, onPress, note, pending, filled, shadow, freeCup }: {
   member: CafeMember;
   points: number;
   redeemAt: number;
@@ -47,50 +47,89 @@ export function MemberCard({ member, points, redeemAt, onPress, note, onRemove }
   /** Replaces the joined date. The POS bill says where the card lands once the
    *  bill is settled, which matters more there than when they signed up. */
   note?: string;
-  /** Shown as an ✕ at the end of the name row — inside the text column, clear
-   *  of the ring. Given when the card is an attachment that can be undone. */
-  onRemove?: () => void;
+  /** Points this bill will add: the green tail on the ring, and the "+n" pill
+   *  on the line below the phone. Kept together so the two always agree. */
+  pending?: number;
+  /** The tile treatment the POS bill uses — a grey fill, no border, matching
+   *  the payment card beside it. The list and the picker keep the white card,
+   *  because there it sits on grey and the border is what separates it. */
+  filled?: boolean;
+  /** This bill spends the card, so it earns nothing — the pill says what the
+   *  customer gets instead of what they gain. */
+  freeCup?: boolean;
+  /** Lifts the card off the page — the success screen shows it on its own,
+   *  with nothing around it to give it an edge. */
+  shadow?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} className="flex-row items-center active:opacity-90" style={{ backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#ececed", paddingLeft: 14, paddingVertical: 14, paddingRight: 6, gap: 12, overflow: "hidden" }}>
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center active:opacity-90"
+      style={{
+        // The shadow first: on Android cardShadow backs the view in white for a
+        // correct outline, and the fill has to win over that.
+        ...(shadow ? cardShadow(2) : null),
+        backgroundColor: filled ? "#f9fafb" : "#fff",
+        borderRadius: filled ? 24 : 18,
+        borderWidth: filled ? 0 : 1,
+        borderColor: "#ececed",
+        paddingLeft: 14,
+        paddingVertical: 14,
+        paddingRight: 6,
+        gap: 12,
+        overflow: "hidden",
+      }}
+    >
       <View style={{ flex: 1, minWidth: 0 }}>
         <View>
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
-            {onRemove ? (
-              <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel="เอาสมาชิกออกจากบิล" className="active:opacity-60">
-                <X size={16} color="#9ca3af" strokeWidth={2.4} />
-              </Pressable>
-            ) : null}
-          </View>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: "#0a0a0a" }}>{member.name || "ไม่ระบุชื่อ"}</Text>
           <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>{fmtMemberPhone(member.phone)}</Text>
-          {/* The ring already carries the count, but 10/10 and 7/10 read alike
-              at a glance on a busy counter — the state itself has to be said. */}
-          {points >= redeemAt ? (
-            <View className="flex-row items-center self-start" style={{ gap: 4, marginTop: 6, backgroundColor: "rgba(49,151,84,0.1)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Gift size={11} color={BRAND_GREEN} strokeWidth={2.6} />
-              <Text style={{ fontSize: 10.5, fontWeight: "800", color: BRAND_GREEN }}>แลกฟรีได้</Text>
+          {/* The joining date is a fact about the member and takes an icon; a
+              note passed in is about the bill and reads as a sentence, so it
+              does not. */}
+          {pending || freeCup || points >= redeemAt ? (
+            /* Where the card stands, then what this bill adds. Wrapping is
+               allowed because a long name can squeeze this column. */
+            <View className="flex-row items-center" style={{ flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+              {/* Two facts of unequal weight: where the card was is context,
+                  what this bill adds is the news — so only one of them is
+                  filled in. Same-coloured pills side by side read as a pair of
+                  equals, which is what made the gain easy to skim past. */}
+              {/* A full card has nothing to say about where it started — it is
+                  simply ready, and one pill says that better than two. */}
+              {points < redeemAt ? (
+                <View style={{ backgroundColor: "#f2f3f2", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: "600", color: TEXT_MUTED }}>แต้มเดิม {points}/{redeemAt}</Text>
+                </View>
+              ) : null}
+              {points >= redeemAt || freeCup ? (
+                <View className="flex-row items-center" style={{ gap: 4, backgroundColor: BRAND_GREEN_DARK, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3.5 }}>
+                  <Gift size={12} color="#fff" strokeWidth={2.6} />
+                  <Text style={{ fontSize: 11.5, fontWeight: "800", color: "#fff" }}>แลกฟรีได้</Text>
+                </View>
+              ) : pending ? (
+                <View style={{ backgroundColor: BRAND_GREEN, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3.5 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: "800", color: "#fff" }}>+{pending} แต้ม</Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-          <View className="flex-row items-center" style={{ gap: 5, marginTop: 8 }}>
-            {/* The icon follows the line: a date when it is the joining date, a
-                cup when the POS has replaced it with where this bill lands. */}
-            {note ? (
-              <Coffee size={12} color="#9ca3af" strokeWidth={2.2} />
-            ) : (
+          ) : note ? (
+            <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 8 }}>{note}</Text>
+          ) : (
+            <View className="flex-row items-center" style={{ gap: 5, marginTop: 8 }}>
               <CalendarDays size={12} color="#9ca3af" strokeWidth={2.2} />
-            )}
-            <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED }}>
-              {note ?? `เป็นสมาชิกตั้งแต่ ${fmtJoined(member.joinedAt)}`}
-            </Text>
-          </View>
+              <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED }}>
+                เป็นสมาชิกตั้งแต่ {fmtJoined(member.joinedAt)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
       {/* Flush to the card's bottom-right: the negative margins cancel the
           card's own padding, and the card's overflow crops the ring. */}
       <View style={{ alignSelf: "flex-end", marginBottom: -14, marginRight: -6 }}>
-        <StampRing size={138} points={points} redeemAt={redeemAt} />
+        <StampRing size={138} points={points} redeemAt={redeemAt} pending={pending} />
       </View>
     </Pressable>
   );

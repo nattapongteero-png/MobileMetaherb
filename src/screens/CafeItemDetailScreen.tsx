@@ -1,6 +1,6 @@
 import { GLASS_BAR_TINT, LIQUID_GLASS } from "../theme/tokens";
 /**
- * META Caffe — menu item detail / customisation page.
+ * METAHERB Café — menu item detail / customisation page.
  * Laid out like ProductDetailScreen: full-bleed square hero with a floating glass
  * back button, stacked white sections on a grey backdrop, option pills + quantity
  * stepper, and a floating Liquid-Glass action bar. Adds the customised line to the
@@ -87,7 +87,7 @@ export function CafeItemDetailScreen() {
   };
 
   const onShare = () => {
-    void Share.share({ message: `${item.name} · ${baht(item.price)} — META Caffe ☕` }).catch(() => {});
+    void Share.share({ message: `${item.name} · ${baht(item.price)} — METAHERB Café ☕` }).catch(() => {});
   };
 
   return (

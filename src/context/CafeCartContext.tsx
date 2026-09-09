@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import type { CafeCartLine } from "../data/cafeCart";
 import type { CafePayMethodId, CafeFavorite } from "../data/cafePayment";
@@ -18,10 +18,10 @@ import {
   type PlaceCafeOrderInput,
 } from "../store/cafe";
 import { currentUserId, sessionStore } from "../store/session";
-import { earnPointsForPhone, memberByPhone, redeemPoints } from "../store/cafeMembers";
+import { earnPointsForUser, memberForUser, redeemPoints } from "../store/cafeMembers";
 
 /**
- * META Caffe cart — shared across the café landing, item-detail and cart screens.
+ * METAHERB Café cart — shared across the café landing, item-detail and cart screens.
  * Lines are keyed by item + chosen options (identical lines merge). Item-level
  * helpers (qtyOfItem / decItem) power the quick +/- on the menu cards.
  *
@@ -87,6 +87,34 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, []);
 
+  // The bar getting ahead moves an order's readyAt earlier (reflowCafeQueue), and
+  // the "ready" push was scheduled for the old time — it would have fired minutes
+  // after the drink was already on the counter. Re-arm it whenever the promised
+  // time actually moves; the Live Activity countdown is restarted from the same
+  // figures so the two never disagree.
+  const armedAt = useRef(new Map<string, number>());
+  useEffect(() => {
+    for (const o of activeOrders) {
+      if (o.status !== "preparing") continue;
+      const known = armedAt.current.get(o.orderId);
+      if (known === o.readyAt) continue;
+      armedAt.current.set(o.orderId, o.readyAt);
+      if (known == null) continue; // placeOrder already armed this one
+      const first = o.items[0];
+      const itemsLabel = first ? (o.items.length > 1 ? `${first.name} +${o.items.length - 1}` : first.name) : "ออเดอร์กาแฟ";
+      const live = { orderId: o.orderId, queueNo: o.queueNo, queueAhead: o.queueAhead, itemsLabel, startedAt: o.readyAt - o.waitMinutes * 60000, readyAt: o.readyAt };
+      startOrderLiveActivity(live);
+      startOrderLiveNotification(live);
+      void cancelCafeReadyNotification(o.orderId).then(() =>
+        scheduleCafeReadyNotification({ orderId: o.orderId, readyAt: o.readyAt, queueNo: o.queueNo, itemsLabel }),
+      );
+    }
+    // Forget orders that have left the queue, so a re-placed id arms cleanly.
+    for (const id of [...armedAt.current.keys()]) {
+      if (!activeOrders.some((o) => o.orderId === id)) armedAt.current.delete(id);
+    }
+  }, [activeOrders]);
+
   const add: Ctx["add"] = (line) =>
     setLines((prev) => {
       const i = prev.findIndex((l) => l.key === line.key);
@@ -117,19 +145,20 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
     // An order placed in the app is a visit like any other. Only the POS used
     // to earn, so a customer could order through the app week after week and
     // stay on zero — while their own card screen told them "ซื้อ 1 ครั้ง ได้ 1
-    // แต้ม". The card is keyed by phone, which is what the session carries, so
-    // the same lookup the card screen uses ties the order to a member here.
-    // No phone, or a phone that is not a member yet, simply earns nothing:
-    // joining still happens at the counter, where a person can explain it.
+    // แต้ม". The card is found from the signed-in account — by its link first,
+    // then by its phone — the same lookup the card screen uses. Someone who has
+    // not joined simply earns nothing; the checkout offers them the card.
     if (!alreadyPlaced) {
-      const phone = sessionStore.get().user?.phone;
+      const user = sessionStore.get().user;
       // Redeem before earning, the order settle() uses at the till: otherwise
       // the point this visit just earned could pay for this visit's free cup.
+      // Spending the card is what this visit was worth; it does not also earn.
       if (order.redeemDiscount) {
-        const m = phone ? memberByPhone(phone) : undefined;
+        const m = memberForUser(user);
         if (m) redeemPoints(m.id, order.orderId);
+      } else {
+        earnPointsForUser(user, order.orderId);
       }
-      earnPointsForPhone(phone, order.orderId);
     }
     setLines([]);
     const first = order.items[0];
@@ -148,6 +177,7 @@ export function CafeCartProvider({ children }: { children: ReactNode }) {
     // (same identifier) replaces it. No-op elsewhere.
     startOrderLiveNotification(live);
     // Local "ready" push at readyAt (fires even if the app is closed).
+    armedAt.current.set(order.orderId, order.readyAt);
     void scheduleCafeReadyNotification({ orderId: order.orderId, readyAt: order.readyAt, queueNo: order.queueNo, itemsLabel });
   };
 

@@ -1,5 +1,5 @@
 /**
- * META Caffe — order-placed / success screen.
+ * METAHERB Café — order-placed / success screen.
  * Confirms the café order and surfaces the barista queue: the customer's queue
  * number, how many orders are ahead, and an estimated ready time. Reads the
  * active order from CafeCartContext (the same source as the queue banner).
@@ -54,7 +54,7 @@ export function CafeSuccessScreen() {
             </View>
             <Text style={{ fontSize: 22, fontWeight: "800", color: TEXT_PRIMARY, marginTop: 16 }}>สั่งซื้อสำเร็จ ☕</Text>
             <Text style={{ fontSize: 14, color: TEXT_SECONDARY, marginTop: 6, textAlign: "center", lineHeight: 20 }}>
-              ขอบคุณที่สั่งกับ META Caffe{"\n"}บาริสต้ากำลังเตรียมออเดอร์ให้คุณ
+              ขอบคุณที่สั่งกับ METAHERB Café{"\n"}บาริสต้ากำลังเตรียมออเดอร์ให้คุณ
             </Text>
             <Text style={{ fontSize: 34, fontWeight: "800", color: BRAND_GREEN_DARK, marginTop: 14 }}>{baht(total)}</Text>
           </View>
@@ -124,7 +124,7 @@ export function CafeSuccessScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 12, gap: 8 }}>
           <Pressable onPress={goCafe} className="active:opacity-80 items-center justify-center" style={{ height: 52, borderRadius: 999, overflow: "hidden" }}>
             <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>สั่งเพิ่มที่ META Caffe</Text>
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>สั่งเพิ่มที่ METAHERB Café</Text>
             </LinearGradient>
           </Pressable>
         </View>

@@ -60,6 +60,23 @@ export function signUp(input: { name: string; email: string; phone: string }): U
   return user;
 }
 
+/**
+ * The METAHERB account that owns a phone number, if there is one.
+ *
+ * The counter types a phone; that number is also how a customer's app finds
+ * their stamp card, so the two are already the same key. This is what lets the
+ * back office fill in the name it knows instead of asking for it again — and
+ * tell the cashier that this card will show up in the customer's app.
+ *
+ * With no server there is exactly one account to look in: the signed-in user.
+ * A real directory drops in here without touching the callers.
+ */
+export function appAccountByPhone(phone: string): User | undefined {
+  const d = (s: string) => s.replace(/\D/g, "");
+  const u = sessionStore.get().user;
+  return u && d(u.phone) === d(phone) ? u : undefined;
+}
+
 export function signOut(): void {
   sessionStore.set({ user: null, shopName: null });
 }

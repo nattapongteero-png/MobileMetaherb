@@ -142,7 +142,7 @@ export function CafeMenuCard({ item, onEdit, stats, showStatus = true }: {
 }
 
 /**
- * จัดการเมนู Meta Cafe (17.1) — same shell as จัดการสินค้า (ShopProductsScreen
+ * จัดการเมนู METAHERB Café (17.1) — same shell as จัดการสินค้า (ShopProductsScreen
  * + ProductsManageSection): SubPageHeader, StickyFilterList with a search pill
  * header + sticky category chips, PMCard-style item cards with a long-press
  * card tapping straight into the edit form (where ลบเมนู lives too), and the

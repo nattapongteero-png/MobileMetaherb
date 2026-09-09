@@ -86,7 +86,7 @@ const SEED_VERSION_KEY = "mh.seedVersion";
  * mockup with a live-looking dashboard that is the right trade; within a day,
  * orders they place, coupons they collect and addresses they type all persist.
  */
-const SEED_SCHEMA = "8";
+const SEED_SCHEMA = "10";
 const seedDay = new Date(SEED_TODAY).toISOString().slice(0, 10);
 export const SEED_VERSION = `${SEED_SCHEMA}@${seedDay}`;
 

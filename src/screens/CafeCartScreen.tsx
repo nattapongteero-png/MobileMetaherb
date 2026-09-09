@@ -1,5 +1,5 @@
 /**
- * META Caffe — cart / order review.
+ * METAHERB Café — cart / order review.
  * Lists customised café cart lines (image · name · options summary · price),
  * with per-line quantity stepper + remove, a clear-all header action, and a
  * sticky total + checkout bar. Checkout is a mockup (confirms then clears).
@@ -46,7 +46,7 @@ export function CafeCartScreen() {
       <StatusBar style="dark" />
       <SubPageHeader
         title="ตะกร้า"
-        subtitle="META Caffe"
+        subtitle="METAHERB Café"
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}
       />

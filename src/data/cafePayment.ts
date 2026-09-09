@@ -4,7 +4,7 @@ import { Banknote } from "lucide-react-native";
 
 export type CafePayMethodId = "promptpay" | "cash";
 
-import { queueAheadOf, type CafeOrder, type CafeOrderItem } from "../store/cafe";
+import { cafeQueueEta, nextCafeQueueNo, queueAheadOf, type CafeOrder, type CafeOrderItem } from "../store/cafe";
 import { currentUserId, DEMO_USER } from "../store/session";
 import { METAHERB_SHOP } from "./shopOrders";
 
@@ -35,14 +35,14 @@ const RAW_HISTORY: Omit<CafeOrder, "userId" | "shopName" | "status">[] = [
   {
     orderId: "CAFE20390712",
     payLabel: "เงินสด",
-    receiveLabel: "จัดส่ง",
+    receiveLabel: "รับที่ร้าน",
     items: [
       { name: "มัทฉะลาเต้ (เย็น)", qty: 2, summary: "หวานปกติ", total: 190 },
       { name: "ครัวซองต์เนยสด", qty: 1, summary: "", total: 55 },
     ],
-    total: 265, // 245 + ค่าส่ง 20
+    total: 245,
     queueNo: 12, queueAhead: 0, waitMinutes: 0, readyAt: 0,
-    ratingService: 5, ratingTaste: 5, comment: "มัทฉะเข้มข้นอร่อย ส่งไวดีค่ะ",
+    ratingService: 5, ratingTaste: 5, comment: "มัทฉะเข้มข้นอร่อยค่ะ",
   },
   {
     orderId: "CAFE20285940",
@@ -64,21 +64,25 @@ export const INITIAL_CAFE_HISTORY: CafeOrder[] = RAW_HISTORY.map((o) => ({
   pickedUpAt: o.readyAt || Date.now(),
 }));
 
-/** Build a placed order from checkout data — queue figures are a deterministic
- *  mock from the order id; readyAt is stamped from the current time. */
+/**
+ * Build a placed order from checkout data. The queue number comes from the
+ * shared counter, and the pickup time from what is on the bill (`prepMinutes`,
+ * summed by orderPrepMinutes) queued behind whatever the bar is still making.
+ */
 export function buildCafeOrder(input: {
   orderId: string;
   total: number;
   payLabel: string;
   receiveLabel: string;
   items: CafeOrderItem[];
+  /** เวลาทำทั้งบิล — from the menu's เวลาทำต่อแก้ว. */
+  prepMinutes: number;
 }) {
-  const seed = parseInt(input.orderId.replace(/\D/g, "").slice(-4) || "0", 10);
-  const queueNo = 10 + (seed % 40); // running counter #10..#49
+  // The same counter the till uses — see nextCafeQueueNo.
+  const queueNo = nextCafeQueueNo();
   // Orders ahead is now the REAL queue depth, not a hash of the order id.
   const queueAhead = queueAheadOf(METAHERB_SHOP, queueNo);
-  const waitMinutes = queueAhead * 4 + 3; // ~3..23 min depending on queue
-  const readyAt = Date.now() + waitMinutes * 60000;
+  const { readyAt, waitMinutes } = cafeQueueEta(input.prepMinutes);
   return {
     ...input,
     userId: currentUserId(),
@@ -100,7 +104,7 @@ export type CafePayMethod = {
   Icon?: ComponentType<{ size?: number; color?: string }>;
 };
 
-// META Caffe accepts only PromptPay + cash-on-receipt — no COD, cards, wallets
+// METAHERB Café accepts only PromptPay + cash-on-receipt — no COD, cards, wallets
 // or bank transfer (unlike the product checkout's PAYMENT_METHODS).
 export const CAFE_PAY_METHODS: CafePayMethod[] = [
   { id: "promptpay", label: "พร้อมเพย์ (PromptPay)", desc: "สแกน QR ชำระเงิน", image: require("../../assets/payment/promptpay.png") },
