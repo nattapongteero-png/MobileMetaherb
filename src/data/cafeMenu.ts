@@ -1,5 +1,5 @@
 /**
- * META Caffe menu — AUTO-DERIVED from assets/menu caffe/<main>/<sub>/*.png.
+ * METAHERB Café menu — AUTO-DERIVED from assets/menu caffe/<main>/<sub>/*.png.
  * 2-level taxonomy: main category (drink/dessert) → sub category (Coffee, Tea,
  * Milk, Soda, Bakery, Thai Desserts) → items. Prices are mock (seeded by sub).
  * Regenerate with scratchpad/gen-cafe.js if the folder changes.

@@ -80,7 +80,9 @@ export function ChoiceRow({ Icon, image, label, desc, active, divider, onPress }
 
 /** A switch you either take or leave — the free cup on a full stamp card. */
 export function OfferRow({ Icon, label, desc, active, divider, onPress }: {
-  Icon: RowIcon;
+  /** Optional: the row reads on its own under a card that already names the
+   *  thing being offered, and an icon there is one mark too many. */
+  Icon?: RowIcon;
   label: string;
   desc?: string;
   active: boolean;
@@ -90,10 +92,25 @@ export function OfferRow({ Icon, label, desc, active, divider, onPress }: {
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center active:opacity-70"
-      style={{ minHeight: 56, paddingVertical: 12, gap: 12, borderTopWidth: divider ? 1 : 0, borderTopColor: "#f0f0f0" }}
+      className="flex-row items-center active:opacity-90"
+      style={{
+        // Its own card, like the member and payment tiles it sits between —
+        // as a bare row under a card it read as that card's footnote rather
+        // than as a thing to decide. Outlined rather than filled: those two are
+        // slots showing what was chosen, this is a switch, and the empty middle
+        // is what says it has not been flipped yet.
+        minHeight: 56,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        gap: 12,
+        marginTop: divider ? 0 : 8,
+        backgroundColor: "transparent",
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: active ? BRAND_GREEN : "#ececed",
+      }}
     >
-      <Icon size={18} color={BRAND_GREEN} strokeWidth={2.2} />
+      {Icon ? <Icon size={18} color={BRAND_GREEN} strokeWidth={2.2} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 14, fontWeight: "600", color: TEXT_PRIMARY }}>{label}</Text>
         {desc ? <Text style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 1 }}>{desc}</Text> : null}

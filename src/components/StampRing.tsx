@@ -1,6 +1,6 @@
 import { View, Image } from "react-native";
 import Svg, { Circle, Path, Text as SvgText, TextPath } from "react-native-svg";
-import { BRAND_GREEN_DARK } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK } from "../theme/tokens";
 
 const CUP = require("../../assets/coffeecup.png");
 
@@ -23,10 +23,15 @@ export function StampRing({
   redeemAt,
   showCount = true,
   crop = CROP,
+  pending = 0,
 }: {
   size: number;
   points: number;
   redeemAt: number;
+  /** Points this bill is about to add: drawn as a green tail past the dark bar,
+   *  and called out as "+n" on the arc. The bar is the thing being changed, so
+   *  the change belongs on it rather than in a line of text beside it. */
+  pending?: number;
   /** The list card is too small for legible text on the arc. */
   showCount?: boolean;
   /** Fraction of the ring left visible; the rest is cropped away. */
@@ -37,6 +42,12 @@ export function StampRing({
   const ringC = 2 * Math.PI * ringR;
   const disc = size - ringW * 2 - Math.round(size * 0.045);
   const pct = Math.min(1, redeemAt > 0 ? points / redeemAt : 0);
+  // The bar is centred on 12 o'clock and grows out of both ends, so the points
+  // this bill adds do too: the green is the longer arc drawn underneath, and
+  // what shows past the dark one is the gain. Growing it one way instead left
+  // the ring lopsided, which is not how the rest of it reads.
+  const pctWithPending = Math.min(1, redeemAt > 0 ? (points + pending) / redeemAt : 0);
+  const pendPct = Math.max(0, pctWithPending - pct);
 
   const arcLen = (deg: number) => (ringC * deg) / 360;
   const arcRot = (deg: number) => -90 - deg / 2;
@@ -50,6 +61,8 @@ export function StampRing({
   const [x2, y2] = lblPt(60);
   const lblPath = `M ${x1} ${y1} A ${ringR} ${ringR} 0 0 1 ${x2} ${y2}`;
   const pathId = `countArc-${Math.round(size)}`;
+
+
 
   const cupW = disc * 0.52;
   const cupH = cupW * 1.33;
@@ -67,6 +80,21 @@ export function StampRing({
       <View style={{ width: size, height: size, alignItems: "center" }}>
         <Svg width={size} height={size} style={{ position: "absolute" }}>
           <Circle cx={size / 2} cy={size / 2} r={ringR} stroke="#f0f2f0" strokeWidth={ringW} fill="none" />
+          {/* The incoming points first, so the dark bar draws over its start
+              and only the new tail shows green. */}
+          {pendPct > 0 ? (
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={ringR}
+              stroke={BRAND_GREEN}
+              strokeWidth={ringW}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={`${arcLen(GAUGE_DEG * pctWithPending)} ${ringC}`}
+              transform={`rotate(${arcRot(GAUGE_DEG * pctWithPending)} ${size / 2} ${size / 2})`}
+            />
+          ) : null}
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -83,9 +111,13 @@ export function StampRing({
               <Path id={pathId} d={lblPath} fill="none" stroke="none" />
               <SvgText fill="#fff" fontSize={countSize} fontWeight="800" textAnchor="middle" dy={countSize * 0.36}>
                 <TextPath href={`#${pathId}`} startOffset="50%">
-                  {`${points}/${redeemAt}`}
+                  {/* The bar is drawn to where this bill leaves the card, so
+                      the figure on it is that too — the count before is on the
+                      card beside it, and the green says which part is new. */}
+                  {`${Math.min(points + pending, redeemAt)}/${redeemAt}`}
                 </TextPath>
               </SvgText>
+
             </>
           ) : null}
         </Svg>
@@ -113,6 +145,7 @@ export function StampRing({
             </View>
           </View>
         </View>
+
       </View>
 
     </View>

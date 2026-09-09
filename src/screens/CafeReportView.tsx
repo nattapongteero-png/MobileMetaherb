@@ -1,5 +1,5 @@
 /**
- * รายงานยอดขาย Meta Cafe (17.5) — an embedded section of the café console
+ * รายงานยอดขาย METAHERB Café (17.5) — an embedded section of the café console
  * (it used to be its own page; the numbers belong right under the ยอดขาย card).
  *
  * Everything here follows the console's ช่วงเวลา + วันที่ selection, the same

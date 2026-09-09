@@ -46,6 +46,26 @@ Whenever a UI change is requested, cite the relevant law/section ("Increased hit
 - Paged sections (แนะนำ / Flash Sale): each page is `SCREEN_WIDTH`-wide with 2 cards inside.
 - Indicator dots animate via `Animated.Value` bound to `scrollX` + `interpolate`.
 
+## Reuse Before You Draw
+
+The café has two faces — the customer's app and the shop's POS — and they show
+the same things: a menu item with its options, a bill, a payment picker, a
+PromptPay slip, a stamp card, an order. **When a surface already exists on the
+customer side, lift it and use it; do not draw a second version for the back
+office.** Two versions of the same thing drift, and a shop worker who has also
+used the app as a customer has to learn the screen twice.
+
+In practice:
+
+- Look for the customer-side screen first (`Cafe*Screen.tsx`), and check
+  `src/components/` for a shared piece that has already been extracted.
+- If the two need to differ, extract the shared part into `src/components/` and
+  give it a prop for the difference — do not fork the file.
+- Shared already: `MemberCard`, `StampRing`, `OptionGroup`/`RadioRow`,
+  `ChoiceRow`/`OfferRow`/`SummaryRow`, `PayMethodList`, `PromptPayCard`,
+  `GlassActionBar`/`PrimaryAction`, `BottomSheet`, `SubPageHeader`.
+- Every floating bottom bar is `GlassActionBar`. Do not hand-roll a capsule.
+
 ## Don't
 
 - Don't pull `expo-image` — it broke build under Node 24 type-stripping. Use plain `react-native` `Image`.

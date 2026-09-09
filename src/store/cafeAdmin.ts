@@ -1,5 +1,5 @@
 /**
- * Meta Cafe back-office state — the admin overlay for the café console.
+ * METAHERB Café back-office state — the admin overlay for the café console.
  *
  * The café menu seed (data/cafeMenu.ts) is a frozen, require()-backed array, so
  * menu CRUD works like the shop catalog does (data/liveCatalog.ts): the seed is
@@ -118,7 +118,19 @@ export type CafeItemFields = {
   optionGroups?: CafeOptionGroup[];
   /** Admin-picked photo (device uri) — overrides a seed item's bundled image. */
   imageUri?: string;
+  /** เวลาทำต่อแก้ว (นาที) — how long the bar takes to make one of these.
+   *  The customer is told a pickup time the moment they order, so the estimate
+   *  has to come from what is actually on the bill: a shaken tea and a pour-over
+   *  are not the same five minutes. Absent = DEFAULT_CAFE_PREP_MIN. */
+  prepMinutes?: number;
 };
+
+/** What an item takes when nobody has said — a plain espresso drink. */
+export const DEFAULT_CAFE_PREP_MIN = 4;
+
+/** เวลาทำของเมนูหนึ่งแก้ว, นาที. */
+export const itemPrepMinutes = (item: { prepMinutes?: number }): number =>
+  item.prepMinutes != null && item.prepMinutes > 0 ? item.prepMinutes : DEFAULT_CAFE_PREP_MIN;
 
 /** Per-item override; applies to seed AND custom items alike. */
 export type CafeMenuEdit = CafeItemFields & {
@@ -216,7 +228,7 @@ export type CafeBanner = {
 // ── พื้นที่ขาย (17.9) ──────────────────────────────────────────
 /**
  * The shop's catchment: a circle on the map, plus the rules for when a customer
- * standing inside it gets the (already-built, fixed-copy) Meta Cafe banner.
+ * standing inside it gets the (already-built, fixed-copy) METAHERB Café banner.
  * One branch today — kept as a single object rather than a list, because a fake
  * array would only invite half-built multi-branch code.
  */
@@ -247,7 +259,7 @@ export type CafeArea = {
 };
 
 export const DEFAULT_CAFE_AREA: CafeArea = {
-  name: "Meta Cafe สาขาราษฎร์บูรณะ",
+  name: "METAHERB Café สาขาราษฎร์บูรณะ",
   lat: 13.6717,
   lng: 100.5043,
   radiusM: 500,
@@ -432,7 +444,7 @@ export function isInsideCafeArea(lat: number, lng: number, a: CafeArea = cafeAre
 }
 
 /**
- * Should the Meta Cafe banner sit on the customer's home screen right now?
+ * Should the METAHERB Café banner sit on the customer's home screen right now?
  *
  * It's a card in the page, not a popup, so there is nothing to rate-limit: a
  * customer inside the ring simply sees the shop. Pure, so the rule is testable.

@@ -6,7 +6,7 @@
  * activeCafeMenu(), which filters those out.
  */
 import { CAFE_MENU, type CafeItem } from "./cafeMenu";
-import { cafeAdminStore, type CafeAdminState, type CafeItemFields } from "../store/cafeAdmin";
+import { cafeAdminStore, itemPrepMinutes, type CafeAdminState, type CafeItemFields } from "../store/cafeAdmin";
 
 export type AdminCafeItem = Omit<CafeItem, "image"> & CafeItemFields & {
   /** Bundled image handle — absent on admin-created items. */
@@ -38,3 +38,21 @@ export function adminCafeMenu(state: CafeAdminState = cafeAdminStore.get()): Adm
 /** Only items that are actually for sale — the POS / customer-facing list. */
 export const activeCafeMenu = (state?: CafeAdminState): AdminCafeItem[] =>
   adminCafeMenu(state).filter((i) => !i.off);
+
+/**
+ * เวลาทำทั้งบิล, นาที — the sum of each line's เวลาทำ times its quantity.
+ *
+ * One barista, one drink at a time: two lattes take twice one latte. It is the
+ * honest floor for what to promise, and it is what both the app checkout and
+ * the till feed into the queue clock.
+ */
+export function orderPrepMinutes(
+  lines: { itemId: string; qty: number }[],
+  menu: AdminCafeItem[] = adminCafeMenu(),
+): number {
+  const total = lines.reduce((sum, l) => {
+    const item = menu.find((i) => i.id === l.itemId);
+    return sum + itemPrepMinutes(item ?? {}) * Math.max(1, l.qty);
+  }, 0);
+  return Math.max(1, total);
+}

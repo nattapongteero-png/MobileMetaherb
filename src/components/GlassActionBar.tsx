@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
 import { GlassView } from "expo-glass-effect";
+import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_GREEN, GLASS_BAR_TINT } from "../theme/tokens";
 
 /**
@@ -51,6 +52,69 @@ export function PrimaryAction({ label, onPress, disabled, icon }: {
     >
       {icon}
       <Text style={{ color: "#fff", fontSize: 14.5, fontWeight: "700", lineHeight: 19 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The action that carries a count and a total — the café's cart bar, and the
+ * POS's ชำระเงิน. Lifted from the customer's café screen: a gradient pill with
+ * the number in a translucent chip, the label, and the amount at the far end.
+ * The till used to put the amount in a block beside the button instead, which
+ * made the same bar read as two different things.
+ */
+export function CountAction({ count, label, amount, onPress }: {
+  count: number;
+  label: string;
+  amount: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} className="active:opacity-80" style={{ flex: 1, height: 50, borderRadius: 999, overflow: "hidden" }}>
+      <LinearGradient
+        colors={["#0b3d2e", "#1a7a4c"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 10 }}
+      >
+        <View style={{ minWidth: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>{count}</Text>
+        </View>
+        <Text style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 15 }}>{label}</Text>
+        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{amount}</Text>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+/**
+ * The same pill as CountAction without a count or a total — for the steps that
+ * only have one thing to say (ยืนยันรับเงิน, ลูกค้าชำระแล้ว, ขายรายการถัดไป).
+ * They were flat green while the bill's button was a gradient, so the primary
+ * changed colour as the cashier moved through the sale.
+ */
+export function GradientAction({ label, onPress, disabled, icon }: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  icon?: ReactNode;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      className="active:opacity-80"
+      style={{ flex: 1, height: 50, borderRadius: 999, overflow: "hidden", opacity: disabled ? 0.4 : 1 }}
+    >
+      <LinearGradient
+        colors={["#0b3d2e", "#1a7a4c"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }}
+      >
+        {icon}
+        <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>{label}</Text>
+      </LinearGradient>
     </Pressable>
   );
 }

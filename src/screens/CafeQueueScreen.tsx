@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Check, Clock, Coffee, Gift, HandPlatter } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
+import { CountBadge } from "../components/CountBadge";
 import { EmptyState } from "../components/EmptyState";
 import { showToast } from "../components/Toast";
 import { BRAND_GREEN, TEXT_MUTED } from "../theme/tokens";
@@ -23,23 +24,49 @@ const TABS: { key: FilterTab; label: string }[] = [
 
 const minutesLeft = (readyAt: number): number => Math.max(0, Math.round((readyAt - Date.now()) / 60000));
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+const CHIP_H = 34;
+/** Badge diameter, and where it sits so the chip's edge runs through its
+ *  middle. Derived, not eyeballed, so both stay right if either changes. */
+const BADGE = 18;
+const BADGE_OFFSET = CHIP_H / 2 - CHIP_H / 2 / Math.SQRT2 - BADGE / 2;
+
+function Chip({ label, count, active, onPress }: {
+  label: string;
+  /** How many orders this tab holds — a barista wants to know before tapping. */
+  count?: number;
+  active: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable
-      onPress={onPress}
-      className="active:opacity-70"
-      style={{
-        paddingHorizontal: 14,
-        height: 34,
-        borderRadius: 999,
-        justifyContent: "center",
-        backgroundColor: active ? BRAND_GREEN : "#fff",
-        borderWidth: 1,
-        borderColor: active ? BRAND_GREEN : "#e5e7eb",
-      }}
-    >
-      <Text style={{ fontSize: 13, fontWeight: "600", color: active ? "#fff" : "#525252" }}>{label}</Text>
-    </Pressable>
+    /* The badge rides the chip's corner, the way it rides the queue icon in the
+       POS header — same shape, same red, so "there is something here" reads the
+       same wherever it appears. */
+    <View>
+      <Pressable
+        onPress={onPress}
+        className="active:opacity-70"
+        style={{
+          paddingHorizontal: 14,
+          height: CHIP_H,
+          borderRadius: 999,
+          justifyContent: "center",
+          backgroundColor: active ? BRAND_GREEN : "#fff",
+          borderWidth: 1,
+          borderColor: active ? BRAND_GREEN : "#e5e7eb",
+        }}
+      >
+        <Text style={{ fontSize: 13, fontWeight: "600", color: active ? "#fff" : "#525252" }}>{label}</Text>
+      </Pressable>
+      {count ? (
+        /* Centred on the chip's own curved edge, not on its bounding-box
+           corner: the chip is a pill, so its edge at 45° sits r − r/√2 inside
+           the corner, and the badge is pulled back by that much less its own
+           radius. Sitting it on the corner point left it floating in space. */
+        <View pointerEvents="none" style={{ position: "absolute", top: BADGE_OFFSET, right: BADGE_OFFSET }}>
+          <CountBadge count={count} size={BADGE} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -129,7 +156,7 @@ function QueueCard({ order }: { order: CafeOrder }) {
 }
 
 /**
- * คิวคาเฟ่ (ฝั่งร้าน) — the barista's view of META Caffe.
+ * คิวคาเฟ่ (ฝั่งร้าน) — the barista's view of METAHERB Café.
  *
  * The café had no shop-side surface at all: orders lived in the customer's
  * CafeCartContext and never left the device. Both sides now read the shared
@@ -149,6 +176,12 @@ export function CafeQueueScreen() {
     [queue, filter],
   );
   const preparing = queue.filter((o) => o.status === "preparing").length;
+  /** Per-tab counts for the chips. */
+  const counts: Record<FilterTab, number> = {
+    all: queue.length,
+    preparing,
+    ready: queue.filter((o) => o.status === "ready").length,
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: "#fafafa" }}>
@@ -163,10 +196,18 @@ export function CafeQueueScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ marginHorizontal: -14 }}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}
+            /* Room at the top and the right end for the badges, which sit
+               outside the chips' own bounds. */
+            contentContainerStyle={{ gap: 12, paddingHorizontal: 14, paddingRight: 20, paddingTop: BADGE / 2 }}
           >
             {TABS.map((t) => (
-              <Chip key={t.key} label={t.label} active={filter === t.key} onPress={() => setFilter(t.key)} />
+              <Chip
+                key={t.key}
+                label={t.label}
+                count={counts[t.key]}
+                active={filter === t.key}
+                onPress={() => setFilter(t.key)}
+              />
             ))}
           </ScrollView>
         }

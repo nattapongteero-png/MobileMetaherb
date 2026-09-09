@@ -47,7 +47,7 @@ const isRequiredGroup = (g: CafeOptionGroup): boolean => g.choices.every((c) => 
 export function CafePosItemScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { itemId } = useRoute<Rt>().params;
+  const { itemId, editKey, initial } = useRoute<Rt>().params;
   const adminState = useStore(cafeAdminStore);
   const item = useMemo(() => activeCafeMenu(adminState).find((i) => i.id === itemId), [adminState, itemId]);
   const groups = useMemo(
@@ -57,9 +57,12 @@ export function CafePosItemScreen() {
 
   // ชื่อกลุ่ม → ชื่อตัวเลือก. Add-on groups start empty (= ไม่เพิ่ม); required
   // ones stay empty until the cashier has asked, which gates the action button.
-  const [picked, setPicked] = useState<Record<string, string>>({});
-  const [note, setNote] = useState("");
-  const [qty, setQty] = useState(1);
+  // Seeded from the line being edited, so opening a cup that is already on the
+  // bill shows what was chosen for it rather than a blank sheet — changing the
+  // sweetness should not mean picking everything again.
+  const [picked, setPicked] = useState<Record<string, string>>(initial?.picked ?? {});
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [qty, setQty] = useState(initial?.qty ?? 1);
   const [viewerOpen, setViewerOpen] = useState(false);
 
   // Stretchy hero — zooms in on pull-down instead of leaving a gap.
@@ -101,6 +104,7 @@ export function CafePosItemScreen() {
       qty,
       opts: chosen,
       note: n || undefined,
+      editKey,
     });
     Haptics.selectionAsync().catch(() => {});
     if (nav.canGoBack()) nav.goBack();

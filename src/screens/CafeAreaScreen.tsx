@@ -209,7 +209,7 @@ export function CafeAreaScreen() {
           <Section Icon={MapPin} tint="#ef4444" title="จุดร้าน" subtitle="จุดศูนย์กลางที่ใช้วัดระยะกับลูกค้า">
             <View>
               <FieldLabel>ชื่อสาขา</FieldLabel>
-              <TextInput value={draft.name} onChangeText={(t) => patch({ name: t })} placeholder="เช่น Meta Cafe สาขาราษฎร์บูรณะ" placeholderTextColor="#a3a3a3" style={INPUT} />
+              <TextInput value={draft.name} onChangeText={(t) => patch({ name: t })} placeholder="เช่น METAHERB Café สาขาราษฎร์บูรณะ" placeholderTextColor="#a3a3a3" style={INPUT} />
             </View>
             {/* The map is the source of truth for the coordinates, and dropping
                 the pin fills the four administrative fields below it. */}

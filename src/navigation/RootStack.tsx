@@ -207,14 +207,19 @@ export type RootStackParamList = {
   AddBankAccount: { selectForPayment?: boolean } | undefined;
   ComplaintStatus: { complaintId: string };
   CafeQueue: undefined;
-  // Meta Cafe back office (ตาราง 17) — the central café admin console.
+  // METAHERB Café back office (ตาราง 17) — the central café admin console.
   CafeAdmin: undefined;
   CafeMenuManage: undefined;
   CafeMenuEdit: { itemId?: string } | undefined;
   /** Opened from a member's page to spend their card: the member is attached
    *  and the redeem armed as soon as the first item lands on the bill. */
   CafePos: { memberId?: string; redeem?: boolean } | undefined;
-  CafePosItem: { itemId: string };
+  CafePosItem: {
+    itemId: string;
+    /** Editing a line already on the bill: its key, and what it holds now. */
+    editKey?: string;
+    initial?: { picked: Record<string, string>; note: string; qty: number };
+  };
   CafePaySettings: undefined;
   CafeHours: undefined;
   CafeBanners: undefined;
@@ -345,7 +350,9 @@ export type RootStackParamList = {
   CafeItemDetail: { item: CafeItem; editKey?: string; initial?: { sweet: number; milk: number; shot: number; note: string; qty: number } };
   CafeCart: undefined;
   CafeCheckout: undefined;
-  CafePaymentMethod: undefined;
+  /** The till opens the customer's own picker: `pos` swaps the list for the
+   *  shop's enabled channels and writes the answer to the POS store. */
+  CafePaymentMethod: { pos?: boolean } | undefined;
   CafeSuccess: { orderId?: string } | undefined;
   CafeOrderDetail: { orderId: string };
   CafeHistory: undefined;
@@ -355,7 +362,7 @@ export type RootStackParamList = {
   BrandInfo: undefined;
   Cart: undefined;
   Payment: undefined;
-  PromptPayQR: { total: number; orderId: string; orderIds?: string[]; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[]; cafeRedeem?: { redeemDiscount: number; redeemPoints: number } };
+  PromptPayQR: { total: number; orderId: string; orderIds?: string[]; cafe?: boolean; receiveLabel?: string; cafeItems?: CafeOrderItem[]; /** เวลาทำทั้งบิล (นาที) — carried through so the QR screen can place the order with the same pickup estimate the checkout showed. */ cafePrep?: number; cafeRedeem?: { redeemDiscount: number; redeemPoints: number } };
   PaymentSuccess: { orderId: string; total: number; methodLabel: string; methodDesc?: string };
   PaymentMethod: undefined;
   ShippingMethod: undefined;

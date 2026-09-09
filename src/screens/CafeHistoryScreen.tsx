@@ -1,5 +1,5 @@
 /**
- * META Caffe — order history.
+ * METAHERB Café — order history.
  * Top section: orders in progress (tap → live detail). Bottom section: past
  * (picked-up) orders, each with service + taste star ratings. Reads from
  * CafeCartContext (activeOrders / orderHistory).
@@ -48,7 +48,7 @@ export function CafeHistoryScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title="ประวัติคำสั่งซื้อ" subtitle="META Caffe" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <SubPageHeader title="ประวัติคำสั่งซื้อ" subtitle="METAHERB Café" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
 
       {empty ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 14 }}>
@@ -56,7 +56,7 @@ export function CafeHistoryScreen() {
             <ShoppingBag size={36} color={BRAND_GREEN} strokeWidth={1.8} />
           </View>
           <Text style={{ fontSize: 16, fontWeight: "800", color: TEXT_PRIMARY }}>ยังไม่มีคำสั่งซื้อ</Text>
-          <Text style={{ fontSize: 13, color: TEXT_SECONDARY, textAlign: "center", lineHeight: 19 }}>เมื่อสั่งเมนูจาก META Caffe รายการจะมาแสดงที่นี่ครับ</Text>
+          <Text style={{ fontSize: 13, color: TEXT_SECONDARY, textAlign: "center", lineHeight: 19 }}>เมื่อสั่งเมนูจาก METAHERB Café รายการจะมาแสดงที่นี่ครับ</Text>
         </View>
       ) : (
         <View style={{ flex: 1 }}>

@@ -1,6 +1,6 @@
 /**
- * META Caffe — checkout / payment page.
- * Order summary (lines + total) + pickup vs delivery + payment method radios,
+ * METAHERB Café — checkout / payment page.
+ * Order summary (lines + total) + stamp card + payment method,
  * with a floating glass "ยืนยันชำระเงิน" bar. Payment is a mockup (confirms,
  * clears the cart, returns to the café).
  */
@@ -11,24 +11,28 @@ import { LinearGradient } from "expo-linear-gradient";
 import { GlassView } from "expo-glass-effect";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CreditCard, Gift, Store, Bike } from "lucide-react-native";
+import { CreditCard, Gift } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
-import { ChoiceRow, OfferRow, SummaryRow } from "../components/CheckoutRows";
+import { OfferRow, SummaryRow } from "../components/CheckoutRows";
+import { MemberCard } from "./CafeMembersScreen";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { useCafeCart } from "../context/CafeCartContext";
 import { cafePayMethod, buildCafeOrder } from "../data/cafePayment";
+import { orderPrepMinutes } from "../data/cafeAdminMenu";
 import { useStore } from "../store/db";
 import { sessionStore } from "../store/session";
-import { cafeMemberStore, cafePointRule, memberByPhone, usablePoints } from "../store/cafeMembers";
+import { cafeMemberStore, cafePointRule, memberForUser, usablePoints } from "../store/cafeMembers";
 import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
 
-const RECEIVE = [
-  { id: "pickup", label: "รับที่ร้าน", desc: "รับเองที่เคาน์เตอร์", Icon: Store, fee: 0 },
-  { id: "delivery", label: "จัดส่ง", desc: "ส่งถึงที่ · ค่าส่ง ฿20", Icon: Bike, fee: 20 },
-];
+/**
+ * The café takes orders only from inside the shop's radius, so every order is
+ * collected at the counter — there is nothing to choose. It is still stated on
+ * the bill, because the customer has to know where the cup is waiting.
+ */
+const RECEIVE_LABEL = "รับที่ร้าน";
 
 export function CafeCheckoutScreen() {
   const nav = useNavigation<Nav>();
@@ -38,7 +42,6 @@ export function CafeCheckoutScreen() {
   const method = cafePayMethod(payMethod);
   const openPaymentSheet = () => nav.navigate("CafePaymentMethod");
 
-  const [receive, setReceive] = useState(0);
   const placing = useRef(false); // guards against a double-tap placing two orders
 
   // The stamp card, read the same way the card screen reads it: by the phone on
@@ -47,8 +50,7 @@ export function CafeCheckoutScreen() {
   // to pay in the app and then walk in to claim the cup separately.
   const memberState = useStore(cafeMemberStore);
   const pointRule = cafePointRule(memberState);
-  const phone = useStore(sessionStore).user?.phone ?? "";
-  const member = phone ? memberByPhone(phone, memberState) : undefined;
+  const member = memberForUser(useStore(sessionStore).user, memberState);
   const memberPoints = member ? usablePoints(member, pointRule) : 0;
   const canUsePoints = member != null && pointRule.enabled && memberPoints >= pointRule.redeemAt;
   const [redeeming, setRedeeming] = useState(false);
@@ -59,33 +61,34 @@ export function CafeCheckoutScreen() {
   );
   const discount = redeeming && canUsePoints && redeemValue > 0 ? redeemValue : 0;
 
-  const shipping = RECEIVE[receive].fee;
-  const grand = Math.max(0, totalPrice + shipping - discount);
+  const grand = Math.max(0, totalPrice - discount);
 
   const pay = () => {
     const orderId = `CAFE${Date.now().toString().slice(-8)}`;
-    const receiveLabel = RECEIVE[receive].label;
     // Snapshot the lines now — the cart is cleared before the success screen shows.
     const items = lines.map((l) => ({ name: l.name, qty: l.qty, summary: l.summary, total: l.unitPrice * l.qty }));
+    // What the bar has to make, from the menu's เวลาทำต่อแก้ว — the pickup time
+    // the customer is about to be told is computed from this.
+    const prepMinutes = orderPrepMinutes(lines);
     // PromptPay confirms payment on the QR screen (which then places the order);
     // cash is settled at the counter, so place it straight away.
     // The redemption rides with the bill, exactly as the POS records it: the
     // lines stay at full price and the card's contribution is its own figure.
     const redeem = discount > 0 ? { redeemDiscount: discount, redeemPoints: pointRule.redeemAt } : undefined;
     if (payMethod === "promptpay") {
-      nav.navigate("PromptPayQR", { total: grand, orderId, cafe: true, receiveLabel, cafeItems: items, cafeRedeem: redeem });
+      nav.navigate("PromptPayQR", { total: grand, orderId, cafe: true, receiveLabel: RECEIVE_LABEL, cafeItems: items, cafePrep: prepMinutes, cafeRedeem: redeem });
       return;
     }
     if (placing.current) return;
     placing.current = true;
-    placeOrder({ ...buildCafeOrder({ orderId, total: grand, payLabel: method.label, receiveLabel, items }), ...redeem });
+    placeOrder({ ...buildCafeOrder({ orderId, total: grand, payLabel: method.label, receiveLabel: RECEIVE_LABEL, items, prepMinutes }), ...redeem });
     nav.reset({ index: 2, routes: [{ name: "Main" }, { name: "Cafe" }, { name: "CafeSuccess", params: { orderId } }] });
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
-      <SubPageHeader title="ชำระเงิน" subtitle="META Caffe" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
+      <SubPageHeader title="ชำระเงิน" subtitle="METAHERB Café" onBack={() => nav.canGoBack() && nav.goBack()} showSearch={false} />
 
       <View style={{ flex: 1 }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: 130 }}>
@@ -107,33 +110,36 @@ export function CafeCheckoutScreen() {
           </View>
         </View>
 
-        {/* Receive method */}
-        <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
-          <Text style={{ fontSize: 15, fontWeight: "800", color: TEXT_PRIMARY, marginBottom: 6 }}>รับสินค้า</Text>
-          {RECEIVE.map((r, i) => (
-            <ChoiceRow key={r.id} Icon={r.Icon} label={r.label} desc={r.desc} active={receive === i} divider={i > 0} onPress={() => setReceive(i)} />
-          ))}
-        </View>
-
-        {/* สมาชิก & แต้ม — the same block the POS bill carries. Shown only to a
-            member: a stamp card is not something to advertise mid-checkout to
-            someone who has not joined, and joining still happens at the counter. */}
+        {/* สมาชิก & แต้ม — the same block the POS bill carries. A member sees
+            where this order leaves the card; someone who has not joined gets one
+            line offering it, because signing up is now a thing they can do
+            themselves and this order would otherwise earn nothing. */}
         {member ? (
           <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
               <Gift size={18} color={BRAND_GREEN} />
               <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>บัตรสะสมแต้ม</Text>
             </View>
-            <Text style={{ fontSize: 12.5, color: TEXT_MUTED }}>
-              มี {memberPoints} แต้ม · บิลนี้ได้อีก {pointRule.earnPerVisit} แต้ม
-            </Text>
+            {/* The same card the till shows, so the customer and the cashier
+                are looking at one thing: the ring lands where this order leaves
+                it, the grey pill is what it started from, the green one is what
+                the order adds. */}
+            <View style={{ marginTop: 6 }}>
+              <MemberCard
+                member={member}
+                points={memberPoints}
+                redeemAt={pointRule.redeemAt}
+                pending={discount > 0 || !pointRule.enabled ? 0 : pointRule.earnPerVisit}
+                freeCup={discount > 0}
+                filled
+                onPress={() => nav.navigate("CafeStampCard")}
+              />
+            </View>
             {canUsePoints && redeemValue > 0 ? (
               <OfferRow
-                Icon={Gift}
                 label="ใช้แต้มแลกฟรี 1 แก้ว"
                 desc={`ตัด ${pointRule.redeemAt} แต้ม · ลดให้ ${baht(redeemValue)}`}
                 active={redeeming}
-                divider
                 onPress={() => setRedeeming((v) => !v)}
               />
             ) : canUsePoints ? (
@@ -142,7 +148,22 @@ export function CafeCheckoutScreen() {
               </Text>
             ) : null}
           </View>
-        ) : null}
+        ) : (
+          <Pressable
+            onPress={() => nav.navigate("CafeStampCard")}
+            className="bg-white flex-row items-center active:opacity-90"
+            style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8, gap: 10 }}
+          >
+            <Gift size={18} color={BRAND_GREEN} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY, lineHeight: 20 }}>สมัครสมาชิกสะสมแต้ม</Text>
+              <Text style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>
+                ซื้อครบ {pointRule.redeemAt} ครั้ง แลกเครื่องดื่มฟรี 1 แก้ว
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, color: BRAND_GREEN_DARK }}>สมัคร</Text>
+          </Pressable>
+        )}
 
         {/* Payment method — selected card + "เปลี่ยน" → shared PaymentMethod sheet (matches product) */}
         <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8 }}>
@@ -178,7 +199,7 @@ export function CafeCheckoutScreen() {
         {/* Totals */}
         <View className="bg-white" style={{ paddingHorizontal: 16, paddingVertical: 16, marginTop: 8, gap: 8 }}>
           <SummaryRow label={`ยอดสินค้า (${totalQty} รายการ)`} value={baht(totalPrice)} />
-          <SummaryRow label="ค่าจัดส่ง" value={shipping ? baht(shipping) : "ฟรี"} />
+          <SummaryRow label="รับสินค้า" value={RECEIVE_LABEL} />
           {discount > 0 ? (
             <SummaryRow label={`แลกฟรี 1 แก้ว · ใช้ ${pointRule.redeemAt} แต้ม`} value={`−${baht(discount)}`} tint={BRAND_GREEN} />
           ) : null}

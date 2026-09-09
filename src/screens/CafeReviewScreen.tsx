@@ -1,5 +1,5 @@
 /**
- * META Caffe — write-a-review sheet (slide-up modal).
+ * METAHERB Café — write-a-review sheet (slide-up modal).
  * Rate service + taste with stars, add an optional comment, then "ส่งรีวิว".
  * Saves onto the history order via CafeCartContext.rateOrder.
  */

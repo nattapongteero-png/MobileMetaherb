@@ -1,5 +1,5 @@
 /**
- * META Caffe (GREEN BREW COFFEE) — in-app café landing page.
+ * METAHERB Café (GREEN BREW COFFEE) — in-app café landing page.
  * One long scroll: green premium hero + every category shown as its own section
  * (main category → sub category), built from the real menu photos in
  * assets/menu caffe/. Search filters across all items; a floating cart bar +
@@ -11,16 +11,20 @@ import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Plus, Minus, Flame, ShoppingBag, Receipt, Search, X, Clock, ListOrdered, Check, Star } from "lucide-react-native";
+import { Plus, Minus, Flame, ShoppingBag, Receipt, Search, X, Clock, ListOrdered, Check, Star, ChevronRight, Gift, Stamp } from "lucide-react-native";
 import { SubPageHeader } from "../components/SubPageHeader";
 import { GlassIconButton } from "../components/GlassIconButton";
+import { CountAction } from "../components/GlassActionBar";
 import { GlassView } from "expo-glass-effect";
 import type { RootStackParamList } from "../navigation/RootStack";
 import { CAFE_SUBS, CAFE_MENU, type CafeItem, type CafeSub } from "../data/cafeMenu";
 import { useCafeCart } from "../context/CafeCartContext";
 import type { CafeOrder } from "../data/cafePayment";
 import { CountdownRing } from "../components/CountdownRing";
-import { BRAND_GREEN, TEXT_PRIMARY, TEXT_MUTED, GLASS_BAR_TINT } from "../theme/tokens";
+import { BRAND_GREEN, BRAND_GREEN_DARK, TEXT_PRIMARY, TEXT_MUTED, GLASS_BAR_TINT, cardShadow } from "../theme/tokens";
+import { useStore } from "../store/db";
+import { sessionStore } from "../store/session";
+import { cafeMemberStore, cafePointRule, memberForUser, usablePoints } from "../store/cafeMembers";
 import { appWidth, gridColumns, gridCardWidth, isTablet } from "../theme/layout";
 
 const CAFE_IMG = require("../../assets/caffe.png");
@@ -35,6 +39,57 @@ const HERO_PROMOS = [
   { title: "กาแฟคั่วพิถีพิถัน", desc: "หอมกรุ่น กลมกล่อมเข้มนุ่ม" },
   { title: "ขนมอบชั้นเลิศ", desc: "ประณีตหวานละมุน สดใหม่ทุกวัน" },
 ];
+/**
+ * แถบสมาชิก — where the customer stands with the stamp card, on the page where
+ * they are about to spend money.
+ *
+ * The card lived two taps away in บัญชี, so someone ordering here could not tell
+ * whether they were a member at all, and someone who was not had nothing telling
+ * them they could join. One row answers both, and it is the only place the
+ * status is shown before checkout.
+ */
+function MemberStrip({ onPress }: { onPress: () => void }) {
+  const state = useStore(cafeMemberStore);
+  const rule = cafePointRule(state);
+  const member = memberForUser(useStore(sessionStore).user, state);
+  const points = member ? usablePoints(member, rule) : 0;
+  const full = points >= rule.redeemAt;
+  if (!rule.enabled) return null;
+
+  return (
+    <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
+      <Pressable
+        onPress={onPress}
+        className="flex-row items-center active:opacity-90"
+        style={{ backgroundColor: "#fff", borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, gap: 10, ...cardShadow(1) }}
+      >
+        <View style={{ width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(49,151,84,0.1)", alignItems: "center", justifyContent: "center" }}>
+          {member ? <Gift size={17} color={BRAND_GREEN} strokeWidth={2.3} /> : <Stamp size={17} color={BRAND_GREEN} strokeWidth={2.3} />}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "700", color: TEXT_PRIMARY }}>
+            {member ? (full ? "แลกฟรีได้ 1 แก้ว" : `บัตรสะสมแต้ม ${points}/${rule.redeemAt}`) : "สมัครสมาชิกสะสมแต้ม"}
+          </Text>
+          <Text numberOfLines={1} style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 2 }}>
+            {member
+              ? full
+                ? "ใช้สิทธิ์ได้ที่หน้าชำระเงิน"
+                : `อีก ${rule.redeemAt - points} ครั้ง แลกเครื่องดื่มฟรี 1 แก้ว`
+              : `สมัครฟรีด้วยเบอร์โทร · ซื้อครบ ${rule.redeemAt} ครั้ง ได้ฟรี 1 แก้ว`}
+          </Text>
+        </View>
+        {member ? (
+          <ChevronRight size={18} color="#c4c4c4" strokeWidth={2.4} />
+        ) : (
+          <View style={{ backgroundColor: BRAND_GREEN_DARK, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 }}>
+            <Text style={{ fontSize: 11.5, fontWeight: "800", color: "#fff" }}>สมัคร</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const baht = (n: number) => "฿" + n.toLocaleString();
 const fmtTime = (d: Date) =>
@@ -273,7 +328,7 @@ export function CafeScreen() {
     <View style={{ flex: 1, backgroundColor: "#fafafa" }}>
       <StatusBar style="dark" />
       <SubPageHeader
-        title="META Caffe"
+        title="METAHERB Café"
         subtitle="GREEN BREW COFFEE"
         onBack={() => nav.canGoBack() && nav.goBack()}
         showSearch={false}
@@ -311,6 +366,8 @@ export function CafeScreen() {
         ) : (
           <HeroBanner />
         )}
+
+        <MemberStrip onPress={() => nav.navigate("CafeStampCard")} />
 
         {/* Search bar — below the hero banner */}
         <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
@@ -376,15 +433,7 @@ export function CafeScreen() {
         <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingBottom: 18 }}>
           <View style={{ borderRadius: 34, shadowColor: "#0a3d22", shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 14 }}>
             <GlassView glassEffectStyle="regular" colorScheme="light" tintColor={GLASS_BAR_TINT} style={{ height: 68, borderRadius: 34, overflow: "hidden", flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
-              <Pressable onPress={openCart} className="active:opacity-80" style={{ flex: 1, height: 50, borderRadius: 999, overflow: "hidden" }}>
-                <LinearGradient colors={["#0b3d2e", "#1a7a4c"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 10 }}>
-                  <View style={{ minWidth: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
-                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>{totalQty}</Text>
-                  </View>
-                  <Text style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 15 }}>ดูตะกร้า</Text>
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{baht(totalPrice)}</Text>
-                </LinearGradient>
-              </Pressable>
+              <CountAction count={totalQty} label="ดูตะกร้า" amount={baht(totalPrice)} onPress={openCart} />
             </GlassView>
           </View>
         </View>

@@ -20,6 +20,9 @@ export type PosLine = {
   opts: PosChoice[];
   /** โน้ตถึงร้าน — free text the barista reads off the ticket. */
   note?: string;
+  /** Set when the cashier opened an existing line to change it: the bill
+   *  replaces that line rather than adding a second one. */
+  editKey?: string;
 };
 
 export const posDraftStore = createStore<PosLine | null>(null);

@@ -1,4 +1,4 @@
-// Local "order ready" notification for META Caffe. Scheduled when an order is
+// Local "order ready" notification for METAHERB Café. Scheduled when an order is
 // placed (fires at readyAt even if the app is closed) and cancelled if the
 // customer picks it up early. Complements the Live Activity countdown — this is
 // the actual push the success screen promises ("จะแจ้งเตือนเมื่อออเดอร์พร้อม").
